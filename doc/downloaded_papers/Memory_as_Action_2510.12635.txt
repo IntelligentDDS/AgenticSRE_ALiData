@@ -1,0 +1,953 @@
+                                             Memory as Action: Autonomous Context Curation for Long-Horizon
+                                                                     Agentic Tasks
+                                             Yuxiang Zhang1 , Jiangming Shu1 , Ye Ma2 , Xueyuan Lin2 , Shangxi Wu3 , Jitao Sang1 *
+                                                   1
+                                                     School of Computer Science and Technology, Beijing Jiaotong University
+                                                                               2
+                                                                                 Hithink Research
+                                                                           3
+                                                                             Huawei Noah’s Ark Lab
+
+                                                          {yuxiangzhang, jiangmingshu, jtsang}@bjtu.edu.cn
+                                                 maye@myhexin.com, linxy59@mail2.sysu.edu.cn, wushangxi1@huawei.com
+
+                                                                 Abstract                                 Conventional Paradigm
+                                                                                                                                Policy Model
+                                              Long-context Large Language Models, despite                                     𝑎! ∼ 𝜋" ⋅ s!#$            Controller
+
+
+
+
+arXiv:2510.12635v2 [cs.AI] 10 Jan 2026
+                                              their expanded capacity, require careful work-                      𝑎! ∈ 𝒜task                             Memory
+                                                                                                                                                         Trigger
+                                              ing memory management to mitigate attention                  Environment
+                                              dilution during long-horizon tasks. Yet exist-                                                             Memory
+                                                                                                                   𝑎! , 𝑜!                               Operator
+                                              ing approaches rely on external mechanisms                                      Working Memory
+                                              that lack awareness of the agent’s reasoning                                   s! = s!#$ ⊕ 𝑎! , 𝑜!
+                                              state, leading to suboptimal decisions. We pro-
+                                                                                                          Memory as Action: Unified Policy
+                                              pose Memory-as-Action (MemAct), a frame-
+                                                                                                                                Policy Model
+                                              work that treats working memory management                                      𝑎! ∼ 𝜋" ⋅ s!#$            𝑎! ∈ 𝒜mem
+                                              as learnable policy actions. By formulating                         𝑎! ∈ 𝒜task
+                                              context management as in-place editing oper-                                                            Executor
+                                                                                                           Environment                       s!#$ , 𝑜! ← ℳ 𝑎! , s!#$
+                                              ations (deletion, insertion), MemAct enables
+                                              joint optimization of information retention and                      𝑎! , 𝑜!
+                                                                                                                              Working Memory
+                                              task performance through end-to-end reinforce-                                 s! = s!#$ ⊕ 𝑎! , 𝑜!
+                                              ment learning. To address the computational
+                                              challenges of dynamic context updates, we              Figure 1: Comparison of context management
+                                              introduce Dynamic Context Policy Optimiza-             paradigms. Top: Conventional approaches decouple
+                                              tion, which restores training efficiency with-         memory management from the policy, where an external
+                                              out compromising reasoning integrity. Exper-           controller with heuristic triggers and operators governs
+                                              iments show that MemAct-RL-14B matches                 context independently. Bottom: MemAct unifies task
+                                              the accuracy of models 16× larger while re-            actions Atask and memory actions Amem within a single
+                                              ducing average context length by 51%, with             policy πθ , enabling end-to-end optimization.
+                                              learned strategies that adapt to model capa-
+                                              bilities and generalize across task complexi-
+                                              ties. The code and datasets are available at           2024). The critical bottleneck thus shifts from
+                                              https://github.com/ADaM-BJTU/MemAct.
+                                                                                                     merely expanding memory capacity to actively cu-
+                                         1    Introduction                                           rating its contents. We term this challenge Context
+                                                                                                     Curation: the process of strategically selecting, in-
+                                         For agentic tasks demanding long-horizon reason-            tegrating, and pruning information to maintain a
+                                         ing and complex tool use, such as deep research             focused and goal-relevant reasoning trace.
+                                         and software engineering agents (Wei et al., 2025;             Recent advances in long-context methods have
+                                         Jimenez et al., 2024), the effectiveness of a Large         successfully expanded the capacity of an agent’s
+                                         Language Model (LLM) is fundamentally con-                  working memory (Peng et al., 2024; DeepSeek-AI,
+                                         strained by what information resides in its context.        2025). However, simply increasing the context
+                                         The agent’s working memory is realized as the               window does not guarantee improved reasoning
+                                         input context, a sequence of tokens encoding the            performance. The effectiveness of long-context
+                                         interaction history available at each decision step.        models is fundamentally determined by Context
+                                         However, left unmanaged, this context inevitably            Engineering (Mei et al., 2025), which refers to the
+                                         saturates with irrelevant information, triggering at-       deliberate curation and structuring of information
+                                         tention dilution that buries critical signals and re-       to ensure the most relevant evidence is accessible
+                                         sults in “lost-in-the-middle” behavior (Liu et al.,         at the right time. The dominant approach to context
+                                             * Corresponding author.                                 engineering today relies on a workflow of heuristic
+
+                                                                                                 1
+rules (Packer et al., 2023; Xu et al., 2025; Zhou             quences and the Prune&Write operator, enabling
+et al., 2025). These designs decouple memory man-             precise, fine-grained working memory editing;
+agement from the agent’s core reasoning policy,               (2) DCPO, a trajectory segmentation algorithm
+preventing the end-to-end optimization of informa-            that reconciles dynamic context updates with ef-
+tion retention against task performance.                      ficient RL training on standard RL infrastructure.
+   We bridge this divide by reconceptualizing con-          • Empirical Validation: We demonstrate that
+text management as an intrinsic, learnable primitive          learned memory strategies exhibit efficiency,
+rather than a policy-agnostic mechanism. This shift           adaptivity, and generalizability: MemAct-RL-
+is non-trivial, as it requires agents to navigate the         14B matches Qwen3-235B accuracy using 49%
+inherent trade-offs between task performance and              of the average context length, distinct strategies
+context efficiency through joint optimization. We             emerge tailored to different backbone models,
+propose Memory-as-Action (MemAct), a frame-                   and learned policies transfer across task com-
+work that treats context curation as a set of learn-          plexity and domains. These findings establish au-
+able actions within a unified policy space. Rather            tonomous context management as a formidable,
+than passively accumulating an ever-growing pre-              scalable, and model-intrinsic capability.
+fix, the agent learns to decide when to retain, com-
+press, or discard segments of history, or synthesize        2   Related Work
+content to maintain context coherence. These trans-         Effective long-horizon reasoning demands active
+formations are applied through explicit function-           management of working memory, which serves as
+call actions, enabling the agent to develop mem-            the evolving workspace that maintains task-relevant
+ory strategies that improve reasoning efficiency, as        context (Hu et al., 2025b,a). Existing approaches
+shown in Fig. 1 for a schematic overview.                   bifurcate into two paradigms. One line of work
+   To learn such memory-editing actions for dy-             treats context as a constrained resource, applying
+namic control, we adopt an end-to-end reinforce-            token-level compression (Jiang et al., 2024; Zhang
+ment learning approach. However, this flexibil-             et al., 2023), selective pruning (Li et al., 2023),
+ity introduces a critical training challenge. Causal        or periodic summarization (Lu et al., 2025; Wu
+LMs assume monotonic context growth, computing              et al., 2025) to fit information within fixed win-
+states over preceding sequences. When MemAct                dows. While computationally efficient, these meth-
+updates context, this assumption breaks: deleted            ods operate without awareness of the agent’s rea-
+content already influenced subsequent token rep-            soning state, risking the loss of semantically critical
+resentations, creating a train-inference mismatch           dependencies. An alternative paradigm delegates
+requiring physical trajectory restructuring.                memory operations to external controllers (Packer
+   For the sake of reconciling dynamic memory               et al., 2023; Xu et al., 2025; Chhikara et al., 2025),
+with large-scale training efficiency, we also propose       which manage structured formation, evolution, and
+Dynamic Context Policy Optimization (DCPO).                 retrieval. However, this decoupled architecture pre-
+DCPO restores training feasibility by logically seg-        vents joint optimization of information retention
+menting fractured trajectories, enabling the policy         and downstream task performance. Recent efforts
+to be optimized end-to-end within standard, highly          explore RL to internalize memory as a learnable
+optimized infrastructure without bespoke modifica-          capability (Yan et al., 2025; Yu et al., 2025; Zhou
+tions. In summary, our core contributions are:              et al., 2025). Yet these approaches typically impose
+                                                            rigid constraints: mandatory per-step compression
+• Paradigm: We propose the Memory-as-Action
+                                                            or coarse-grained retrieval that treats context as a
+  paradigm, which shifts working memory manage-
+                                                            monolithic buffer. In contrast, MemAct formulates
+  ment from external mechanisms or fixed routines
+                                                            working memory management as fine-grained, ad-
+  to an intrinsic, learnable policy capability. By
+                                                            dressable editing actions within a unified policy,
+  integrating memory editing as actions within a
+                                                            enabling the agent to perform selective, surgical
+  unified policy space, MemAct enables agents to
+                                                            action aligned with its evolving reasoning needs.
+  autonomously balance context curation and task
+  execution through end-to-end optimization.                3   Method
+• Method: We contribute two technical compo-
+  nents: (1) a Markov Decision Process (MDP) for-           This section presents the MemAct framework in
+  mulation with ID-based addressable decision se-           three parts: an operational overview of autonomous
+
+                                                        2
+        Time t (Original Context)
+                                                                      …                       Agent Policy
+          Query            (a! , o! )    (a" , o" )   (a# , o# )             (a$ , o$ )      𝑎!"# ∼ 𝜋$ ⋅ s!
+                                                             Action:
+                                                         Prune record of steps 1 & 3
+                                                                                          𝑎#$% ∈ 𝐴&'&
+                                                                           Action:
+        Time 𝐭 + 𝟏 (Edited Context)                                          Append memory content
+
+          Query             (a" , o" )    …      (a$ , o$ )    a!"! ’memory’: Summarized Context’ , o!"! (ACK)
+
+
+Figure 2: Workflow of MemAct: Autonomous Context Management. At timestep t, the policy generates a
+Prune&Write action that specifies (1) which historical turns to remove (indices 1 and 3), and (2) a synthesized
+memory note containing summaries or key facts. The action itself is retained in-place as persistent memory,
+transforming the original context into a compact state st+1 for subsequent reasoning.
+
+
+context management (§3.1), MDP formalization of                    3.2    MDP Formulation
+the problem (§3.2), and Dynamic Context Policy                     We model the agent’s interaction as a Markov De-
+Optimization (DCPO), our training algorithm for                    cision Process, formalizing working memory as a
+non-sequential context updates (§3.3).                             sequence of uniquely addressable interaction turns.
+                                                                   • State: The state st is the current working mem-
+3.1   Overview                                                       ory Ht , represented as a sequence of interac-
+                                                                     tion records Ht = [z1 , z2 , . . . , zk ]. Each record
+MemAct internalizes context management by in-                        zi = (ai , oi , idi ) comprises an action, its obser-
+tegrating it directly into the policy’s action space.                vation, and a unique identifier idi that ensures
+Unlike external memory systems that operate via                      precise addressing regardless of context shifts.
+fixed heuristics, MemAct enables the policy to au-                 • Action Space: A = Atask ∪ Amem .
+tonomously learn when and how to curate its work-                    – Atask : Standard environment interactions (e.g.,
+ing memory using the Prune&Write operator, a                            search, web browser).
+unified primitive for in-place context editing.                      – Amem : The context management operator.
+  As illustrated in Fig. 2, rather than passively                       A memory action takes the form amem =
+accumulating all interaction history, the agent inter-                  (Itarget , c), where Itarget is the set of IDs to re-
+sperses memory actions to enact context updates.                        move and c represents the generated memory
+The workflow consists of three key steps:                               content. This content synthesizes summariza-
+                                                                        tion, reflection, and planning to ensure reason-
+1. Action Selection: Given the current state st ,                       ing continuity despite memory pruning.
+   the agent samples an action at ∼ πθ (a|st ) from
+                                                                   • Transition: The transition dynamics depend on
+   the augmented action space A = Atask ∪ Amem .
+                                                                     the action type:
+   This selection is implicit in the model’s genera-
+   tion, allowing it to dynamically switch between                   – Task Action: Ht+1 = Ht ⊕ (at , ot , idnew ).
+   reasoning and context management.                                 – Memory Action: Given at = (Itarget , content),
+2. Operation Parameterization: If a memory ac-                          the system executes an ID-based filtering oper-
+   tion is selected, the model instantiates the op-                     ation:
+   eration by generating its specific parameters: a                              Ht+1 = {zi ∈ Ht | idi ∈       / Itarget }
+                                                                                                                           (1)
+   set of indices IDs to prune and a text field of                                         ⊕ (at , ostatus , idmem )
+   memory content to summarize or reflect.
+                                                                       The record of the memory action is appended
+3. Execution: The system executes the pruning
+                                                                       in-place, ensuring the curated summary re-
+   based on the target IDs. Crucially, the amem
+                                                                       mains addressable.
+   action record (containing the new memory con-
+                                                                   • Objective: Learn a policy πθ (a|Ht ) that maxi-
+   tent) is appended in-place, making the memory
+                                                                     mizes the expected cumulative reward.
+   contents mutable for future update.
+  This process recursively transforms working                      3.3    Dynamic Context Policy Optimization
+memory into a curated state, continuously keep-                    Optimizing MemAct is primarily hindered by a
+ing critical information within a bounded context.                 structural misalignment between generated tokens
+
+                                                              3
+and their corresponding generative contexts. While           dency holds locally. During training, we generate
+conventional policy gradient objectives presuppose           Ntraj full trajectories for each prompt and sample
+a strictly monotonic, incremental history to max-            a subset of segments Σ(τ ) ⊆ {σi } for optimiza-
+imize computational efficiency, the Prune&Write              tion using a trajectory-based round-robin strategy
+operator introduces non-continuous trajectories              to ensure balanced coverage.
+where Ht+1 ̸⊇ Ht (see Fig. 2). This departure from
+                                                             3.3.2 Reward Design
+standard auto-regressive assumptions causes naive
+backpropagation to compute gradients against his-            Each full trajectory τ is assigned a sparse, terminal
+torically mismatched states, inevitably resulting            reward R(τ ) contingent on its final outcome:
+in severely biased credit assignment. To resolve
+                                                                         
+                                                                         rtask if the task succeeds,
+                                                                         
+this, DCPO restructures these non-continuous tra-
+                                                               R(τ ) = rpen if a constraint is violated, (3)
+jectories into a series of logically consistent, inde-                   
+                                                                           0      otherwise.
+                                                                         
+pendent segments, thereby restoring the intrinsic
+causal structure required for stable optimization.           Here, rtask > 0 denotes the incentive for successful
+                                                             completion, while rpen < 0 penalizes constraint
+Why Not Simple Attention Masking? While
+                                                             violations (e.g., exceeding the maximum context
+attention masking offers a seemingly straightfor-
+                                                             length). This sparse signal encourages the policy
+ward approach to managing memory deletions, it
+                                                             to jointly optimize for both functional correctness
+is fundamentally incompatible with the causal na-
+                                                             and resource efficiency.
+ture of LLMs. In the architecture of causal lan-
+guage models, the latent representation of each              3.3.3 Reward Attribution and Optimization
+token encapsulates information from its entire an-           Since the final outcome R(τ ) depends on the col-
+tecedent sequence. Thus, the influence of a seman-           lective sequence of memory edits and generations,
+tically “deleted” token is already encoded into the          we adopt a global credit assignment strategy where
+key-value states of all subsequent tokens generated          each sampled segment σ ∈ Σ(τ ) inherits the
+prior to the deletion. This creates an irreconcil-           trajectory-level advantage A(τ ). This advantage is
+able mismatch: the model’s internal states remain            computed using the group-relative normalization
+conditioned on information that is semantically              scheme:
+absent but physically persistent in the historical                                R(τ ) − mean(Ru )
+KV cache. To truly learn from the post-edit his-                         A(τ ) =                             (4)
+                                                                                     std(Ru ) + ϵ
+tory, the trajectory must be physically reconstructed
+to sever these causal dependencies. Furthermore,             where Ru is the set of rewards for all Ntraj trajecto-
+production-grade inference engines are architec-             ries sampled for prompt u. The policy is optimized
+turally tailored for monotonic context expansion,            by minimizing the following objective:
+making non-linear cache modifications or frequent
+                                                                                                        
+                                                                                        1       X
+recomputations computationally prohibitive.                         L(θ) = − Eu∼D                    Lτ  , (5)
+                                                                                      |G(u)|
+                                                                                              τ ∈G(u)
+3.3.1   Trajectory Segmentation                                                X
+To resolve context misalignment while preserv-                       Lτ =             Jclip (y | C, A(τ ))      (6)
+ing training scalability, DCPO logically partitions                         (C,y)∈Σ(τ )
+
+the trajectory at each memory edit point. Let                where Σ(τ ) denotes the set of logically consistent
+tmem
+ 1   , . . . , tmem
+                K denote the timesteps of memory ac-         segments reconstructed from trajectory τ , and Jclip
+tions, with tmem0   = 0 and tmem
+                             K+1 = T . The trajectory        denotes the clipped surrogate objective following
+is re-organized into K + 1 independent segments              the GRPO (Shao et al., 2024). This formulation
+{σi }K
+     i=0 . For clarity, we represent each segment as         ensures that gradients are computed against the cor-
+a tuple:                                                     rectly reconstructed context mapped to each train-
+                     σi = (Ci , yi )              (2)        ing segment while remaining concise.
+where Ci = Htmemi
+                  is the fixed context prefix at the         4     Experiments & Results
+start of the segment, and yi = ytmem
+                                  i  +1:tmem
+                                          i+1
+                                              is the
+subsequent token sequence. The crucial insight is            4.1    Datasets
+that within any segment σi , the context prefix Ci           We evaluate MemAct using synthetic data and pub-
+remains fixed, ensuring that the sequential depen-           lic benchmarks to assess its reasoning efficiency.
+
+                                                         4
+Our analysis focuses on two pivotal dimensions:             Asearcher (Gao et al., 2025) and synthesized multi-
+maintaining accuracy under context pressure and             objective tasks. We deliberately limit the training
+generalizing from low-complexity training tasks to          tasks to at most three objectives. This setup al-
+unseen, high-complexity inference scenarios.                lows us to test the model’s generalization: by train-
+                                                            ing only on simpler cases, we can verify that the
+4.1.1   Evaluation Benchmarks                               gains on harder tasks (4 to 8 objectives) come from
+Multi-objective Tasks To test the agent’s long-             a learned general working memory management
+range reasoning and memory management, we built             strategy rather than memorizing training patterns.
+a multi-objective QA dataset based on HotpotQA,
+following the construction method in (Zhou et al.,          4.2   Evaluation Metrics
+2025). In each task, the agent must answer several          We measure Task Accuracy using an LLM-based
+independent sub-questions to provide a single final         evaluator (OpenAI, 2025) with a three-pass consen-
+answer. We evaluate the model on test sets with up          sus protocol. If any of the three checks fails, the
+to 8 objectives, with 200 samples at each level.            answer is marked as incorrect. For single-objective
+                                                            benchmarks, this metric is the success rate; for
+Single-Objective Tasks To evaluate MemAct’s                 multi-objective tasks, it is the average success rate
+robustness across different reasoning lengths, we           across all sub-objectives. We also track the Solved
+selected a diverse range of benchmarks, from stan-          Sub-objective Count to evaluate reasoning depth.
+dard multi-hop queries to complex, long-horizon             To measure efficiency, we record the total number
+reasoning tasks. This set includes 2WikiMul-                of tokens used and the frequency of tool calls.
+tihopQA (Ho et al., 2020), Bamboogle (Press
+et al., 2023), HotpotQA (Yang et al., 2018), and            4.3   Baselines
+Musique (Trivedi et al., 2022), as well as the              We compare MemAct against three types of base-
+more challenging Frames (Krishna et al., 2025)              lines, ranging from models using full context to
+and BrowseComp-Plus (Chen et al., 2025).                    those with externally-managed or RL-based agents.
+4.1.2   Training Data Construction                          Unless otherwise specified, all baselines are imple-
+                                                            mented using their default configurations and the
+This section introduces the data composition in             same LLM as MemAct to ensure a fair comparison.
+the training process, and detailed statistics for SFT
+and RL can be found in Table 3 in the Appendix.             Full-Context Baseline We use Qwen3-235B-
+We also explain our data construction and how the           A22B-Instruct as a full-context baseline. With no
+training setup is used to test model generalization.        memory pruning, it represents the performance up-
+                                                            per bound for our evaluation.
+Synthetic Data for SFT Initialization. Prelim-
+inary experiments showed that even frontier mod-            Externally-managed Strategies These methods
+els, such as OpenAI o3 and DeepSeek-V3.1, strug-            manage memory using fixed rules or external sys-
+gle with managing working memory automatically.             tems, rather than the agent’s own policy:
+Common failures include ignoring the tool en-               • Sliding Window: This method naively keeps
+tirely, invoking it repetitively, or losing track of          only the most recent 8K tokens and discards older
+the flow after a memory update. To fix this, we               context once the limit is reached.
+use DeepSeek-V3.1 to synthesize training trajec-            • Summarization: This method adds a short sum-
+tories through a staged prompting method. When                mary of the discarded content, generated by the
+the context length is between 8K and 16K tokens,              model itself, to the Sliding Window approach.
+we insert a message suggesting the model check if           • A-MEM (Xu et al., 2025): A system that orga-
+a memory action is needed. Once the context ex-               nizes historical experiences into interconnected
+ceeds 16K tokens, we use strict messages to force             networks through dynamic linking and allows
+the operation. We only keep successful trajectories           memories to evolve as new information arrives.
+where the final answer is correct, and we remove
+                                                            Learning-based Agents We also compare
+the injected hints in the final SFT dataset to ensure
+                                                            MemAct against other agents that learn to man-
+the model learns to act independently.
+                                                            age context through training:
+RL Dataset and Complexity Scaling. The                      • MEM1 (Zhou et al., 2025): An RL-based base-
+RL phase combines single-objective tasks from                 line that also learns memory actions through
+
+                                                        5
+  training. It follows a fixed schedule where state                                                           Task Accuracy vs. Context Efficiency
+
+  compression is triggered at every step. We re-                                         60%    MemAct-RL-14B
+
+                                                                                                                 MemAct-RL-7B               Tongyi DeepResearch
+  trained it using our training data.                                                    55%
+                                                                                                                            Qwen3-235B
+• Tongyi-DeepResearch (Team et al., 2025): A
+
+
+
+
+                                                            Sub-Objective Accuracy
+                                                                                         50%                                                         Search-R1-14B
+                                                                                                    MemAct-SFT-14B
+  30B-parameter model specialized in autonomous
+                                                                                         45%
+  web research, optimized via reinforcement learn-                                                  MemAct-SFT-7B        Qwen2.5-14B                  235B (no tools)
+                                                                                                                                                        Search-R1-7B
+  ing to handle long-horizon tasks.                                                      40%          Mem1-14B
+                                                                                               A-MEM-14B
+• Search-R1 (Jin et al., 2025): This baseline is                                         35%
+                                                                                                                                                       30B (no tools)
+                                                                                                                                                       14B (no tools)
+  essentially MemAct without the memory action                                                                             MemAct (Ours)                MEM1
+                                                                                         30%
+  capability. It follows the same training pipeline                                            7B (no tools)
+                                                                                                                           Tongyi-DeepResearch          A-MEM
+                                                                                                                                                        Baseline Trend
+                                                                                                                           Search-R1
+  using GRPO on the same dataset, but cannot                                             25%
+                                                                                               Qwen2.5-7B
+                                                                                                                           Qwen3-235B
+
+  perform memory actions.                                                                      2000               4000           6000        8000            10000
+                                                                                                               Average Context Size per Turn (Tokens)
+
+4.3.1    Implementation Details
+                                                            Figure 3: Accuracy–Efficiency Trade-off. MemAct
+Model and Training. We use Qwen2.5-7B-                      variants (stars) occupy the Pareto frontier, achieving
+Instruct and Qwen2.5-14B-Instruct (Team et al.,             competitive accuracy with significantly reduced context
+2024) as base models. In the SFT stage, we train            size. Dashed lines show no-tool baselines at different
+the model for 6 epochs with a batch size of 256 and         model scales for reference.
+a learning rate of 5 × 10−5 , using cosine decay and
+10% warm-up. The model obtained after this stage                                                               Effective Reasoning Capacity ↑
+is denoted as MemAct-SFT. In the RL stage, we use                                        4.5
+                                                                                                     MemAct-RL-14B (Ours)          Qwen3-235B
+the DCPO algorithm with a batch size of 128 and a                                        4.0         MemAct-SFT-14B                MEM1-14B
+
+
+
+
+                                                            Avg. Solved Sub-Objectives
+                                                                                                     Tongyi-DeepResearch           A-MEM-14B
+constant learning rate of 1 × 10−6 . The final model                                     3.5         Search-R1-14B
+after reinforcement learning is denoted as MemAct-                                       3.0
+RL. Both stages are optimized by AdamW. All ex-                                          2.5
+periments are conducted on NVIDIA H100 GPUs.
+                                                                                         2.0
+Following the strategy in §3.3.1, we set Ntraj = 5
+                                                                                         1.5
+and Nseg = 12. Tasks are limited to a maximum of
+                                                                                         1.0
+40 steps, including memory actions.
+                                                                                         0.5
+
+Reward Configuration. The numerical specifi-                                                    1         2                  4                   6                 8
+                                                                                                                      Number of Objectives
+cations for the reward function R(τ ) are as follows.
+We assign rtask = +1.0 for successful task comple-          Figure 4: Reasoning Stability under Complexity. As
+tion and rpen = −0.1 for any violation of opera-            task complexity increases (number of sub-objectives),
+tional constraints, such as exceeding the 20K token         baselines suffer from performance saturation, while
+context limit or the 40-step execution threshold.           MemAct-RL maintains a more stable trajectory.
+All other outcomes result in a zero reward. Task
+success is determined by an LLM-based evaluator
+that assesses the semantic consistency between the          average input context length of only 3,500 tokens
+agent’s final answer and the ground truth.                  per step, which is nearly 50% shorter than Qwen3-
+                                                            235B and 60% shorter than Search-R1-14B.
+4.4     Main Results                                           This performance lead is accompanied by a
+As shown in Figure 3 and Table 1, MemAct                    significant reduction in total computational cost.
+variants (stars) consistently occupy the top-left           Table 1 shows that MemAct-RL-14B uses only
+Pareto frontier, which indicates they achieve               8.2 × 104 tokens on average. This total cost
+higher accuracy with much smaller context sizes             is about 51% lower than that of Qwen3-235B
+than all baselines. Specifically, MemAct-RL-                (16.7 × 104 ) and 57% lower than Search-R1-14B
+14B reaches the highest multi-objective accu-               (19.3 × 104 ). While some fixed-rule baselines like
+racy of 59.1%, outperforming the much larger                A-MEM (3.9 × 104 ) have lower costs, their accu-
+Qwen3-235B (53.1%) and the specialized Tongyi-              racy is much lower at 39.9%. These smaller context
+DeepResearch (56.0%). Notably, MemAct-RL-                   sizes also provide MemAct with a major advantage
+14B maintains this lead while operating with a lean         in inference latency, as analyzed below.
+
+                                                        6
+Table 1: Main results on Single-Objective and Multi-Objective benchmarks. Except for Qwen3-235B, all
+methods use Qwen2.5-14B-Instruct. Performance is reported as Task Accuracy, defined as the success rate of
+single objective tasks and the average success rate of sub-objectives for Multi-Objective tasks. “Cost” denotes
+average token consumption (×104 ). Bold and underlined values indicate the best and second-best performance.
+
+                            Single-Objective Tasks (Difficulty: Low → High)                Multi-Objective Tasks
+ Method
+                             2Wi. Hot. Bam. Fra.          Bro.       Avg.     2-obj. 4-obj. 6-obj. 8-obj. Avg. Cost(×104 )
+ Qwen3-235B                 0.603 0.690 0.505 0.430 0.268            0.500     0.580 0.531 0.523 0.489 0.531           16.7
+ Qwen2.5-14B                0.580 0.655 0.488 0.275 0.111            0.421     0.510 0.466 0.422 0.378 0.444            6.5
+ Sliding Window             0.535 0.560 0.472 0.215 0.085            0.373     0.517 0.513 0.474 0.475 0.495           3.8
+ Summarization              0.540 0.692 0.442 0.335 0.120            0.426     0.540 0.498 0.495 0.471 0.501           4.1
+ A-MEM                      0.528 0.591 0.453 0.250 0.094            0.383     0.430 0.385 0.364 0.339 0.399           3.9
+ Search-R1 (SFT + RL)       0.775 0.723 0.624 0.376 0.177            0.535     0.625   0.546   0.493   0.393   0.514   19.3
+ MEM1 (RL)                  0.565 0.660 0.470 0.285 0.141            0.424     0.494   0.435   0.357   0.293   0.435   5.0
+ MemAct (SFT)               0.764 0.705 0.616 0.359 0.160            0.521     0.652   0.547   0.520   0.493   0.485   9.4
+ MemAct (SFT+RL)            0.767 0.710 0.618 0.385 0.207            0.537     0.660   0.591   0.570   0.543   0.591   8.2
+   w/ Fixed Update†           -     -     -     -     -                -       0.672   0.581   0.557   0.516   0.582   7.0
+ †
+     Enforces a static memory schedule with a fixed update interval of 5 turns.
+
+
+Latency and Efficiency. We measured the la-                          sence of memory actions leads to excessive token
+tency across 2,000 trajectories using the SGLang                     growth and context noise. As shown in Table 2,
+inference engine (Zheng et al., 2024). Results show                  MemAct-RL-7B performs 28.9 total tool calls on
+that MemAct-RL-7B reduces total duration by 40%                      average, exceeding the 23.5 calls of Search-R1-
+compared to Search-R1, even though Search-R1                         7B. Despite this increased activity, MemAct main-
+performs fewer tool calls. This speedup comes                        tains higher accuracy by removing irrelevant his-
+from two main factors. First, by maintaining a                       tory through proactive memory actions.
+compact average context size, MemAct reduces
+                                                                     Comparison of Learning and Fixed Policies.
+pre-fill time and prevents the decoding speed from
+                                                                     Reinforcement learning is indispensable for op-
+slowing down. Since memory updates are sparse,
+                                                                     timizing memory decisions, as MemAct-RL im-
+the context history remains stable, which increases
+                                                                     proves multi-objective accuracy from 0.485 to
+the prefix cache hit rate. Second, MemAct elimi-
+                                                                     0.591 compared to its SFT version. The inher-
+nates the need for auxiliary inference passes. Un-
+                                                                     ent limitations of rigid schedules are further shown
+like methods such as A-MEM that re-process the
+                                                                     by the Fixed-Interval baseline, which executes
+entire context to generate summaries or evaluate
+                                                                     memory actions every five turns. Although this rule
+states, MemAct executes memory actions inline
+                                                                     reduces context size, it causes a performance drop
+within the reasoning flow. This approach avoids
+                                                                     compared to MemAct, especially in complex tasks.
+the high cost of separate maintenance steps and
+                                                                     As reported in Table 1, the accuracy of the fixed pol-
+saves significant time during long-range reasoning.
+                                                                     icy falls behind MemAct on 8-objective tasks. This
+4.5     Ablation Analysis                                            suggests that static schedules often delete critical
+                                                                     information, while MemAct learns to synchronize
+We conduct an ablation analysis to investigate how                   memory actions with the reasoning process.
+making memory management an active policy de-
+cision, rather than a passive or fixed process, con-                 4.6      Scalability and Generalization
+tributes to the overall performance of MemAct.                       We evaluate how MemAct performs when tasks be-
+                                                                     come more complex or move to new environments.
+Effect of Active Context Management. Active
+                                                                     Specifically, we focus on discovering better man-
+memory management is essential for maintaining
+                                                                     agement strategies without human intervention.
+reasoning quality beyond simple token savings.
+Search-R1 serves as an ablation of MemAct with-                      Scaling to Complex Tasks. We tested the mod-
+out memory management and retains all informa-                       els on tasks with an increasing number of sub-
+tion during reasoning. Although reinforcement                        objectives. As shown in Fig. 4, baselines reach a
+learning enhances reasoning in Search-R1, the ab-                    performance bottleneck when tasks exceed four ob-
+
+                                                                 7
+                       Number of Objectives                                                                 Granularity of Context Curation
+                                                                                                18
+ Model             2-obj.       4-obj.       8-obj.                                                                                           Method
+                                                                                                16                                                SFT
+
+
+
+
+                                                               Number of Records Being Pruned
+                Task Mem. Task Mem. Task Mem.
+                                                                                                14                                                RL
+ Ref Models
+ Qwen3-235B      5.3   0.0   9.6    0.0   18.2   0.0
+                                                                                                12
+ Tongyi-30B      5.4   0.0   14.2   0.0   33.2   0.0                                            10
+ 7B Models                                                                                       8
+ Search-R1  7.7        0.0   16.5   0.0   23.5   0.0                                             6
+ MemAct-SFT 12.0       1.6   18.7   2.4   21.8   2.8
+ MemAct-RL 13.6        2.1   20.6   3.3   25.2   3.7                                             4
+ 14B Models                                                                                      2
+ Search-R1  7.5        0.0   14.4   0.0   21.3   0.0                                             0
+ MemAct-SFT 10.4       1.5   15.3   2.2   22.1   3.7                                                   7B-SFT      7B-RL     14B-SFT      14B-RL
+ MemAct-RL 8.7         1.4   14.6   2.1   20.2   3.9
+                                                                      Figure 5: Pruning granularity distribution. Each
+Table 2: Tool usage statistics. “Task” denotes task-                  violin shows the distribution of records pruned per
+related tool calls (e.g., search); “Mem.” denotes memory              Prune&Write action (|Itarget |) on multi-objective tasks.
+management actions (Prune&Write).                                     RL-trained policies exhibit lower variance than SFT, in-
+                                                                      dicating convergence toward consistent strategies. The
+                                                                      14B-RL model shows a bimodal pattern with peaks at
+jectives. This limit exists even for large models like                fine-grained (∼2) and coarse-grained (∼6) pruning.
+Tongyi-DeepResearch. Specifically, MemAct-RL
+shows strong generalization to unseen task com-                                                 2 records) to remove irrelevant context during
+plexities. Although it was trained on tasks with                                                reasoning. In contrast, it performs coarse-grained
+at most three objectives, it remains effective for                                              pruning (about 6 records) to clear intermediate
+up to eight objectives. It achieves 54.3% accuracy                                              steps once a sub-objective is finished. This ap-
+in the 8-objective setting, which is significantly                                              proach balances the need for detailed information
+surpassing the 39.3% achieved by Search-R1.                                                     with the goal of saving context space.
+Domain Transfer Performance. MemAct con-
+                                                                        5                            Conclusion
+sistently remains stable on simpler tasks like 2Wiki
+where basic reasoning is enough without any ex-                        This paper presents Memory-as-Action (MemAct),
+plicit memory action. The advantage of the model                       a framework that internalizes context curation as a
+becomes much clearer as the reasoning complex-                         learnable capability by treating working memory
+ity increases, as shown in Table 1. Additionally,                      management as explicit policy actions. To recon-
+the performance on BrowseComp-plus shows that                          cile dynamic context updates with reinforcement
+MemAct generalizes well to new tool environments                       learning, we introduced Dynamic Context Policy
+even when the underlying web corpus is unfamiliar.                     Optimization (DCPO), which ensures logical con-
+                                                                       sistency by restructuring trajectories into indepen-
+Model-Specific Memory Strategies. MemAct                               dent segments at memory edit points. Our em-
+automatically discovers strategies tailored to the ca-                 pirical results demonstrate that MemAct-RL-14B
+pacity of each base model, as shown in Table 2 and                     establishes a superior Pareto frontier for accuracy
+Fig. 5, with further examples provided in Table 6.                     and efficiency, matching the performance of mod-
+• 7B Model: For the 7B model, RL training                              els over 16× larger while reducing average context
+  leads to more frequent memory actions to han-                        length by 51% and significantly improving end-
+  dle its limited context capacity. In challenging                     to-end inference latency. Crucially, our analysis
+  8-objective tasks, the action frequency increases                    reveals that models autonomously discover special-
+  notably from 2.8 to 3.7. Fig. 5 shows that this                      ized, capacity-aware strategies, adapting their mem-
+  model follows a consistent strategy by removing                      ory action intensity to maintain a focused reasoning
+  about 6 records per action to maintain stability.                    trace. Taken together, our results demonstrate that
+• 14B Model: The 14B model learns a strategy that                      autonomous context curation can be internalized
+  separates ongoing research from task completion.                     as a learnable skill, providing a fundamental and
+  As shown by the bimodal distribution in Fig. 5,                      scalable architectural building block for agentic
+  this model performs fine-grained pruning (about                      behavior in long-horizon reasoning processes.
+
+                                                           8
+6   Limitations                                               production-ready AI agents with scalable long-term
+                                                              memory. arXiv preprint arXiv:2504.19413.
+While MemAct shows that context management
+can be learned, the current approach still faces            DeepSeek-AI. 2025. Deepseek-v3.2: Pushing the fron-
+                                                              tier of open large language models.
+challenges common in reinforcement learning for
+agents. The framework relies on sparse rewards              Jiaxuan Gao, Wei Fu, Minyang Xie, Shusheng Xu,
+from the final output, which makes it difficult to             Chuyi He, Zhiyu Mei, Banghua Zhu, and Yi Wu.
+accurately assign credit to specific memory actions.           2025. Beyond ten turns: Unlocking long-horizon
+                                                               agentic search with large-scale asynchronous RL.
+In tasks that require long-horizon reasoning, the              arXiv preprint arXiv:2508.07976.
+model might accidentally delete information that
+only becomes relevant later in the process. How-            Xanh Ho, Anh-Khoa Duong Nguyen, Saku Sugawara,
+ever, our analysis shows an intrinsic coupling be-            and Akiko Aizawa. 2020. Constructing a multi-hop
+                                                              qa dataset for comprehensive evaluation of reasoning
+tween memory behavior and reasoning. This con-                steps. COLING.
+nection suggests that the MemAct paradigm could
+eventually help solve credit assignment issues in           Mengkang Hu, Tianxing Chen, Qiguang Chen, Yao Mu,
+                                                             Wenqi Shao, and Ping Luo. 2025a. Hiagent: Hier-
+agent workflows. Furthermore, our current opti-
+                                                              archical working memory management for solving
+mization method uses a random sampling algo-                  long-horizon agent tasks with large language model.
+rithm that treats all memory operations as equally           ACL.
+important. Since we do not yet use posterior meth-
+                                                            Yuyang Hu, Shichun Liu, Yanwei Yue, Guibin Zhang,
+ods to identify key steps, the process may allocate
+                                                              and 1 others. 2025b. Memory in the age of ai agents.
+resources to segments with less information, which            arXiv preprint arXiv:2512.13564.
+limits training efficiency in complex scenarios.
+   Regarding information fidelity, working memory           Huiqiang Jiang, Qianhui Wu, Xufang Luo, Dongsheng
+                                                              Li, Chin-Yew Lin, Yuqing Yang, and Lili Qiu. 2024.
+management involves a trade off between context               Longllmlingua: Accelerating and enhancing llms
+length and density. Because this compression pro-             in long context scenarios via prompt compression.
+cess is lossy, the system cannot recover original             ACL.
+data once details are summarized. This constraint
+                                                            Carlos E Jimenez, John Yang, Alexander Wettig,
+defines the boundary and future potential of our              Shunyu Yao, Kexin Pei, Ofir Press, and Karthik R
+study. Since local memory cannot maintain infinite            Narasimhan. 2024. Swe-bench: Can language mod-
+precision, we see this approach as complementary              els resolve real-world github issues? ICLR.
+to existing system-level infrastructures. Our pri-
+                                                            Bowen Jin, Hansi Zeng, Zhenrui Yue, Jinsung Yoon,
+ority is to verify the core mechanisms of memory              Sercan Arik, Dong Wang, Hamed Zamani, and Jiawei
+actions within the standard context window to es-             Han. 2025. Search-r1: Training llms to reason and
+tablish a principled interface at the decision layer.         leverage search engines with reinforcement learning.
+Future work can reduce the lossy nature of com-               arXiv preprint arXiv:2503.09516.
+pression by expanding this action space, such as            Satyapriya Krishna, Kalpesh Krishna, Anhad Mo-
+adding selective retrieval from external stores or            hananey, Steven Schwarcz, Adam Stambler, Shyam
+tiered caching, to combine learned curation with              Upadhyay, and Manaal Faruqui. 2025. Fact, fetch,
+scalable, high precision infrastructure.                      and reason: A unified evaluation of retrieval-
+                                                              augmented generation. NAACL.
+
+                                                            Yucheng Li, Bo Dong, Frank Guerin, and Chenghua Lin.
+References                                                    2023. Compressing context to enhance inference
+                                                              efficiency of large language models. EMNLP.
+Zijian Chen, Xueguang Ma, Shengyao Zhuang, Ping
+   Nie, Kai Zou, Andrew Liu, Joshua Green, Kshama           Nelson F. Liu, Kevin Lin, John Hewitt, Ashwin Paran-
+   Patel, Ruoxi Meng, Mingyi Su, Sahel Shari-                 jape, Michele Bevilacqua, Fabio Petroni, and Percy
+   fymoghaddam, Yanxi Li, Haoran Hong, Xinyu                  Liang. 2024. Lost in the middle: How language mod-
+   Shi, Xuye Liu, Nandan Thakur, Crystina Zhang,              els use long contexts. Transactions of the Association
+   Luyu Gao, Wenhu Chen, and Jimmy Lin. 2025.                 for Computational Linguistics.
+   Browsecomp-plus: A more fair and transparent eval-
+   uation benchmark of deep-research agent. arXiv           Miao Lu, Weiwei Sun, Weihua Du, Zhan Ling, Xuesong
+   preprint arXiv:2508.06600.                                 Yao, Kang Liu, and Jiecao Chen. 2025. Scaling
+                                                              llm multi-turn rl with end-to-end summarization-
+Prateek Chhikara, Dev Khant, Saket Aryan, Taranjeet           based context management.         arXiv preprint
+  Singh, and Deshraj Yadav. 2025. Mem0: Building              arXiv:2510.06727.
+
+
+                                                        9
+Lingrui Mei, Jiayu Yao, Yuyao Ge, Yiwei Wang, Bao-               Memory-r1: Enhancing large language model agents
+  long Bi, Yujun Cai, Jiazhi Liu, Mingyu Li, Zhong-Zhi           to manage and utilize memories via reinforcement
+  Li, Duzhen Zhang, Chenlin Zhou, Jiayi Mao, Tianze              learning. arXiv preprint arXiv:2508.19828.
+  Xia, Jiafeng Guo, and Shenghua Liu. 2025. A sur-
+  vey of context engineering for large language models.        Zhilin Yang, Peng Qi, Saizheng Zhang, Yoshua Ben-
+  arXiv preprint arXiv:2507.13334.                               gio, William W Cohen, Ruslan Salakhutdinov, and
+                                                                 Christopher D Manning. 2018. Hotpotqa: A dataset
+OpenAI. 2025. gpt-oss-120b & gpt-oss-20b model card.             for diverse, explainable multi-hop question answer-
+  arXiv preprint arXiv:2508.10925.                               ing. ACL.
+
+Charles Packer, Sarah Wooders, Kevin Lin, Vivian Fang,         Hongli Yu, Tinghong Chen, Jiangtao Feng, Jiangjie
+  Shishir G. Patil, Ion Stoica, and Joseph E. Gonzalez.          Chen, Weinan Dai, Qiying Yu, Ya-Qin Zhang, Wei-
+  2023. Memgpt: Towards llms as operating systems.               Ying Ma, Jingjing Liu, Mingxuan Wang, and 1 others.
+  arXiv preprint arXiv:2310.08560.                               2025. Memagent: Reshaping long-context llm with
+                                                                 multi-conv rl-based memory agent. arXiv preprint
+Bowen Peng, Jeffrey Quesnelle, Honglu Fan, and En-               arXiv:2507.02259.
+  rico Shippole. 2024. Yarn: Efficient context window
+  extension of large language models. ICLR.                    Zhenyu Zhang, Ying Sheng, Tianyi Zhou, Tianlong
+                                                                 Chen, Lianmin Zheng, Ruisi Cai, Zhao Song, Yuan-
+Ofir Press, Muru Zhang, Sewon Min, Ludwig Schmidt,               dong Tian, Christopher Re, Clark Barrett, Zhangyang
+  Noah A Smith, and Mike Lewis. 2023. Measuring                  Wang, and Beidi Chen. 2023. H2o: Heavy-hitter ora-
+  and narrowing the compositionality gap in language             cle for efficient generative inference of large language
+  models. EMNLP.                                                 models. NeurIPS.
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu,                Lianmin Zheng, Liangsheng Yin, Zhiqiang Xie, Chuyue
+  Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan                  Sun, Jeff Huang, Cody Hao Yu, Shiyi Cao, Christos
+  Zhang, YK Li, and 1 others. 2024. Deepseekmath:                 Kozyrakis, Ion Stoica, Joseph E. Gonzalez, Clark W.
+  Pushing the limits of mathematical reasoning in open            Barrett, and Ying Sheng. 2024. Sglang: Efficient
+  language models. arXiv preprint arXiv:2402.03300.               execution of structured language model programs.
+                                                                 NeurIPS.
+Qwen Team and 1 others. 2024. Qwen2 technical report.
+  arXiv preprint arXiv:2407.10671.                             Zijian Zhou, Ao Qu, Zhaoxuan Wu, Sunghwan
+                                                                  Kim, Alok Prakash, Daniela Rus, Jinhua Zhao,
+Tongyi DeepResearch Team, Baixuan Li, Bo Zhang,                   Bryan Kian Hsiang Low, and Paul Pu Liang. 2025.
+  Dingchu Zhang, Fei Huang, Guangyu Li, Guoxin                    Mem1: Learning to synergize memory and reason-
+  Chen, Huifeng Yin, Jialong Wu, Jingren Zhou, and 1              ing for efficient long-horizon agents. arXiv preprint
+  others. 2025. Tongyi deepresearch technical report.             arXiv:2506.15841.
+  arXiv preprint arXiv:2510.24701.
+
+Harsh Trivedi, Niranjan Balasubramanian, Tushar Khot,
+  and Ashish Sabharwal. 2022. Musique: Multi-
+  hop questions via single-hop question composition.
+  Transactions of the Association for Computational
+  Linguistics.
+
+Jason Wei, Zhiqing Sun, Spencer Papay, Scott McK-
+   inney, Jeffrey Han, Isa Fulford, Hyung Won Chung,
+   Alex Tachard Passos, William Fedus, and Amelia
+   Glaese. 2025. Browsecomp: A simple yet challeng-
+   ing benchmark for browsing agents. arXiv preprint
+   arXiv:2504.12516.
+
+Xixi Wu, Kuan Li, Yida Zhao, Liwen Zhang, Litu
+  Ou, Huifeng Yin, Zhongwang Zhang, Xinmiao
+  Yu, Dingchu Zhang, Yong Jiang, and 1 others.
+  2025. Resum: Unlocking long-horizon search in-
+  telligence via context summarization. arXiv preprint
+  arXiv:2509.13313.
+
+Wujiang Xu, Zujie Liang, Kai Mei, Hang Gao, Juntao
+ Tan, and Yongfeng Zhang. 2025. A-MEM: agentic
+ memory for LLM agents. NeurIPS.
+
+Sikuan Yan, Xiufeng Yang, Zuchao Huang, Ercong
+  Nie, Zifeng Ding, Zonggen Li, Xiaowen Ma, Hin-
+  rich Schütze, Volker Tresp, and Yunpu Ma. 2025.
+
+
+                                                          10
+A     Appendix                                                       Table 3: Training Dataset Composition. Categoriza-
+                                                                     tion of training instances by the number of reasoning
+A.1    Pseudocode for DCPO                                           objectives across SFT and RL phases.
+
+                                                                           Phase   1-Obj     2-Obj      3-Obj       Total
+Algorithm 1 DCPO Training Loop
+                                                                           SFT      779        113       38           930
+ 1: Input: Initial policy πθ , dataset D, environment E,                   RL      8,192      1,025     1,023      10,240
+          trajectories per prompt Ntraj , segments per prompt
+    Nseg
+ 2: Output: Optimized policy πθ
+ 3: while not converged do                                           A.3    Additional Results
+ 4:   Sample a batch of prompts U ∼ D
+ 5:   B ← ∅ {Global training batch}                                  We provide additional experimental data to further
+ 6:   Amap ← {} {Map: trajectory → advantage}                        evaluate the performance of smaller models and
+ 7:   for all u ∈ U do
+ 8:       Tu ← ∅
+                                                                     the specific behaviors of different model configura-
+ 9:       for n = 1 to Ntraj do                                      tions.
+10:           Generate a trajectory τ from prompt u and ob-
+              tain reward R(τ )                                      Table 4: Performance comparison of 7B models on
+11:           Tu ← Tu ∪ {(τ, R(τ ))}                                 tasks with multiple objectives. Accuracy represents
+12:       end for                                                    the average success rate for individual sub objectives.
+13:       // Compute Advantage                                       Cost values indicate the consumption of input tokens
+14:       µu ← mean({R | (·, R) ∈ Tu })
+15:       σu ← std({R | (·, R) ∈ Tu }) + ϵ                           (×104 ). Bold and underlined numbers show the best
+16:       for all (τ, R) ∈ Tu do                                     and second best results.
+17:           Amap [τ.id] ← (R − µu )/σu
+18:       end for                                                                          Multi Objective Tasks       Cost
+19:       Σu ← ∅ {Segment pool for prompt u}                          Method
+20:       for all (τ, ·) ∈ Tu do                                                      2 obj. 4 obj. 6 obj. 8 obj. Avg. (×104 )
+21:           Identify memory edit points {tmem
+                                              k } in τ                Qwen2.5 7B    0.295 0.218 0.196 0.198 0.227 1.64
+22:           Set tmem
+                   0    ← 0, tmem
+                               K+1 ← T
+                                                                      Search R1 7B  0.553 0.409 0.383 0.341 0.422 11.97
+23:           for i = 0 to K do
+                                                                      MemAct SFT 7B 0.535 0.431 0.404 0.366 0.434 10.81
+24:              Ci ← Htmem       {Context prefix}
+                           i                                          MemAct RL 7B 0.598 0.493 0.434 0.416 0.485 11.97
+                             tmem
+                             i+1
+25:            yi ← (yt )t=t   mem +1      {Segment genera-
+                               i
+               tion}
+26:            input_ids ← tokenize(Ci ) ⊕ yi
+27:            mσi ← [0, . . . , 0, 1, . . . , 1] {Mask for
+                                                                     Results for 7B Model Variants. The results in
+               yi , where |0| = |tokenize(Ci )|}                     Table 4 show that MemAct RL 7B maintains a
+28:            Append (input_ids, mσi , τ.id) to Σu                  clear advantage over the baseline models in all set-
+29:          end for
+30:      end for                                                     tings. Specifically, MemAct RL 7B achieves the
+31:      Bu ← Sample Nseg segments from Σu                           highest average accuracy of 0.485, which confirms
+32:      B ← B ∪ Bu                                                  that the memory action framework remains effec-
+33:    end for
+34:    L(θ) ← ComputePolicyLoss(B, Amap , πθ )                       tive even on smaller language models. While the
+35:    Update policy πθ using ∇θ L(θ)                                original Qwen2.5 7B model shows the lowest to-
+36: end while                                                        ken consumption, this is primarily because it lacks
+37: return πθ
+                                                                     long range reasoning capabilities. The base model
+                                                                     fails to sustain the reasoning process required for
+A.2    Datasets Statistics                                           complex tasks and terminates early. This behavior
+                                                                     leads to both lower success rates and reduced token
+Training data is generated from HotpotQA (Yang
+                                                                     usage.
+et al., 2018) and Asearcher (Gao et al., 2025) us-
+ing the staged prompting protocol. The SFT phase                     Analysis of Memory Strategies. The results in
+uses 930 accurate examples, which are divided into                   Table 5 reveal distinct strategies for managing in-
+3,000 training segments to teach basic memory                        ternal context between 7B and 14B models. Here,
+management rules. The RL phase scales to 10,240                      the Chain of Thought length specifically refers to
+trajectories to improve the policy. As shown in                      the average length of the reasoning sequence gen-
+Table 3, all training samples are limited to at most                 erated immediately before each memory tool call.
+three objectives. This limit ensures that perfor-                    The data indicates that 14B models generally pro-
+mance gains on tasks with 4 to 8 objectives re-                      duce longer Chain of Thought sequences than 7B
+flect true generalization rather than just memoriz-                  models, with reinforcement learning significantly
+ing training patterns.                                               increasing this reasoning depth. In contrast, 7B
+
+                                                                11
+Table 5: Action statistics for MemAct across vary-                   facts and current status from the tool calls being re-
+ing levels of task complexity. Chain of Thought and                  moved. It must contain sufficient information to con-
+Mem. represent the average token lengths for the rea-                tinue reasoning.
+soning prior to memory tools and the memory actions,               • delete_ids (array[string], required): List of tool call
+                                                                     IDs to remove from conversation history. These should
+respectively. Pruned Actions shows the average number
+                                                                     be redundant or superseded tool calls.
+of past actions removed from the context during each
+memory update. Numbers in parentheses indicate the                A.4.2 System Instruction Template
+change in RL compared to the SFT baseline.
+                                                                  The following instruction template is prepended to
+Method Obj. CoT Len.         Mem. Len. Pruned Actions             every task query during both supervised fine-tuning
+                                                                  and reinforcement learning:
+       2 obj       27.2         156.8            6.2
+7B-SFT 4 obj       17.0         165.6            6.9               You are an Information Seeking Master. Your task is to
+       8 obj       17.0         180.8            7.1               thoroughly seek the internet for information and provide
+          2 obj 28.1 (+0.9) 171.1 (+14.3)     6.2 (0.0)            accurate answers to questions. You will not give up until
+7B-RL     4 obj 20.6 (+3.6) 176.3 (+10.7)     6.5 (-0.4)           you find the corresponding information.
+          8 obj 21.8 (+4.8) 198.7 (+17.9)     7.0 (-0.1)
+        2 obj      29.4         167.1            5.9               As you proceed, adhere to the following principles:
+14B-SFT 4 obj      32.7         161.5            6.1               1. Persistent Actions for Answers: You will engage in
+        8 obj      31.0         186.5            5.8               many interactions, delving deeply into the topic to explore
+                                                                   all possible aspects.
+       2 obj 35.2 (+5.8) 159.7 (-7.4)         5.6 (-0.3)           2. Repeated Verification: Before presenting a Final
+14B-RL 4 obj 43.4 (+10.7) 162.3 (+0.8)        5.6 (-0.5)           Answer, you will cross-check the information you have
+       8 obj 35.7 (+4.7) 191.1 (+4.6)         5.2 (-0.6)           gathered to confirm its reliability.
+                                                                   3. Attention to Detail: You will carefully analyze each
+                                                                   information source to ensure that all data is current and
+models maintain shorter reasoning lengths but rely                 relevant.
+more heavily on explicit memory storage. This
+                                                                   Core Tool: prune_context
+is evidenced by the RL 7B model producing the
+longest memory records at 198.7 tokens for 8 ob-                   • You have access to prune_context for active context
+jective tasks. Furthermore, the higher value in the                  management. Its function is to summarize specific tool
+Pruned Actions column shows that 7B models re-                       calls into memory paragraphs and delete them after
+                                                                     execution.
+move a greater number of past actions in a single                  • Treat this as a core reasoning tool. Use it throughout
+memory update. This pattern suggests that smaller                    every step of your reasoning process to maintain focus
+models perform more aggressive context clearing,                     and clarity.
+                                                                   Context Management Policy
+likely because they need to purge more historical
+information at once to maintain focus given their                  • Keep the active context logically consistent.
+limited processing capacity.                                       • Continuously summarize outcomes and prune super-
+                                                                     seded steps to maintain a high signal-to-noise ratio.
+A.4     Tool Scheme and Prompt Template                            Memory Structure:
+
+This section provides the complete tool schemas                    • [OBJECTIVE] The ultimate goal of the user.
+and system prompt templates used during training                   • [CONCLUSIONS/FACTS] Verifiably true information
+                                                                     gathered.
+and inference.                                                     • [STATUS] The specific and actionable next step.
+                                                                   • [ASSUMPTIONS] Optional unverified premises used to
+A.4.1    Memory Management Tool Schema                               proceed.
+ Function: prune_context
+ Description: Manages conversation history by removing
+                                                                  A.5    Case Study
+ redundant or superseded tool calls while preserving              In this section, we provide detailed examples of
+ essential information. Use this tool to maintain context
+ efficiency when the conversation becomes too long or             memory actions. Table 6 illustrates how the model
+ contains outdated information.                                   uses the Prune&Write tool to manage context dur-
+ When to use: Context exceeds token limits, information is        ing different reasoning stages. Table 7 analyzes
+ superseded by newer results, or completed investigations
+ need archival.
+                                                                  common failure modes where the model struggles
+ Process: First summarize key outcomes in memory, then            with evidence ambiguity or memory hallucinations.
+ specify which tool call IDs to remove via delete_ids.
+
+ Parameters:
+ • memory (string, required): Detailed summary of key
+
+
+
+                                                             12
+Table 6: Examples of different memory curation strategies learned by MemAct. These cases illustrate how
+the model adapts its pruning behavior to support final answer preparation, subtask transitions, and information
+consolidation across various reasoning stages.
+
+ Chain-of-thoughts     Memory Content                                       Removed Ids     Mechanism Analysis
+ Let me prune the      [OBJECTIVE] Determine what Groundation               4sNKCfUv,       Final Answer Preparation:
+ context to maintain   and Jamaica have in common                           nNUehhvj, ...   The operation prunes
+ efficiency and        [CONCLUSIONS/FACTS] Groundation is a                 (Total 10)      intermediate search steps. The
+ summarize what        California-based reggae band... name comes                           structured memory records the
+ I’ve learned about    from Rastafarian "groundings"... references                          synthesized findings and
+ Groundation’s         Grounation Day... which commemorates Haile                           preserves the established links
+ connection to         Selassie’s... visit to Jamaica... The band plays                     between the band’s name,
+ Jamaica.              roots reggae music...                                                musical style, and Jamaican
+                       [STATUS] Ready to provide final answer...                            culture.
+                       [ASSUMPTIONS] Groundation is a reggae
+                       band that draws heavily from Jamaican
+                       musical and cultural traditions
+ Let me prune the      [OBJECTIVE] Answer three specific                    Jrr7YuRY,       Phase Transition: The
+ context to keep the   questions...                                         9EnqZAXu, ...   operation clears the context
+ conversation          [CONCLUSIONS/FACTS] Found                            (Total 9)       after the identification subtask.
+ focused and           information about Bargain Booze... but need                          The structured memory retains
+ continue searching    to verify if it was founded in 1981...                               the candidate answer and
+ for the answers.      [STATUS] Need to search for specific                                 explicitly lists the remaining
+                       information about Bargain Booze’s founding                           verification requirements (date
+                       year... then move to questions 2 and 3                               and store count).
+                       [ASSUMPTIONS] Bargain Booze may be the
+                       answer to Q1 but requires verification
+ Let me prune the      [OBJECTIVE] Determine which composer                 t4qeJxRu,       Information Consolidation:
+ context to maintain   had their first notable composition released         trWYuaUY, ...   The operation removes raw
+ efficiency and        earlier...                                           (Total 5)       search results. The structured
+ continue with my      [CONCLUSIONS/FACTS] Josquin des Prez                                 memory retains specific dates
+ research on the       was active... in the 1470s and his works were                        and publication details for both
+ composers.            published as early as 1502. Palestrina’s first                       entities to support the
+                       major publication was in 1554. Josquin’s                             subsequent temporal
+                       motet "Ave Maria..." is... one of his early                          comparison.
+                       works...
+                       [STATUS] Need to verify specific dates of
+                       Josquin’s earliest compositions...
+ Let me prune the      [OBJECTIVE] Find the name of the unseen              sxDSsMtk,       Research Refocusing: The
+ context to remove     announcer on TV’s University Challenge               ekbxCapH, ...   operation eliminates
+ the less relevant     [CONCLUSIONS/FACTS] Initial searches                 (Total 8)       unproductive search paths
+ search results and    have not yet identified the specific unseen                          regarding visible hosts. The
+ continue with a       announcer. ...hosted by Bamber Gascoigne...                          updated memory records the
+ more focused          and Jeremy Paxman..., but these are the visible                      negative results and formalizes
+ search.               hosts...                                                             the specific hypothesis (Roger
+                       [STATUS] Need to find specific information                           Tilling) for the next search
+                       about the voice announcer... focusing on the                         phase.
+                       name Roger Tilling...
+                       [ASSUMPTIONS] The unseen announcer is
+                       likely a different person from the visible host...
+ Let me prune the      [OBJECTIVE] Answer two questions: Q1                 zX9vraas,       Multi-Query Management:
+ context to maintain   about... Curuá River... and Silver River...; Q2      X5Aouyfx, ...   The operation removes
+ efficiency while      about legal tradition... where Sai Van Bridge is     (Total 9)       completed search segments.
+ continuing my         located                                                              The structured memory
+ research.             [CONCLUSIONS/FACTS] Curuá River is in                                separates findings by question
+                       Brazil... Silver River appears to be in                              number and distinguishes
+                       Michigan... Sai Van Bridge is in Macau...                            confirmed facts (locations) from
+                       Macau was Portuguese territory...                                    unverified claims.
+                       [STATUS] Need to verify Silver River
+                       location... and research Macau’s legal system
+                       tradition
+                       [ASSUMPTIONS] Silver River likely exists
+                       in Michigan... Macau’s legal system likely
+                       influenced by Portuguese tradition
+
+
+
+                                                               13
+Table 7: Analysis of representative failure cases during autonomous context management. These examples
+show how unresolved ambiguity or missing evidence can lead to incorrect assumptions being stored in the memory
+and affecting the final reasoning outcome.
+
+ Chain-of-thoughts         Memory Content                                  Removed Ids       Mechanism Analysis
+ Let me prune the          [OBJECTIVE] Identify the nationality of the     aP9xLmQ2,         Ambiguity Ignored: The
+ context to reduce         author of “The Thing of It Is. . . ” and        vT3bKp11, . . .   model encounters two different
+ noise. The author         determine the Western TV series associated      (Total 6)         works with the same title but
+ name “The Thing           with Pat Hingle’s friend.                                         doesn’t resolve the conflict.
+ of It Is. . . ” appears   [CONCLUSIONS/FACTS] Search results                                Instead of checking further, it
+ in two different          show both William Goldman (novelist) and                          collapses the ambiguity and
+ search results, but       John Callaway (journalist) have works titled                      assumes both refer to the same
+ most likely they          similarly.                                                        author. This mistaken
+ refer to the same         [STATUS] Conclude that the autobiography                          assumption gets written into
+ person. I’ll assume       by John Callaway is the referenced work;                          memory and steers the rest of
+ the journalist wrote      proceed to answer.                                                the reasoning in the wrong
+ it and finalize.          [ASSUMPTIONS] “The Thing of It Is. . . ” is                       direction.
+                           more likely an autobiography than a novel.
+ Let me prune the          [OBJECTIVE] Identify the American               mxTV6UnX,         Hallucination in Memory:
+ context to maintain       actress/singer born in 1956 who recorded        TG6tXj9F,         After repeated searches fail to
+ efficiency and            “Something There.”                              XbyiVBRr, . . .   produce any relevant result, the
+ consolidate my            [CONCLUSIONS/FACTS] Multiple searches           (Total 7)         model feels compelled to fill the
+ findings about who        confirm the original vocalists were Paige                         gap. It invents a connection that
+ recorded                  O’Hara (born 1954) and Robby Benson (born                         isn’t supported by any evidence
+ “Something There.”        1955). No evidence supports any 1956-born                         and treats the guess as fact.
+ All searches so far       recording artist for this song.                                   Once this fabricated link is
+ point to the original     [STATUS] Conclude that Toni Braxton,                              stored in memory, it drives the
+ film cast, but they       notable cast member of Beauty and the Beast,                      model toward a confident but
+ do not surface any        must be the intended answer.                                      entirely incorrect final answer.
+ American actress          [ASSUMPTIONS] Toni Braxton participated
+ born in 1956.             in soundtrack-related recordings and may have
+                           covered “Something There.”
+
+
+
+
+                                                               14
+

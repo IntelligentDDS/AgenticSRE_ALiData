@@ -1,0 +1,11 @@
+graph TB
+    subgraph Round1["第 1 轮"]
+        A1["并行证据采集"] --> B1["初始分析报告"]
+    end
+    subgraph Critique["批评审查"]
+        B1 --> C1["Critic Agent<br/>识别不足与漏洞"]
+    end
+    subgraph Round2["第 2 轮（改进）"]
+        C1 -->|"补充调查指令"| A2["定向补充调查"]
+        A2 --> B2["改进后的报告"]
+    end

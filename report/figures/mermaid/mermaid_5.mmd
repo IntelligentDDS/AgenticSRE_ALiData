@@ -1,0 +1,5 @@
+graph LR
+    A["Agent A<br/>事件分析"] -->|上下文传递| B["Agent B<br/>指标分析"]
+    B -->|累积上下文| C["Agent C<br/>日志分析"]
+    C -->|累积上下文| D["Agent D<br/>链路分析"]
+    D -->|全部证据| E["LLM<br/>综合报告"]

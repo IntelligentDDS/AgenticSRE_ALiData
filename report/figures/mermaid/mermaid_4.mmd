@@ -1,0 +1,19 @@
+graph LR
+    subgraph CoT["Chain-of-Thought"]
+        C1[输入] --> C2[逐步推理] --> C3[输出]
+    end
+    
+    subgraph ReAct["ReAct"]
+        R1[Thought] --> R2[Action] --> R3[Observation]
+        R3 --> R1
+    end
+    
+    subgraph PnE["Plan-and-Execute"]
+        P1[规划] --> P2[执行步骤1] --> P3[执行步骤2] --> P4[执行步骤N]
+        P4 -.->|动态调整| P1
+    end
+    
+    subgraph Ref["Reflection"]
+        F1[执行] --> F2[自我批评] --> F3[改进执行]
+        F3 --> F2
+    end

@@ -1,0 +1,63 @@
+flowchart LR
+    Start([异常触发<br/>Alert / Event / Log / Metric]) --> P1
+
+    subgraph P1["Phase 1 DETECTION"]
+        D1["Prometheus firing alerts"]
+        D2["K8s Warning Events"]
+        D3["日志错误模式"]
+        D4["Z-score / EWMA / 阈值检测"]
+    end
+
+    P1 --> P2
+    subgraph P2["Phase 2 HYPOTHESIS"]
+        H1["检索相似故障<br/>FaultContextStore"]
+        H2["生成 3-5 个候选根因"]
+        H3["注入历史规则与专家反馈"]
+    end
+
+    P2 --> P3
+    subgraph P3["Phase 3 INVESTIGATION"]
+        Ctx["ContextBuilder<br/>领域上下文组装"]
+        M["MetricAgent"]
+        L["LogAgent"]
+        T["TraceAgent"]
+        E["EventAgent"]
+        Rank["HypothesisAgent<br/>证据匹配与重排序"]
+        Ctx --> M
+        Ctx --> L
+        Ctx --> T
+        Ctx --> E
+        M --> Rank
+        L --> Rank
+        T --> Rank
+        E --> Rank
+    end
+
+    P3 --> Gate{最高置信度<br/>>= 0.85?}
+    Gate -- 否，最多 3 轮 --> P3
+    Gate -- 是 --> P4
+
+    subgraph P4["Phase 4 REASONING"]
+        Corr["Hero 风格跨信号关联"]
+        RCA["服务拓扑 PageRank RCA"]
+        Report["LLM 生成 RCA 报告"]
+        Judge["RCAJudge 质量评分"]
+        Corr --> RCA --> Report --> Judge
+    end
+
+    P4 --> Review{Judge 分数<br/>>= 0.65?}
+    Review -- 否 --> Human["人工审核"]
+    Review -- 是 --> P5
+
+    subgraph P5["Phase 5 RECOVERY"]
+        PlanFix["RemediationAgent<br/>修复方案"]
+        DryRun["dry-run / 审批"]
+        Exec["ActionStack 执行"]
+        Verify["恢复验证"]
+        Rollback["失败回滚"]
+        PlanFix --> DryRun --> Exec --> Verify
+        Verify -- 失败 --> Rollback
+    end
+
+    P5 --> Learn["高质量轨迹入库<br/>规则提炼 / 演化审计"]
+    Human --> Learn

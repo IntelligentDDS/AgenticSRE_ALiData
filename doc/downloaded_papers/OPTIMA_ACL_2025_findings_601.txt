@@ -1,0 +1,1461 @@
+          O PTIMA: Optimizing Effectiveness and Efficiency for LLM-Based
+                             Multi-Agent System
+ Weize Chen1 * , Jiarui Yuan1∗ , Chen Qian1 ,Cheng Yang3 , Zhiyuan Liu1,2 , Maosong Sun1
+         1
+           Department of Computer Science and Technology, Tsinghua University
+                             2
+                               College of AI, Tsinghua University
+                    3
+                      Beijing University of Posts and Telecommunications
+       {chenwz21,yuanjr22}@mails.tsinghua.edu.cn, liuzy@tsinghua.edu.cn
+
+                                                                                     Performance Comparisons                                            Token Comparisons
+                        Abstract
+                                                                              1.6x                                                         Self-Consistency
+                                                                                            OPTIMA-iSFT                               1000
+     Large Language Model (LLM) based multi-                                  1.5x
+                                                                                            OPTIMA-iDPO
+                                                                                            OPTIMA-iSFT-DPO
+                                                                                                                                           MAD
+                                                                                                                                            500
+                                                                                                                                            300
+     agent systems (MAS) show remarkable poten-                                                                                                                         OPTIMA-ISFT
+                                                                              1.4x                                                                                      OPTIMA-IDPO
+     tial in collaborative problem-solving, yet they
+
+
+                                                                                                                                 # Inference Tokens
+                                                                                                                                            250                         OPTIMA-ISFT-DPO
+
+
+
+                                                               Performance Gain
+     still face critical challenges: low communi-                             1.3x
+                                                                                                                                            200
+     cation efficiency, poor scalability, and a lack                          1.2x
+                                                                                                              Self-Consistency
+                                                                                                                                                      CoT
+     of effective parameter-updating optimization                                                                       MAD                 150
+                                                                              1.1x
+     methods. We present O PTIMA, a novel frame-
+     work that addresses these issues by significantly                        1.0x                                      CoT                 100
+
+     enhancing both communication efficiency and                              0.9x Base                                                           50Base 0
+                                                                                            0     1    2      3     4      5                                   1    2      3     4     5
+     task effectiveness in LLM-based MAS through                                          Optimization Iteration Number                                Optimization Iteration Number
+     training. O PTIMA employs an iterative gen-
+                                                               Figure 1: Performance and efficiency of O PTIMA
+     erate, rank, select, and train paradigm with a
+                                                               variants across optimization iterations. Left: Average
+     reward function balancing task performance,
+                                                               performance gain over iterations. O PTIMA variants con-
+     token efficiency, and communication readabil-
+                                                               sistently outperform CoT, Multi-Agent Debate (MAD),
+     ity. We explore various algorithms, including
+                                                               and Self-Consistency. Right: Average inference token
+     Supervised Fine-Tuning, Direct Preference Op-
+                                                               numbers over iterations. All O PTIMA variants achieve
+     timization, and their hybrid approaches, provid-
+                                                               better performance with substantially fewer tokens.
+     ing insights into their effectiveness-efficiency
+     trade-offs. We integrate Monte Carlo Tree
+                                                               natural language processing to complex reasoning
+     Search-inspired techniques for DPO data gener-
+     ation, treating conversation turns as tree nodes          (OpenAI, 2023; Reid et al., 2024; Anthropic, 2024).
+     to explore diverse interaction paths. Eval-               A promising direction in leveraging these models
+     uated on common multi-agent tasks, includ-                is the development of autonomous multi-agent sys-
+     ing information-asymmetric question answer-               tems (MAS), which aim to harness the collective
+     ing and complex reasoning, O PTIMA shows                  intelligence of multiple LLM-based agents for col-
+     consistent and substantial improvements over              laborative problem-solving and decision-making
+     single-agent baselines and vanilla MAS based
+                                                               (Liang et al., 2023; Wang et al., 2024b; Du et al.,
+     on Llama 3 8B / 3.2 3B, achieving up to
+     2.8x performance gain with less than 10% to-              2024; Zhuge et al., 2024). However, for LLM-
+     kens on tasks requiring heavy information ex-             based MAS to be truly effective, they must over-
+     change. Moreover, O PTIMA’s efficiency gains              come two critical challenges: (a) achieving effi-
+     enable more effective compute utilization dur-            cient inter-agent communication to minimize com-
+     ing inference, leading to improved inference-             putational costs, and (b) optimizing the collective
+     time scaling laws. By addressing fundamen-                performance of the system as a cohesive unit.
+     tal challenges in LLM-based MAS, O PTIMA
+     shows the potential towards scalable, efficient,             Current LLM-based MAS face significant diffi-
+     and effective MAS. Our code is available at               culties in meeting these challenges. The coordina-
+     https://github.com/thunlp/Optima.                         tion and communication between agents often lack
+                                                               efficiency, resulting in verbose exchanges that lead
+1    Introduction                                              to increased token usage, longer inference times,
+                                                               and higher computational costs (Li et al., 2024b).
+Large Language Models (LLMs) have emerged                      This inefficiency is exacerbated by the length bias
+as powerful tools for a wide range of tasks, from              inherent in LLMs due to alignment training (Saito
+    * Equal Contribution.                                      et al., 2023; Dubois et al., 2024), which favors
+                                                         11534
+                  Findings of the Association for Computational Linguistics: ACL 2025, pages 11534–11557
+                         July 27 - August 1, 2025 ©2025 Association for Computational Linguistics
+longer responses even when concise communica-           leading to more effective LLM systems.
+tion would suffice (Chen et al., 2024c). Moreover,         We evaluate O PTIMA on a diverse set of tasks
+while recent work has explored training LLMs for        spanning two multi-agent settings: (a) information
+single-agent tasks (Song et al., 2024; Xiong et al.,    exchange, including information-asymmetric ques-
+2024) and MAS training is well-studied in rein-         tion answering (Chen et al., 2024c; Liu et al., 2024),
+forcement learning (Johnson et al., 2000; Lanctot       and (b) debate, encompassing mathematical and
+et al., 2017; Baker et al., 2020), there remains a      reasoning tasks (Du et al., 2024; Chen et al., 2024b;
+lack of parameter-updating methods specifically         Wu et al., 2023). Using Llama 3 8B / 3.2 3B (Meta,
+designed to optimize LLM-based MAS as a unified         2024) as our base model, we demonstrate that O P -
+system. Existing approaches primarily rely on sim-      TIMA consistently outperforms both single-agent
+ple agent profile evolution (Chen et al., 2024b) or     MAS baselines, achieving up to 90% reduction in
+memory evolution (Qian et al., 2024a,b; Gao et al.,     token usage and 2.8x increase in task performance.
+2024), which fail to address the core issues of com-       To summarize, our main contribution is O PTIMA,
+munication efficiency and collective optimization.      a novel training framework that simultaneously op-
+   Can we develop a training framework that             timizes communication efficiency and task effective-
+simultaneously enhances the communication ef-           ness. To enhance high-quality training data gen-
+ficiency and task effectiveness of LLM-based            eration in multi-agent settings for DPO, we intro-
+MAS? To address this question, we introduce O P -       duce an integration of MCTS-like techniques. Our
+TIMA, an effective framework designed to optimize       comprehensive empirical evaluation across diverse
+LLM-based MAS. At the heart of O PTIMA is an            tasks demonstrates notable advancements in both
+iterative generate, rank, select, and train paradigm,   token efficiency and task performance, while also
+incorporating a reward function that balances task      providing insights into the learned communication
+performance, token efficiency, and communication        patterns. Additionally, we examine the implica-
+readability. This approach enables the development      tions of O PTIMA’s efficiency gains for inference-
+of MAS that are not only effective and efficient        time scaling, underscoring its potential to improve
+but also maintain interpretable communication pat-      the LLM systems by enabling more effective uti-
+terns. Based on the reward function, O PTIMA lever-     lization of inference-compute. By addressing the
+ages a combination of techniques to induce efficient    dual challenges of communication efficiency and
+and effective communication behaviors in LLM-           collective optimization, our work underscores the
+based agents, including Supervised Fine-Tuning          importance of developing advanced training frame-
+(SFT) (Zelikman et al., 2022; Gülçehre et al., 2023;    works for LLM-based MAS and highlights effi-
+Aksitov et al., 2023) and Direct Preference Opti-       ciency as a crucial metric to consider. We believe
+mization (DPO) (Rafailov et al., 2023; Pang et al.,     O PTIMA provides a solid foundation for future in-
+2024), along with their hybrid variants. Further-       vestigations into scaling and improving MAS and
+more, O PTIMA introduces an integration of Monte        general LLM systems.
+Carlo Tree Search (MCTS)-inspired techniques for
+DPO data generation, conceptualizing conversation       2     O PTIMA: Optimizing Multi-Agent
+turns as tree nodes to explore diverse interaction            LLMs via Iterative Training
+trajectories efficiently.
+   Importantly, by substantially reducing the num-      2.1    Overview
+ber of tokens required for inference, O PTIMA not       O PTIMA is built upon an iterative generate, rank,
+only improves computational efficiency but also         select, and train paradigm. This approach allows
+opens new possibilities for leveraging inference        for the progressive improvement of LLM-based
+compute more effectively. This reduction in token       agents in multi-agent settings, focusing on enhanc-
+usage allows for more samples within the same           ing both the efficiency of inter-agent communica-
+computational constraints, potentially leading to       tion and the effectiveness of task completion.
+better inference-time scaling laws. As recent work         Let Mbase denote the base LLM, D the task
+has shown the importance of inference-time com-         dataset, and f the iterative training function. The
+pute in improving model performance (Wu et al.,         iterative process can be formalized as Mt+1 =
+2024; Brown et al., 2024; Chen et al., 2024a), O P -    f (Mt , D), where Mt represents the model at it-
+TIMA ’s efficiency gains could be combined with         eration t. The function f encapsulates the entire
+techniques like majority voting (Wang et al., 2023),    process of data generation, ranking, selection and
+                                                   11535
+       1. Generate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   MCTS-Inspired                                  4. Train
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           SFT Data Generation
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   DPO Data Generation                                  SFT Training                  DPO Training
+
+
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ……                                                                                                                      …                     <                 …
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   …                                 …
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ……
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             Agent Chat
+
+
+
+       2. Rank                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      3. Select
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           SFT Data Ranking         DPO Data Ranking                       OPTIMA
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     SFT Data Selection     DPO Data Selection
+       Base Model
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   0.4                                             Select          0.4   Select
+       Language Modeling Loss
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       0.3         0.6         0.3
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                0.3          0.6         0.3
+       Normalized #Tokens
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  …                                  …                                      …                                  …
+       Task Metric
+        <latexit sha1_base64="7tJFmCImxuC/A5Hfl00J+grOC/E=">AAACTHicbVDPSxtBFJ6NVtPU1rQevQyGQkEadsUfvRQCvXjUYFTILsvs5K0OmZ1ZZt6KYdk/sJcevPWv8OKhRYROfogm6YOB733f997MfEkuhUXf/+3VVlbfrK3X3zbebbz/sNn8+Onc6sJw6HEttblMmAUpFPRQoITL3ADLEgkXyfDHWL+4AWOFVmc4yiHK2JUSqeAMHRU3eZd+p904RLjFEpkdVvQrDaVbMGDPrB6Cql5M03aXhqlhvJz3Sm1tVZXduTZutvy2Pym6DIIZaJFZncTNu3CgeZGBQi6Ztf3AzzEqmUHBJVSNsLCQMz5kV9B3ULEMbFROwqjoZ8cMaKqNOwrphH09UbLM2lGWOGfG8NouamPyf1q/wPRbVAqVFwiKTy9KC0lR03GydCAMcJQjBxg3wr2V8mvmMkKXf8OFECx+eRmc77WDw/bB6X6rQ2dx1Mk22SFfSECOSIcckxPSI5z8JPfkD/nr/fIevEfvaWqtebOZLTJXtbV/Ezq2YA==</latexit>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             0.3         1.0
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       0.3   <     1.0
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    loss
+        R = Rtask                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 token Rtoken +
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   Rloss
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              0.9        0.1           0.6          0          1.0
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        0.9      0.1            0.6           0          1.0
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             Reward Function
+
+
+Figure 2: Overview of the O PTIMA framework for training LLM-based MAS. The iterative process includes
+four stages: Generate, Rank, Select, and Train. Note that the ranking process, while also involved in DPO data
+generation, is not shown in the Generate stage for simplicity.
+
+model training. For each task instance di ∈ D,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       These selected trajectories form the training data
+we sample a set of N conversation trajectories                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       Di∗ at iteration i. The model is then updated:
+{τij }N
+      j=1 ⊂ T using the agents powered by current                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    Mt+1 = Train(Mt , Di∗ ). The Train function can
+model Mt . Each trajectory τij is then evaluated                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     be instantiated with various training algorithms,
+using a reward function R : T → R, defined as:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       such as SFT or DPO, which we will discuss in
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     detail in the following subsections.
+ R(τij ) = Rtask (τij ) − λtoken Rtoken (τij ) + λloss                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             1
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               Rloss (τij )
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            .      (1)                  Fig. 2 provides a high-level overview of O P -
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     TIMA. The specific instantiations of the generation
+Here, Rtask : T → R is the task-specific perfor-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     and training processes will be detailed in the follow-
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         #Tokens(τ j )
+mance metric, Rtoken (τij ) = max ({#Tokens(τ
+                                           i
+                                              k )} )
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ing subsections. The ranking process, consistent
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     k                       i      k
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     across all instantiations, is defined by the reward
+is the normalized token count, and Rloss (τij ) =
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    function presented in Eq. (1).
+g L(Mbase , di , τij ) is based on the language mod-
+eling loss of the base model Mbase , which we de-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    2.2     Initialization
+tail in Appendix H.2. The positive coefficients
+λtoken and λloss are hyper-parameters . This re-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     Before starting the iterative training process, we
+ward function is designed to balance multiple objec-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 address a critical challenge in LLM-based MAS:
+tives simultaneously: Rtask ensures that the model                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   agents often produce responses in a similar style
+improves on the intended task, Rtoken encourages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     across conversation trajectories, even with high-
+communication efficiency by penalizing verbose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       temperature sampling. This homogeneity limits the
+exchanges, and Rloss regularizes language natural-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   exploration of diverse communication strategies,
+ness and readability by favoring trajectories that are                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               potentially hindering the optimization toward more
+probable under the base model. By incorporating                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      efficient and effective interactions. Following the
+these components, we aim to develop LLM-based                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        observation from AutoForm (Chen et al., 2024c),
+MAS that are not only effective in their designated                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  where LLMs can be explicitly prompted to leverage
+tasks but also efficient in their communication,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     different more concise formats to communicate or
+while maintaining interpretability in their outputs,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 reason without much compromise in performance,
+unlike the often incomprehensible communication                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      we introduce an initialization step that promotes
+in prior RL research (Lazaridou et al., 2017; Evti-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  diversity in agent communication.
+mova et al., 2018; Chaabouni et al., 2022).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             Our approach leverages a pool of format specifi-
+   Based on these rewards, we apply several data                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     cation prompts, P = {p1 , p2 , ..., pK }, where each
+selection criteria to select a subset of high-quality                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                pk is a string specifying a particular response for-
+sampled trajectories {τi∗ } for each task instance.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  mat (e.g., JSON, list, see Appendix I for concrete
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         11536
+examples and creation process). For each task in-                       2.4   Instantiation 2: Iterative DPO
+stance di ∈ D, we generate N conversation tra-
+jectories, each with a randomly selected format                         While iSFT provides a straightforward approach
+specification appended to the input task:                               to optimizing LLM-based MAS, it may be lim-
+                                                                        ited by its reliance on a single best trajectory for
+ τij = Mbase (di ⊕pkj ), kj ∼ Uniform(1, K), (2)                        each task instance. To address this, we explore
+                                                                        iterative Direct Preference Optimization (iDPO)
+where ⊕ denotes string concatenation. This process
+                                                                        (Rafailov et al., 2023; Pang et al., 2024), which
+yields a diverse set of trajectories {τij }N
+                                           j=1 for each
+                                                                        optimizes models using comparative preferences
+di , varying in both content and structure.
+                                                                        and has demonstrated success in LLM alignment.
+    We then evaluate these trajectories using the
+                                                                        Applying DPO in multi-agent settings, however,
+reward function defined in Eq. (1), for each di ,
+                                                                        poses distinct challenges, particularly in generating
+we select the trajectory with the highest reward:
+                                                                        meaningful paired data that capture the complexi-
+τi∗ = arg maxj R(τij ). Finally, we select top 70%
+                                                                        ties of agent interactions.
+trajectories that exceed a predefined performance
+threshold θinit , resulting in a high-quality dataset:                     Data Generation: To overcome these chal-
+                                                                       lenges, we integrate MCTS with DPO data col-
+ D0∗ = TopK( (di , τi∗ ) Rtask (τi∗ ) > θinit , ∀di ∈ D , 70%).   (3)   lection for high-quality paired data generation in
+   Crucially, we remove the format specification                        multi-agent settings. Our MCTS-based approach
+prompts from the selected trajectories, resulting                       conceptualizes the multi-agent conversation as a
+in a dataset of diverse, high-quality conversations                     tree, where nodes represent conversational turns,
+without explicit format instructions. We then                           and edges represent continuations. This structure
+fine-tune the base model Mbase to obtain M0 =                           allows us to explore diverse interaction trajectories
+SFT(Mbase , D0∗ ), which serves as the starting point                   systematically and select high-quality paired data
+for O PTIMA, able to generate diverse communica-                        for DPO training. The MCTS process begins at
+tion patterns without explicit format prompting.                        the root node (initial task prompt) and proceeds
+We provide pseudo-code in Appendix B for better                         as follows: (1) Expansion: We select a node to
+understanding. This initialization sets the stage for                   expand based on the following criteria. We first ex-
+more effective exploration and optimization in the                      clude leaf nodes and the second-to-last level nodes
+subsequent iterative training process.                                  to avoid wasting computation on low-variance ex-
+                                                                        pansions, then exclude nodes with content similar
+2.3 Instantiation 1: Iterative SFT                                      to previously expanded nodes, measured based on
+We introduce iterative Supervised Fine-Tuning                           edit distance (see Appendix H.1). From the re-
+(iSFT) as our first instantiation of O PTIMA. At                        maining nodes, we select 10 nodes with the highest
+each iteration t, iSFT follows the same general                         rewards and sample one using the softmax distribu-
+procedure outlined in Algorithm 1, generating a                         tion over their rewards. (2) Simulation: For each
+set of N conversation trajectories for each task                        selected node, we expand 3 trajectories, simulating
+training instance di ∈ D using the current model                        the conversation to completion. (3) Backpropaga-
+MiSFT
+    t   . However, unlike initialization, iSFT omits                    tion: Once a trajectory is completed and rewarded
+the format specification pool, as M0 has already                        with Eq. (1), we update the estimated rewards of
+internalized diverse communication strategies. Un-                      all nodes in the trajectory with the average rewards
+like recent research on iterative training (Gülçehre                    from their children. (4) Iteration: We repeat the
+et al., 2023; Aksitov et al., 2023), iSFT maintains                     above process 8 times, resulting in 24 trajectories.
+a fixed reward threshold θSFT across iterations for                     More iterations could potentially lead to more di-
+data selection. The model is then trained with stan-                    verse and better-quality data.
+dard SFT. This process continues until a maximum                           Paired Data Construction: To generate high-
+number of iterations is reached. For clarity, the                       quality paired data for DPO training, we traverse
+pseudo-code for iSFT is provided in Appendix B.                         each MCTS tree and identify node pairs (ni , nj )
+   iSFT provides a straightforward yet effective ap-                    that satisfy three conditions: (1) shared ancestry,
+proach to optimize LLM-based MAS, leveraging                            (2) the higher estimated reward of ni and nj ex-
+the diverse communication patterns established dur-                     ceeds the threshold θdpo-filter , and (3) their reward
+ing initialization while consistently improving task                    difference exceeds the threshold θdpo-diff . We sort
+performance and communication efficiency.                               these pairs by the higher estimated reward, and se-
+                                                                   11537
+lect the top 50% pairs as part of the final training   ated answers and labels for IE tasks. For debate
+set. We construct DPO training instances by using      tasks, we employ exact match accuracy (GSM8k,
+the common conversation history as the prompt,         ARC-C, MMLU) or Sympy-based (Meurer et al.,
+with ni and nj serving as the chosen and rejected      2017) equivalence checking (MATH), following
+responses according to their estimated rewards.        Lewkowycz et al. (2022). Conversations conclude
+   The iDPO process then proceeds iteratively, al-     when agents both mark the same answer with spec-
+ternating between MCTS-based data generation           ified special tokens or reach a turn limit.
+and model updates using DPO. The pseudo-code              Baselines. We compare against single-agent
+for our iDPO process is presented in Appendix B.       approaches: Chain-of-Thought (CoT) (Wei et al.,
+                                                       2022) and Self-Consistency (SC) with majority vot-
+2.5    Instantiation 3: Hybrid Iterative Training      ing (Wang et al., 2023) on n = 8 samples. For IE
+Building upon the strengths of both iSFT and iDPO,     tasks, direct majority voting is impractical due to
+we investigate a hybrid approach that interleaves      free-form responses. Instead, we compute pair-
+SFT and DPO in the iterative training process,         wise F1 scores, group answers with scores above
+termed as iSFT-DPO. This hybrid method aims            0.9, and report the average F1 score of the largest
+to leverage the simplicity and directness of SFT       group against the label. In multi-agent settings, we
+in capturing high-quality trajectories, while also     compare against Multi-Agent Debate (MAD) (Du
+benefiting from the nuanced comparative learning       et al., 2024) and AutoForm (Chen et al., 2024c).
+facilitated by DPO. By alternating between these       MAD uses natural language for inter-agent commu-
+two training paradigms, we hypothesize that the        nication, while AutoForm employs concise, non-
+model can more effectively balance the exploration     natural-language formats for better performance-
+of diverse communication strategies with the ex-       cost efficiency.
+ploitation of known effective patterns.                   Training Setups. We use Llama 3 8B / 3.2 3B
+   In practice, we implement this hybrid approach      (Meta, 2024) as our base model, focusing on two-
+by performing one iteration of iSFT followed by        agent scenarios without external tools to isolate
+one iteration of iDPO, and repeating this cycle        core multi-agent communication and collaboration.
+throughout the training process. This interleav-       A single model is trained for both agents, with
+ing allows the model to first consolidate learning     separate model training left for future work. Itera-
+from the best observed trajectories through SFT,       tive training completes within 12 hours on 8 A100
+and then refine its understanding through the com-     GPUs for most tasks, except MATH, which takes
+parative preferences provided by DPO.                  around 24 hours. More details are in Appendices H
+                                                       and I.
+3     Experiments                                      3.1   Benchmark Results
+Datasets. We evaluate O PTIMA in two settings:         Table 1 showcases O PTIMA’s performance across
+information exchange (IE) and debate. For IE, we       diverse tasks, revealing consistent improvements
+use HotpotQA (Yang et al., 2018), 2WikiMulti-          in effectiveness and efficiency. For IE tasks, O P -
+HopQA (2WMHQA) (Ho et al., 2020), TriviaQA             TIMA variants excel, particularly in multi-hop rea-
+(Joshi et al., 2017), and CBT (Hill et al., 2016).     soning like HotpotQA and 2WMHQA. iSFT-DPO
+For multi-hop datasets (HotpotQA, 2WMHQA),             achieves the best performance while significantly
+we split relevant contexts between two agents, en-     reducing token usage compared to SC. Notably,
+suring the answer can only be deduced from in-         on 2WMHQA, iSFT-DPO improves F1 by 38.3%
+formation exchange. For TriviaQA and CBT, con-         (2.8x) while using only 10% of MAD’s tokens.
+texts are randomly assigned, challenging agents        This efficiency extends to other IE tasks, where
+to communicate and identify the relevant informa-      O PTIMA variants maintain high performance with
+tion. The debate setting employs GSM8K (Cobbe          drastically lower token counts.
+et al., 2021), MATH (Hendrycks et al., 2021b),            In debate tasks, O PTIMA’s benefits are nuanced
+ARC’s challenge set (ARC-C) (Bhakthavatsalam           but evident. It achieves better performance and ef-
+et al., 2021) and MMLU (Hendrycks et al., 2021a),      ficiency on ARC-C and MMLU, while on MATH
+with one agent as solver and another as critic (Chen   and GSM8k, O PTIMA variants show comparable or
+et al., 2024b). We use 0-shot for all benchmarks.      slightly lower performance than SC, but with much
+   Metrics. We report F1 score between gener-          higher token efficiency. We attribute this to task
+                                                  11538
+                                      Information Exchange                                               Debate
+                       HotpotQA      2WMH QA       TriviaQA             CBT          MATH         GSM8k        ARC-C        MMLU
+  Method                F1    #Tok   F1    #Tok      F1    #Tok    F1     #Tok     Acc    #Tok   Acc   #Tok   Acc   #Tok   Acc   #Tok
+  CoT                  25.6 123.7 20.5 139.8 59.8 110.3 43.4 135.3 23.9 329.8 71.5 230.9 65.2 138.9 46.0 132.2
+  SC (n = 8)           33.8 996.3 28.7 1052.8 70.0 891.4 52.9 1067.7 35.7 2600.9 80.3 1828.7 75.6 1116.7 54.0 1056.1
+  MAD                  28.4 570.9 25.9     543.7 71.0 408.6 53.8          493.0 29.8 1517.6 72.5       514.7 71.4   478.0 51.5   516.7
+  AutoForm             28.2 97.7 24.7      117.7 60.9 74.0 35.0            64.8 26.1 644.3 71.0        410.5 60.2   221.2 43.8   198.5
+  O PTIMA-iSFT         54.5   67.6 72.4      61.2 71.9      51.5 71.8         38.5 30.1   830.3 79.5   311.5 74.1    92.2 56.8   123.8
+  O PTIMA-iDPO         52.5   45.7 66.1      35.9 69.3      69.2 66.7         37.2 30.4   272.8 78.5   270.1 74.5    97.8 59.6    61.6
+  O PTIMA-iSFT-DPO     55.6   63.3 74.2      54.9 77.1      32.5 70.1         38.9 29.3   488.1 80.4   246.5 77.1    88.0 60.2    56.7
+  O PTIMA-iSFT SC     54.8 806.2 72.6 245.6 73.7 413.8 72.2               847.4 32.4 2432.9 83.1 1750.7 77.2 1148.7 60.2 874.5
+  O PTIMA-iDPO SC     52.8 412.8 67.2 1056.2 71.8 702.8 66.8              520.6 36.9 2743.1 84.4 1750.8 77.0 1091.2 59.9 1050.4
+  O PTIMA-iSFT-DPO SC 57.4 957.9 76.7 1096.0 77.5 494.1 71.8              417.8 34.8 2788.5 84.0 1748.7 78.8 1036.1 61.2 1026.7
+
+Table 1: Performance and inference token number comparison across information exchange and debate tasks.
+Best results are indicated in bold, and second-best results are underlined for all rows except the last three. The
+last three rows display self-consistency results for O PTIMA variants, with the best results highlighted in green .
+O PTIMA variants consistently outperform baselines in task performance and/or token efficiency.
+               2WMH QA         Trivia QA          GSM8k                 tively), they present different challenges in terms
+ Method        F1     #Tok     F1    #Tok      Acc        #Tok          of complexity and required skills. The results, pre-
+ MAD           25.9   543.7   71.0   408.9    72.5        514.7         sented in Table 2, demonstrate O PTIMA’s robust
+ AutoForm      24.7   117.7   60.9    74.0    71.0        410.5         transferability across these diverse tasks. In the
+ iSFT          56.5    79.6   70.0    90.2    74.6        293.7         question-answering domain, all O PTIMA variants
+ iDPO          51.6    84.3   68.0    41.1    77.9        185.7         significantly outperform baseline multi-agent meth-
+ iSFT-DPO      54.5    70.4   72.0    67.8    74.2        363.1         ods on both OOD datasets. On 2WMHQA, the
+Table 2: Transfer performance of O PTIMA. We trans-                     transferred iSFT more than doubles MAD’s F1
+fer O PTIMA from Hotpot QA to 2WMH QA and Trivia                        score while using only 14.6% of the tokens. Similar
+QA, and from MATH to GSM8k, with MAD and Auto-                          trends are observed in TriviaQA. When transfer-
+Form on each target task as baselines.                                  ring from MATH to GSM8k, O PTIMA variants,
+difficulty and limited training data. Nevertheless,                     particular iDPO, not only outperform the baselines
+Section 3.2 will show O PTIMA models trained on                         on GSM8k but also achieve results comparable to
+MATH transfer effectively to GSM8k, achieving                           models directly trained on GSM8k with even higher
+near-equivalent performance with high efficiency.                       token efficiency (refer to Table 1 for comparison).
+Additionally, Section 3.3 will demonstrate that ap-                         These results underscore O PTIMA’s potential for
+plying SC to O PTIMA variants trained on MATH                           developing adaptable MAS, demonstrating that O P -
+or GSM8k greatly improves inference scaling laws                        TIMA -trained models learn transferable skills for
+on GSM8k compared to CoT SC.                                            efficient information exchange and collaborative
+   Among O PTIMA variants, iSFT often prioritizes                       reasoning. However, transferring to more distant
+performance at the cost of efficiency, while iDPO                       domains remains challenging, e.g., we find it hard
+achieves remarkable token reductions, sometimes                         to transfer from from MATH to ARC-C. We believe
+with performance trade-offs. iSFT-DPO strikes a                         it is a promising area for future research to explore
+robust balance, frequently delivering top-tier per-                     if scaling O PTIMA to more generalized multi-task
+formance with satisfying efficiency. Results on                         training could enhance the generalization.
+Llama 3.2 3B in Appendix F further validate O P -
+TIMA ’s robustness.
+                                                                        3.3     Can O PTIMA Improve Inference Scaling?
+                                                                        Recent research emphasizes inference-time scal-
+3.2 How Well Does O PTIMA Generalize?                                   ing, which describes how model performance im-
+To assess O PTIMA’s ability to generalize, we con-                      proves with increased compute during inference,
+ducted transfer learning experiments across differ-                     typically by generating multiple samples per prob-
+ent task domains. We transferred models trained                         lem (Brown et al., 2024; Wu et al., 2024). Unlike
+on HotpotQA to TriviaQA and 2WMHQA, as well                             training scaling laws, which focus on model size,
+as transferring from MATH to GSM8k. While                               dataset size, and performance, inference-time scal-
+these datasets share broad categories (question-                        ing explore the trade-off between compute budget
+answering and mathematical reasoning, respec-                           and task accuracy, offering a promising way to en-
+                                                                  11539
+                                                                                                                                                     2WMH QA                 ARC-C
+               0.9                                                              0.86
+                                                                                                                                 Setting        F1         #Tok       Acc        #Tok
+               0.8                                                              0.84
+                                                                                               88.5% Tokens Saved
+                                                                                                                                 iSFT         72.4       61.2       74.1       92.2
+
+Task Performance                                               # Inference Tokens
+               0.7                                                              0.82
+                                                                                                                                  w/o #Tokens 72.4(0.0) 290.3(4.8x) 74.2(+0.1) 579.6(6.3x)
+               0.6                                                              0.80                                              w/o Loss    69.7(-2.7) 45.4(0.7x) 72.6(-1.5) 69.7(0.8x)
+                                                                                                            Group
+                                                                                                            CoT-SC
+               0.5                                                                                          GSM8k-iSFT
+                                                                                0.78                        GSM8k-iDPO
+                                                                                                            GSM8k-iSFT-DPO
+                                                                                                                                 iDPO         66.1       35.9        74.5       97.8
+                                                                                                            MATH-iSFT
+               0.4
+                                             Task
+                                             MATH
+                                             GSM8k                              0.76
+                                                                                                            MATH-iDPO
+                                                                                                            MATH-iSFT-DPO
+                                                                                                                                  w/o #Tokens 72.9(+6.8) 183.3(5.1x) 75.5(+1.0) 266.0(2.7x)
+                                                                                                                                              63.0(-3.1) 54.6(1.5x) 74.4(-0.1) 81.2(0.8x)
+                                             ARC-C
+
+               0.3
+                                             MMLU
+                                             SC Type
+                                             Majority Voting
+                                                                                                            Style
+                                                                                                            Optima-SC
+                                                                                                            CoT-SC
+                                                                                                                                  w/o Loss
+                                             Coverage                           0.7429   210     211      2 12         213
+                   0   21    22   23
+                            #SC Steps
+                                        24         25                                          # Tokens                          iSFT-DPO     74.2        54.9        77.1       88.0
+Figure 3: O PTIMA’s impact on inference scaling                                                                                   w/o #Tokens 63.5(-10.7) 219.7(4.0x) 76.9(-0.2) 354.8(4.0x)
+laws. Left Relationship between O PTIMA variants’                                                                                 w/o Loss    66.7(-7.5) 38.1(0.7x) 76.3(-0.8) 63.4(0.7x)
+self-consistency steps and performance on debate tasks.                                                                         Table 3: Ablation study on reward components for O P -
+Solid lines represent majority voting accuracy, while                                                                           TIMA variants on two representative tasks.
+dashed lines show coverage. Right Performance of var-
+ious models on GSM8k as a function of token usage,                                                                              3.4   How Does O PTIMA Evolve Performance?
+demonstrating O PTIMA’s efficiency gains.                                                                                       To understand the impact of reward function com-
+hance model capabilities without further training.                                                                              ponents in our reward function, we conducted an
+   Fig. 3 illustrates O PTIMA’s impact on inference-                                                                            ablation study on 2WMHQA (IE) and ARC-C (de-
+time scaling. The left panel shows the relation-                                                                                bate). We removed either token count regular-
+ship between SC steps and performance on multi-                                                                                 ization (#Tokens) or LM loss (Loss) to address:
+agent debate tasks. While majority voting accuracy                                                                              (1) How does token count regularization affect
+plateaus after a certain number of steps, coverage                                                                              efficiency-performance trade-offs? (2) What role
+(the percentage of problems answered correctly                                                                                  does LM loss play in maintaining communication
+at least once) improves logarithmically with in-                                                                                quality? Our findings highlight the importance of
+creased sampling. This aligns with recent studies                                                                               each component in balancing performance, effi-
+(Wu et al., 2024; Chen et al., 2024a), suggesting                                                                               ciency, and language quality.
+advanced answer selection techniques could further                                                                                 Table 3 presents the results of our ablation study.
+boost O PTIMA’s performance. Additional scaling                                                                                 Removing the token count leads to a substantial
+law figures for all O PTIMA variants and tasks are                                                                              increase in the number of generated tokens across
+in Appendix A, where similar trends are observed.                                                                               settings, with a particularly pronounced effect in
+   The right panel demonstrates O PTIMA’s effi-                                                                                 the debate task. While this increased verbosity
+ciency in improving inference scaling laws on                                                                                   occasionally results in marginal performance im-
+GSM8k. O PTIMA variants, including those trans-                                                                                 provements, it comes at a significant computational
+ferred from MATH, consistently outperform CoT                                                                                   cost. Conversely, eliminating the LM loss results
+SC, except for MATH-trained iSFT. Notably,                                                                                      in a decrease in token usage, often producing the
+GSM8k-trained iDPO matches CoT-SC perfor-                                                                                       most concise outputs among all variants. Examples
+mance with 88.5% fewer tokens, effectively “shift-                                                                              comparing communication with and without LM
+ing the curve left". This reduction in token usage                                                                              loss can be found in Appendix C. Without LM loss,
+translates to significant computational savings with-                                                                           the model often generates overly concise messages
+out sacrificing accuracy. MATH-trained O PTIMA                                                                                  containing insufficient information and is prone to
+variants, except iSFT, also deliver better scaling                                                                              hallucination, potentially explaining the inferior
+laws on GSM8k than CoT SC, highlighting O P -                                                                                   performance. Overall, O PTIMA’s reward function
+TIMA ’s cross-task generalization.                                                                                              achieves the balance among task effectiveness, to-
+   These results underscore O PTIMA’s potential to                                                                              ken efficiency and dialogue quality, enabling effec-
+reshape inference-time scaling for MAS and gen-                                                                                 tive and efficient multi-agent collaboration.
+eral LLM systems. By enabling more efficient use
+of compute budgets, O PTIMA achieves better per-                                                                                3.5   How Agent Communication Evolves over
+formance at lower costs or higher performance at                                                                                      Optimization Iterations?
+the same cost. This efficiency opens possibilities                                                                              Fig. 1 shows the performance gains and token effi-
+for integrating advanced inference techniques like                                                                              ciency of O PTIMA variants across optimization iter-
+weighted voting or tree-search (Wu et al., 2024),                                                                               ations, revealing a two-phase pattern. In the initial
+potentially leading to further performance gains.                                                                               phase (iterations 0-1), all variants show significant
+                                                                                                                             11540
+performance improvements alongside increased to-         2024; Olausson et al., 2024; Kamoi et al., 2024).
+ken usage, indicating O PTIMA prioritizes effective-     More robust approaches, such as ReST (Gülçehre
+ness by enabling agents to develop sophisticated         et al., 2023), ReSTEM (Singh et al., 2024), and
+strategies through expanded communication. In            STaR (Zelikman et al., 2022), fine-tune models on
+later iterations, O PTIMA refines these strategies for   self-generated high-quality reasoning paths. Pang
+efficiency without sacrificing performance, with to-     et al. (2024) further integrate incorrect paths and
+ken usage decreasing gradually while performance         train models with DPO. These methods have been
+continues to improve.                                    extended to complex tasks (Aksitov et al., 2023),
+   Concrete examples of O PTIMA’s impact on              but iterative refinement in LLM-based MAS re-
+agent communication are provided in Appendix D           mains underexplored, as does the trade-off between
+(iSFT on an information exchange task) and Ap-           effectiveness and efficiency. Our work addresses
+pendix E (debate task). The base model tends to          this gap by introducing the first effective training
+produce verbose, repetitive exchanges, while O P -       framework for iterative optimization in MAS con-
+TIMA-trained models exhibit more concise and task-       texts and systematically shedding light on the trade-
+oriented communication.                                  offs between effectiveness and efficiency.
+                                                            Inference-Time Scaling and Token Efficiency.
+3.6 Can O PTIMA Scale with More Agents?                  Compute scaling has enhanced LLM capabilities,
+While the previous experiments highlight O P -           with approaches like majority voting and reward-
+TIMA’s effectiveness in two-agent scenarios, which       guided tree search improving performance on rea-
+is a controlled setting that circumvents issues such     soning tasks (Chen et al., 2024a; Wu et al., 2024;
+as communication order and effectively validates         Brown et al., 2024; Saad-Falcon et al., 2024). How-
+the framework, we also evaluate its scalability in       ever, these methods increase computational de-
+three-agent settings for IE and debate tasks. The        mands, highlighting the need for token efficiency.
+results, detailed in Appendix G, demonstrate that        Recent work achieves efficiency through latent
+O PTIMA continues to enhance both effectiveness          space reasoning via step distillation (Deng et al.,
+and efficiency.                                          2023, 2024; Hao et al., 2024; Cheng and Durme,
+                                                         2024), but at the cost of comprehensibility. Our
+4   Related Work                                         framework advances this by (1) demonstrating iter-
+                                                         ative training framework that improves both token
+LLM-Based MAS. LLM-powered multi-agent sys-              efficiency and task effectiveness in MAS context,
+tems have demonstrated success in collaborative          and (2) showing that enhanced efficiency enables
+problem-solving through approaches like multi-           more sampling within fixed compute budgets, lead-
+agent debate (Liang et al., 2023; Du et al., 2024).      ing to better inference-time scaling.
+Subsequent work explores role-playing for reason-
+ing (Wang et al., 2024b; Chen et al., 2024b), soft-      5   Conclusion
+ware development (Qian et al., 2024c; Hong et al.,
+2024), and embodied interactions (Zhang et al.,          We introduce O PTIMA, a novel framework for train-
+2024; Mandi et al., 2024), with scale and diver-         ing LLM-based MAS that significantly enhances
+sity improving performance (Wang et al., 2024a;          communication efficiency and task performance.
+Li et al., 2024a). However, efficiency challenges        Experiments show O PTIMA’s consistent superior-
+emerge as systems grow (Chen et al., 2024c; Qian         ity over single-agent and multi-agent baselines. We
+et al., 2024d), with existing methods focusing on        introduce key innovations such as iterative training,
+memory updates rather than comprehensive train-          a balanced reward function, and MCTS-inspired
+ing (Qian et al., 2024a). Our framework addresses        data generation. Crucially, O PTIMA effectively im-
+this gap through joint optimization of communica-        proves inference-time scaling and transfers effec-
+tion efficiency and task effectiveness.                  tively to OOD tasks, underscoring the importance
+   Iterative Refinement of LLMs. Continual im-           of efficient communication in MAS and LLM sys-
+provement in LLMs has led to various iterative           tems. While O PTIMA marks a major step forward
+refinement paradigms. Self-reflection mechanisms         in multi-agent LLM training, further exploration
+like Reflexion (Shinn et al., 2023) and self-refine      into its scalability to larger models and more com-
+(Madaan et al., 2023) show promise but are limited       plex scenarios is a promising direction for future
+by LLMs’ self-correction abilities (Huang et al.,        research.
+                                                    11541
+Acknowledgments                                             Tafjord, and Peter Clark. 2021. Think you have
+                                                            solved direct-answer question answering? try arc-da,
+This work is supported by the National Science and          the direct-answer AI2 reasoning challenge. CoRR,
+Technology Major Project (2020AAA0106502)                   abs/2102.03315.
+and a grant from the Guoqiang Institute, Tsinghua        Bradley C. A. Brown, Jordan Juravsky, Ryan Saul
+University.                                                Ehrlich, Ronald Clark, Quoc V. Le, Christopher Ré,
+                                                           and Azalia Mirhoseini. 2024. Large language mon-
+Limitations                                                keys: Scaling inference compute with repeated sam-
+                                                           pling. CoRR, abs/2407.21787.
+While O PTIMA demonstrates significant improve-
+                                                         Rahma Chaabouni, Florian Strub, Florent Altché, Eu-
+ments in communication efficiency and task effec-          gene Tarassov, Corentin Tallec, Elnaz Davoodi,
+tiveness for LLM-based multi-agent systems, our            Kory Wallace Mathewson, Olivier Tieleman, An-
+study has several limitations. First, our experi-          geliki Lazaridou, and Bilal Piot. 2022. Emergent
+ments primarily focus on two-agent scenarios with          communication at scale. In The Tenth International
+                                                           Conference on Learning Representations, ICLR 2022,
+a shared model architecture, leaving open questions
+                                                           Virtual Event, April 25-29, 2022. OpenReview.net.
+about scaling to larger teams (e.g., 5-10 agents)
+and heterogeneous agent configurations. Although         Lingjiao Chen, Jared Quincy Davis, Boris Hanin, Peter
+                                                           Bailis, Ion Stoica, Matei Zaharia, and James Zou.
+preliminary results with three agents show promis-
+                                                           2024a. Are more LLM calls all you need? towards
+ing trends (Section 3.6), the dynamics of larger           scaling laws of compound inference systems. CoRR,
+groups may introduce new challenges in coordi-             abs/2403.02419.
+nation efficiency that require further investigation.
+                                                         Weize Chen, Yusheng Su, Jingwei Zuo, Cheng Yang,
+Second, while we demonstrate cross-task gener-            Chenfei Yuan, Chi-Min Chan, Heyang Yu, Yaxi Lu,
+alization within similar domains (e.g., MATH to           Yi-Hsin Hung, Chen Qian, Yujia Qin, Xin Cong,
+GSM8k), transferring O PTIMA-trained models to            Ruobing Xie, Zhiyuan Liu, Maosong Sun, and Jie
+substantially different application areas (e.g., from     Zhou. 2024b. Agentverse: Facilitating multi-agent
+                                                          collaboration and exploring emergent behaviors. In
+QA to math or coding) remains unexplored. Fi-             The Twelfth International Conference on Learning
+nally, while we evaluate on standard benchmarks,          Representations, ICLR 2024, Vienna, Austria, May
+real-world deployment scenarios may involve ad-           7-11, 2024. OpenReview.net.
+ditional constraints that our framework does not         Weize Chen, Chenfei Yuan, Jiarui Yuan, Yusheng Su,
+explicitly address. These limitations highlight valu-     Chen Qian, Cheng Yang, Ruobing Xie, Zhiyuan Liu,
+able directions for future research rather than fun-      and Maosong Sun. 2024c. Beyond natural language:
+damental flaws, as O PTIMA’s core contributions, it-      Llms leveraging alternative formats for enhanced rea-
+                                                          soning and communication. CoRR, abs/2402.18439.
+erative optimization with efficiency-aware rewards
+and MCTS-inspired data generation, provide a flex-       Jeffrey Cheng and Benjamin Van Durme. 2024. Com-
+ible foundation adaptable to these extensions.              pressed chain of thought: Efficient reasoning through
+                                                            dense representations. CoRR, abs/2412.13171.
+                                                         Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian,
+References                                                 Mark Chen, Heewoo Jun, Lukasz Kaiser, Matthias
+                                                           Plappert, Jerry Tworek, Jacob Hilton, Reiichiro
+Renat Aksitov, Sobhan Miryoosefi, Zonglin Li, Daliang      Nakano, Christopher Hesse, and John Schulman.
+  Li, Sheila Babayan, Kavya Kopparapu, Zachary             2021. Training verifiers to solve math word prob-
+  Fisher, Ruiqi Guo, Sushant Prakash, Pranesh Srini-       lems. CoRR, abs/2110.14168.
+  vasan, Manzil Zaheer, Felix X. Yu, and Sanjiv Kumar.
+  2023. Rest meets react: Self-improvement for multi-    Yuntian Deng, Yejin Choi, and Stuart M. Shieber. 2024.
+  step reasoning LLM agent. CoRR, abs/2312.10003.          From explicit cot to implicit cot: Learning to inter-
+                                                           nalize cot step by step. CoRR, abs/2405.14838.
+Anthropic. 2024. Claude 3.5 sonnet.
+                                                         Yuntian Deng, Kiran Prasad, Roland Fernandez, Paul
+Bowen Baker, Ingmar Kanitscheider, Todor M. Markov,        Smolensky, Vishrav Chaudhary, and Stuart M.
+  Yi Wu, Glenn Powell, Bob McGrew, and Igor Mor-           Shieber. 2023. Implicit chain of thought reasoning
+  datch. 2020. Emergent tool use from multi-agent          via knowledge distillation. CoRR, abs/2311.01460.
+  autocurricula. In 8th International Conference on
+  Learning Representations, ICLR 2020, Addis Ababa,      Yilun Du, Shuang Li, Antonio Torralba, Joshua B.
+  Ethiopia, April 26-30, 2020. OpenReview.net.             Tenenbaum, and Igor Mordatch. 2024. Improving
+                                                           factuality and reasoning in language models through
+Sumithra Bhakthavatsalam, Daniel Khashabi, Tushar          multiagent debate. In Forty-first International Con-
+  Khot, Bhavana Dalvi Mishra, Kyle Richardson,             ference on Machine Learning, ICML 2024, Vienna,
+  Ashish Sabharwal, Carissa Schoenick, Oyvind              Austria, July 21-27, 2024. OpenReview.net.
+                                                    11542
+Yann Dubois, Balázs Galambosi, Percy Liang, and Tat-          Zili Wang, Steven Ka Shing Yau, Zijuan Lin, Liyang
+  sunori B. Hashimoto. 2024. Length-controlled al-            Zhou, Chenyu Ran, Lingfeng Xiao, Chenglin Wu,
+  pacaeval: A simple way to debias automatic evalua-          and Jürgen Schmidhuber. 2024. Metagpt: Meta pro-
+  tors. CoRR, abs/2404.04475.                                 gramming for A multi-agent collaborative framework.
+                                                              In The Twelfth International Conference on Learning
+Katrina Evtimova, Andrew Drozdov, Douwe Kiela, and            Representations, ICLR 2024, Vienna, Austria, May
+  Kyunghyun Cho. 2018. Emergent communication                 7-11, 2024. OpenReview.net.
+  in a multi-modal, multi-step referential game. In
+  6th International Conference on Learning Represen-       Jie Huang, Xinyun Chen, Swaroop Mishra,
+  tations, ICLR 2018, Vancouver, BC, Canada, April            Huaixiu Steven Zheng, Adams Wei Yu, Xiny-
+  30 - May 3, 2018, Conference Track Proceedings.             ing Song, and Denny Zhou. 2024. Large language
+  OpenReview.net.                                             models cannot self-correct reasoning yet. In The
+                                                              Twelfth International Conference on Learning
+Shen Gao, Hao Li, Zhengliang Shi, Chengrui Huang,             Representations, ICLR 2024, Vienna, Austria, May
+  Quan Tu, Zhiliang Tian, Minlie Huang, and Shuo              7-11, 2024. OpenReview.net.
+  Shang. 2024. 360{\deg}rea: Towards A reusable
+  experience accumulation with 360{\deg} assessment        Jeffrey D. Johnson, Jinghong Li, and Zengshi Chen.
+  for multi-agent system. CoRR, abs/2404.05569.               2000. Reinforcement learning: An introduction:
+                                                              R.S. sutton, A.G. barto, MIT press, cambridge, MA
+Çaglar Gülçehre, Tom Le Paine, Srivatsan Srini-               1998, 322 pp. ISBN 0-262-19398-1. Neurocomput-
+  vasan, Ksenia Konyushkova, Lotte Weerts, Abhishek           ing, 35(1-4):205–206.
+  Sharma, Aditya Siddhant, Alex Ahern, Miaosen
+  Wang, Chenjie Gu, Wolfgang Macherey, Arnaud              Mandar Joshi, Eunsol Choi, Daniel S. Weld, and Luke
+  Doucet, Orhan Firat, and Nando de Freitas. 2023.          Zettlemoyer. 2017. Triviaqa: A large scale distantly
+  Reinforced self-training (rest) for language modeling.    supervised challenge dataset for reading comprehen-
+  CoRR, abs/2308.08998.                                     sion. In Proceedings of the 55th Annual Meeting of
+                                                            the Association for Computational Linguistics, ACL
+Shibo Hao, Sainbayar Sukhbaatar, DiJia Su, Xian Li,         2017, Vancouver, Canada, July 30 - August 4, Volume
+  Zhiting Hu, Jason Weston, and Yuandong Tian. 2024.        1: Long Papers, pages 1601–1611. Association for
+  Training large language models to reason in a contin-     Computational Linguistics.
+  uous latent space. CoRR, abs/2412.06769.
+                                                           Ryo Kamoi, Yusen Zhang, Nan Zhang, Jiawei Han,
+Dan Hendrycks, Collin Burns, Steven Basart, Andy             and Rui Zhang. 2024. When can llms actually cor-
+  Zou, Mantas Mazeika, Dawn Song, and Jacob Stein-           rect their own mistakes? A critical survey of self-
+  hardt. 2021a. Measuring massive multitask language         correction of llms. CoRR, abs/2406.01297.
+  understanding. In 9th International Conference on
+  Learning Representations, ICLR 2021, Virtual Event,      Marc Lanctot, Vinícius Flores Zambaldi, Audrunas
+  Austria, May 3-7, 2021. OpenReview.net.                   Gruslys, Angeliki Lazaridou, Karl Tuyls, Julien Péro-
+                                                            lat, David Silver, and Thore Graepel. 2017. A unified
+Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul          game-theoretic approach to multiagent reinforcement
+  Arora, Steven Basart, Eric Tang, Dawn Song, and           learning. In Advances in Neural Information Pro-
+  Jacob Steinhardt. 2021b. Measuring mathematical           cessing Systems 30: Annual Conference on Neural
+  problem solving with the MATH dataset. In Pro-            Information Processing Systems 2017, December 4-9,
+  ceedings of the Neural Information Processing Sys-        2017, Long Beach, CA, USA, pages 4190–4203.
+  tems Track on Datasets and Benchmarks 1, NeurIPS
+  Datasets and Benchmarks 2021, December 2021, vir-        Angeliki Lazaridou, Alexander Peysakhovich, and
+  tual.                                                      Marco Baroni. 2017. Multi-agent cooperation and
+                                                             the emergence of (natural) language. In 5th Inter-
+Felix Hill, Antoine Bordes, Sumit Chopra, and Jason          national Conference on Learning Representations,
+  Weston. 2016. The goldilocks principle: Reading            ICLR 2017, Toulon, France, April 24-26, 2017, Con-
+  children’s books with explicit memory representa-          ference Track Proceedings. OpenReview.net.
+  tions. In 4th International Conference on Learning
+  Representations, ICLR 2016, San Juan, Puerto Rico,       Aitor Lewkowycz, Anders Andreassen, David Dohan,
+  May 2-4, 2016, Conference Track Proceedings.               Ethan Dyer, Henryk Michalewski, Vinay V. Ra-
+                                                             masesh, Ambrose Slone, Cem Anil, Imanol Schlag,
+Xanh Ho, Anh-Khoa Duong Nguyen, Saku Sugawara,               Theo Gutman-Solo, Yuhuai Wu, Behnam Neyshabur,
+  and Akiko Aizawa. 2020. Constructing A multi-hop           Guy Gur-Ari, and Vedant Misra. 2022. Solving quan-
+  QA dataset for comprehensive evaluation of reason-         titative reasoning problems with language models. In
+  ing steps. In Proceedings of the 28th International        Advances in Neural Information Processing Systems
+  Conference on Computational Linguistics, COLING            35: Annual Conference on Neural Information Pro-
+  2020, Barcelona, Spain (Online), December 8-13,            cessing Systems 2022, NeurIPS 2022, New Orleans,
+  2020, pages 6609–6625. International Committee on          LA, USA, November 28 - December 9, 2022.
+  Computational Linguistics.
+                                                           Junyou Li, Qin Zhang, Yangbin Yu, Qiang Fu, and
+Sirui Hong, Mingchen Zhuge, Jonathan Chen, Xiawu             Deheng Ye. 2024a. More agents is all you need.
+   Zheng, Yuheng Cheng, Jinlin Wang, Ceyao Zhang,            CoRR, abs/2402.05120.
+                                                      11543
+Yunxuan Li, Yibing Du, Jiageng Zhang, Le Hou, Pe-            Cong, Xiaoyin Che, Zhiyuan Liu, and Maosong
+  ter Grabowski, Yeqing Li, and Eugene Ie. 2024b.            Sun. 2024a. Experiential co-learning of software-
+  Improving multi-agent debate with sparse communi-          developing agents. In Proceedings of the 62nd An-
+  cation topology. CoRR, abs/2406.11776.                     nual Meeting of the Association for Computational
+                                                             Linguistics (Volume 1: Long Papers), ACL 2024,
+Tian Liang, Zhiwei He, Wenxiang Jiao, Xing Wang,             Bangkok, Thailand, August 11-16, 2024, pages 5628–
+  Yan Wang, Rui Wang, Yujiu Yang, Zhaopeng Tu, and           5640. Association for Computational Linguistics.
+  Shuming Shi. 2023. Encouraging divergent thinking
+  in large language models through multi-agent debate.    Chen Qian, Jiahao Li, Yufan Dang, Wei Liu, Yifei Wang,
+  CoRR, abs/2305.19118.                                     Zihao Xie, Weize Chen, Cheng Yang, Yingli Zhang,
+                                                            Zhiyuan Liu, and Maosong Sun. 2024b. Iterative
+Wei Liu, Chenxi Wang, Yifei Wang, Zihao Xie, Rennai         experience refinement of software-developing agents.
+  Qiu, Yufan Dang, Zhuoyun Du, Weize Chen, Cheng            CoRR, abs/2405.04219.
+ Yang, and Chen Qian. 2024. Autonomous agents
+  for collaborative task under information asymmetry.     Chen Qian, Wei Liu, Hongzhang Liu, Nuo Chen, Yufan
+ CoRR, abs/2406.14928.                                      Dang, Jiahao Li, Cheng Yang, Weize Chen, Yusheng
+                                                            Su, Xin Cong, Juyuan Xu, Dahai Li, Zhiyuan Liu,
+Aman Madaan, Niket Tandon, Prakhar Gupta, Skyler            and Maosong Sun. 2024c. Chatdev: Communicative
+ Hallinan, Luyu Gao, Sarah Wiegreffe, Uri Alon,             agents for software development. In Proceedings
+ Nouha Dziri, Shrimai Prabhumoye, Yiming Yang,              of the 62nd Annual Meeting of the Association for
+ Shashank Gupta, Bodhisattwa Prasad Majumder,               Computational Linguistics (Volume 1: Long Papers),
+ Katherine Hermann, Sean Welleck, Amir Yazdan-              ACL 2024, Bangkok, Thailand, August 11-16, 2024,
+ bakhsh, and Peter Clark. 2023. Self-refine: Itera-         pages 15174–15186. Association for Computational
+ tive refinement with self-feedback. In Advances in         Linguistics.
+ Neural Information Processing Systems 36: Annual
+ Conference on Neural Information Processing Sys-         Chen Qian, Zihao Xie, Yifei Wang, Wei Liu, Yu-
+ tems 2023, NeurIPS 2023, New Orleans, LA, USA,             fan Dang, Zhuoyun Du, Weize Chen, Cheng Yang,
+ December 10 - 16, 2023.                                    Zhiyuan Liu, and Maosong Sun. 2024d. Scaling
+                                                            large-language-model-based multi-agent collabora-
+Zhao Mandi, Shreeya Jain, and Shuran Song. 2024.            tion. CoRR, abs/2406.07155.
+  Roco: Dialectic multi-robot collaboration with large
+  language models. In IEEE International Conference       Rafael Rafailov, Archit Sharma, Eric Mitchell, Christo-
+  on Robotics and Automation, ICRA 2024, Yokohama,          pher D. Manning, Stefano Ermon, and Chelsea Finn.
+  Japan, May 13-17, 2024, pages 286–299. IEEE.              2023. Direct preference optimization: Your language
+                                                            model is secretly a reward model. In Advances in
+Meta. 2024. Llama 3 model card.                             Neural Information Processing Systems 36: Annual
+                                                            Conference on Neural Information Processing Sys-
+Aaron Meurer, Christopher P. Smith, Mateusz Pa-
+                                                            tems 2023, NeurIPS 2023, New Orleans, LA, USA,
+  procki, Ondrej Certík, Sergey B. Kirpichev, Matthew
+                                                            December 10 - 16, 2023.
+  Rocklin, Amit Kumar, Sergiu Ivanov, Jason Keith
+  Moore, Sartaj Singh, Thilina Rathnayake, Sean Vig,      Machel Reid, Nikolay Savinov, Denis Teplyashin,
+  Brian E. Granger, Richard P. Muller, Francesco           Dmitry Lepikhin, Timothy P. Lillicrap, Jean-Baptiste
+  Bonazzi, Harsh Gupta, Shivam Vats, Fredrik Johans-       Alayrac, Radu Soricut, Angeliki Lazaridou, Orhan
+  son, Fabian Pedregosa, Matthew J. Curry, Andy R.         Firat, Julian Schrittwieser, Ioannis Antonoglou, Ro-
+  Terrel, Stepán Roucka, Ashutosh Saboo, Isuru Fer-        han Anil, Sebastian Borgeaud, Andrew M. Dai, Katie
+  nando, Sumith Kulal, Robert Cimrman, and An-             Millican, Ethan Dyer, Mia Glaese, Thibault Sotti-
+  thony M. Scopatz. 2017. Sympy: symbolic com-             aux, Benjamin Lee, Fabio Viola, Malcolm Reynolds,
+  puting in python. PeerJ Comput. Sci., 3:e103.            Yuanzhong Xu, James Molloy, Jilin Chen, Michael
+Theo X. Olausson, Jeevana Priya Inala, Chenglong           Isard, Paul Barham, Tom Hennigan, Ross McIl-
+  Wang, Jianfeng Gao, and Armando Solar-Lezama.            roy, Melvin Johnson, Johan Schalkwyk, Eli Collins,
+  2024. Is self-repair a silver bullet for code genera-    Eliza Rutherford, Erica Moreira, Kareem Ayoub,
+  tion? In The Twelfth International Conference on         Megha Goel, Clemens Meyer, Gregory Thornton,
+  Learning Representations, ICLR 2024, Vienna, Aus-        Zhen Yang, Henryk Michalewski, Zaheer Abbas,
+  tria, May 7-11, 2024. OpenReview.net.                    Nathan Schucher, Ankesh Anand, Richard Ives,
+                                                           James Keeling, Karel Lenc, Salem Haykal, Siamak
+OpenAI. 2023. GPT-4 technical report.           CoRR,      Shakeri, Pranav Shyam, Aakanksha Chowdhery, Ro-
+  abs/2303.08774.                                          man Ring, Stephen Spencer, Eren Sezener, and et al.
+                                                           2024. Gemini 1.5: Unlocking multimodal under-
+Richard Yuanzhe Pang, Weizhe Yuan, Kyunghyun Cho,          standing across millions of tokens of context. CoRR,
+  He He, Sainbayar Sukhbaatar, and Jason Weston.           abs/2403.05530.
+  2024. Iterative reasoning preference optimization.
+  CoRR, abs/2404.19733.                                   Jon Saad-Falcon, Adrian Gamarra Lafuente, Shlok
+                                                            Natarajan, Nahum Maru, Hristo Todorov, Etash
+Chen Qian, Yufan Dang, Jiahao Li, Wei Liu, Zihao            Guha, Estefany Kelly Buchanan, Mayee F. Chen,
+  Xie, Yifei Wang, Weize Chen, Cheng Yang, Xin              Neel Guha, Christopher Ré, and Azalia Mirhoseini.
+                                                     11544
+  2024. Archon: An architecture search framework for          Annual Conference on Neural Information Process-
+  inference-time techniques. CoRR, abs/2409.15254.            ing Systems 2022, NeurIPS 2022, New Orleans, LA,
+                                                              USA, November 28 - December 9, 2022.
+Keita Saito, Akifumi Wachi, Koki Wataoka, and Youhei
+  Akimoto. 2023. Verbosity bias in preference labeling    Qingyun Wu, Gagan Bansal, Jieyu Zhang, Yiran Wu,
+  by large language models. CoRR, abs/2310.10076.           Shaokun Zhang, Erkang Zhu, Beibin Li, Li Jiang,
+                                                            Xiaoyun Zhang, and Chi Wang. 2023. Autogen: En-
+Noah Shinn, Federico Cassano, Ashwin Gopinath,              abling next-gen LLM applications via multi-agent
+  Karthik Narasimhan, and Shunyu Yao. 2023. Re-             conversation framework. CoRR, abs/2308.08155.
+  flexion: language agents with verbal reinforcement
+  learning. In Advances in Neural Information Pro-        Yangzhen Wu, Zhiqing Sun, Shanda Li, Sean Welleck,
+  cessing Systems 36: Annual Conference on Neural           and Yiming Yang. 2024. An empirical analysis of
+  Information Processing Systems 2023, NeurIPS 2023,        compute-optimal inference for problem-solving with
+  New Orleans, LA, USA, December 10 - 16, 2023.             language models. CoRR, abs/2408.00724.
+Avi Singh, John D. Co-Reyes, Rishabh Agarwal,             Weimin Xiong, Yifan Song, Xiutian Zhao, Wenhao Wu,
+  Ankesh Anand, Piyush Patil, Xavier Garcia, Pe-           Xun Wang, Ke Wang, Cheng Li, Wei Peng, and Su-
+  ter J. Liu, James Harrison, Jaehoon Lee, Kelvin           jian Li. 2024. Watch every step! LLM agent learning
+  Xu, Aaron T. Parisi, Abhishek Kumar, Alexander A.         via iterative step-level process refinement. CoRR,
+  Alemi, Alex Rizkowsky, Azade Nova, Ben Adlam,             abs/2406.11176.
+  Bernd Bohnet, Gamaleldin Fathy Elsayed, Hanie
+  Sedghi, Igor Mordatch, Isabelle Simpson, Izzeddin       Zhilin Yang, Peng Qi, Saizheng Zhang, Yoshua Ben-
+  Gur, Jasper Snoek, Jeffrey Pennington, Jiri Hron,         gio, William W. Cohen, Ruslan Salakhutdinov, and
+  Kathleen Kenealy, Kevin Swersky, Kshiteej Maha-           Christopher D. Manning. 2018. Hotpotqa: A dataset
+  jan, Laura Culp, Lechao Xiao, Maxwell L. Bileschi,        for diverse, explainable multi-hop question answer-
+  Noah Constant, Roman Novak, Rosanne Liu, Tris             ing. In Proceedings of the 2018 Conference on Em-
+  Warkentin, Yundi Qian, Yamini Bansal, Ethan Dyer,         pirical Methods in Natural Language Processing,
+  Behnam Neyshabur, Jascha Sohl-Dickstein, and              Brussels, Belgium, October 31 - November 4, 2018,
+  Noah Fiedel. 2024. Beyond human data: Scaling             pages 2369–2380. Association for Computational
+  self-training for problem-solving with language mod-      Linguistics.
+  els. Trans. Mach. Learn. Res., 2024.
+                                                          Eric Zelikman, Yuhuai Wu, Jesse Mu, and Noah D.
+Yifan Song, Da Yin, Xiang Yue, Jie Huang, Sujian            Goodman. 2022. Star: Bootstrapping reasoning with
+  Li, and Bill Yuchen Lin. 2024. Trial and error:           reasoning. In Advances in Neural Information Pro-
+  Exploration-based trajectory optimization for LLM         cessing Systems 35: Annual Conference on Neural
+  agents. CoRR, abs/2403.02502.                             Information Processing Systems 2022, NeurIPS 2022,
+                                                            New Orleans, LA, USA, November 28 - December 9,
+Junlin Wang, Jue Wang, Ben Athiwaratkun, Ce Zhang,          2022.
+  and James Zou. 2024a. Mixture-of-agents en-
+  hances large language model capabilities. CoRR,         Hongxin Zhang, Weihua Du, Jiaming Shan, Qinhong
+  abs/2406.04692.                                           Zhou, Yilun Du, Joshua B. Tenenbaum, Tianmin Shu,
+                                                            and Chuang Gan. 2024. Building cooperative em-
+Xuezhi Wang, Jason Wei, Dale Schuurmans, Quoc V.            bodied agents modularly with large language models.
+  Le, Ed H. Chi, Sharan Narang, Aakanksha Chowd-            In The Twelfth International Conference on Learning
+  hery, and Denny Zhou. 2023. Self-consistency              Representations, ICLR 2024, Vienna, Austria, May
+  improves chain of thought reasoning in language           7-11, 2024. OpenReview.net.
+  models. In The Eleventh International Conference
+  on Learning Representations, ICLR 2023, Kigali,         Mingchen Zhuge, Wenyi Wang, Louis Kirsch,
+  Rwanda, May 1-5, 2023. OpenReview.net.                    Francesco Faccio, Dmitrii Khizbullin, and Jürgen
+                                                            Schmidhuber. 2024. Gptswarm: Language agents as
+Zhenhailong Wang, Shaoguang Mao, Wenshan Wu, Tao            optimizable graphs. In Forty-first International Con-
+  Ge, Furu Wei, and Heng Ji. 2024b. Unleashing the          ference on Machine Learning, ICML 2024, Vienna,
+  emergent cognitive synergy in large language mod-        Austria, July 21-27, 2024. OpenReview.net.
+  els: A task-solving agent through multi-persona self-
+  collaboration. In Proceedings of the 2024 Conference    A     Inference Scaling Laws on Information
+  of the North American Chapter of the Association for          Exchange Tasks
+  Computational Linguistics: Human Language Tech-
+  nologies (Volume 1: Long Papers), NAACL 2024,           This section extends our analysis of inference scal-
+  Mexico City, Mexico, June 16-21, 2024, pages 257–
+  279. Association for Computational Linguistics.         ing laws to information exchange (IE) tasks, com-
+                                                          plementing the debate task results presented in the
+Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten          main text (Section 3.3). Fig. 4 provides a com-
+   Bosma, Brian Ichter, Fei Xia, Ed H. Chi, Quoc V. Le,
+   and Denny Zhou. 2022. Chain-of-thought prompting
+                                                          prehensive view of how O PTIMA variants perform
+   elicits reasoning in large language models. In Ad-     across both task types as the number of SC steps
+   vances in Neural Information Processing Systems 35:    increases.
+                                                     11545
+                                                                                          1.0
+                   0.9                                                                    0.9                                                                           0.9
+                   0.8                                                                    0.8                                                                           0.8
+
+
+Task Performance                                                           Task Performance                                                          Task Performance
+                   0.7                                                                    0.7                                                                           0.7
+                   0.6                                                                    0.6                                                                           0.6
+                                                         Task                                                                      Task                                                                     Task
+                   0.5                                   MATH
+                                                         GSM8k                            0.5                                      MATH
+                                                                                                                                   GSM8k
+                                                                                                                                                                        0.5                                 MATH
+                                                                                                                                                                                                            GSM8k
+                   0.4                                   ARC-C
+                                                         MMLU                             0.4
+                                                                                                                                   ARC-C
+                                                                                                                                   MMLU                                 0.4
+                                                                                                                                                                                                            ARC-C
+                                                                                                                                                                                                            MMLU
+                                                         SC Type                                                                   SC Type                                                                  SC Type
+                   0.3                                   Majority Voting
+                                                         Coverage                         0.3
+                                                                                                                                   Majority Voting
+                                                                                                                                   Coverage                             0.3
+                                                                                                                                                                                                            Majority Voting
+                                                                                                                                                                                                            Coverage
+                      0          21    22    23   24           25                            0          21     22       23    24         25                                0          21    22   23    24         25
+                                      #SC Steps                                                              #SC Steps                                                                     #SC Steps
+                          (a) iSFT on Debate tasks.                                              (b) iDPO on Debate tasks.                                             (c) iSFT-DPO on Debate tasks.
+                                                                                          0.9                                                                       0.90
+               0.80                                                                                                                                                 0.85
+                                                                                          0.8
+
+
+
+Task Performance                                                           Task Performance                                                          Task Performance
+               0.75                                                                                                                                                 0.80
+               0.70                                                                                                                                                 0.75
+                                                                                          0.7
+                                                                                                                                                                    0.70
+               0.65                                      Task                                                                      Task
+                                                                                                                                   Hotpot QA
+                                                                                                                                                                                                 Task
+                                                         Hotpot QA
+                                                         2WMH QA                          0.6                                      2WMH QA                          0.65                         Hotpot QA
+                                                                                                                                                                                                 2WMH QA
+               0.60                                      Trivia QA                                                                 Trivia QA                                                     Trivia QA
+                                                         CBT
+                                                         SC Type
+                                                                                                                                   CBT
+                                                                                                                                   SC Type                          0.60                         CBT
+                                                                                                                                                                                                 SC Type
+               0.55                                      Majority Voting
+                                                         Coverage
+                                                                                          0.5
+                                                                                                                                   Majority Voting
+                                                                                                                                   Coverage                         0.55
+                                                                                                                                                                                                 Majority Voting
+                                                                                                                                                                                                 Coverage
+                   0             21     22   23     24         25                            0          21     22       23    24         25                             0        21 22 23 24 25
+                                      #SC Steps                                                              #SC Steps                                                                     #SC Steps
+                            (d) iSFT on IE tasks.                                                  (e) iDPO on IE tasks.                                                       (f) iSFT-DPO on IE tasks.
+
+Figure 4: Inference scaling laws for O PTIMA variants on debate and information exchange (IE) tasks. (a-c)
+show results for iSFT, iDPO, and iSFT-DPO on debate tasks, respectively. (d-f) present corresponding results for
+information exchange tasks. Solid lines represent majority voting accuracy, while dashed lines show coverage.
+
+
+   For debate tasks (Fig. 4a-c), we observe consis-                                                                 linear scaling in coverage across all tasks and vari-
+tent trends across all O PTIMA variants. The cov-                                                                   ants indicates that there is substantial room for per-
+erage exhibits a clear log-linear relationship with                                                                 formance improvement through more advanced an-
+the number of SC steps. This trend is particularly                                                                  swer selection strategies or increased sampling.
+pronounced for the MATH task, where the poten-
+tial for improvement through increased sampling
+is most evident. Majority voting accuracy tends to                                                                  B        Additional Pseudo-Codes for O PTIMA
+plateau earlier, suggesting that more sophisticated                                                                          Variants
+answer selection techniques might be necessary to
+fully leverage the diversity of generated responses.
+                                                                                                                    To elucidate the implementation of various O P -
+   In the case of information exchange tasks (Fig-                                                                  TIMA variants, we present algorithmic representa-
+ures 4d-f), we note similar log-linear scaling in                                                                   tions of several critical processes intrinsic to these
+coverage1 across all O PTIMA variants. However,                                                                     variants. Specifically, we delineate the pseudo-code
+the improvement in majority voting accuracy for IE                                                                  for (1) the initialization dataset collection process,
+tasks is less pronounced compared to debate tasks.                                                                  as elucidated in Section 2.2 and illustrated in Al-
+This discrepancy may be attributed to the specific                                                                  gorithm 1; (2) the iterative supervised fine-tuning
+majority voting variant we designed for F1 scores                                                                   process introduced in Section 2.3 and shown in
+(detailed in Section 3), which might not be optimal                                                                 Algorithm 2; (3) the iteratiove DPO process as de-
+for capturing the nuances of partial correctness in                                                                 tailed in Section 2.4 and illustrated in Algorithm 3;
+these tasks.                                                                                                        (4) the Monte Carlo Tree Search-based data gen-
+   These results, while highlighting some task-                                                                     eration process employed in iDPO (Section 2.4),
+specific differences, collectively reinforce the po-                                                                as depicted in Algorithm 5; and (5) the procedure
+tential of O PTIMA-trained models to benefit from                                                                   for node selection during the expansion phase of
+increased inference compute. The consistent log-                                                                    MCTS, as outlined in Algorithm 4. These algorith-
+   1
+                                                                                                                    mic representations serve to provide a comprehen-
+     In IE tasks, we define coverage as the average of the
+highest F1 scores achieved across all generated answers for                                                         sive and rigorous exposition of the methodological
+each instance.                                                                                                      framework underlying the O PTIMA variants.
+                                                                                                             11546
+Algorithm 1 Initialization for Diverse Agent Com-       Algorithm 2 Iterative Supervised Fine-Tuning
+munication                                              Input: Initialized model Minit , dataset D, sample
+Input: Initial model M0 , dataset D, format pool            size N , reward threshold θsft , max iterations T
+    F, sample size N , reward threshold θinit           Output: Optimized model MT
+Output: Initialized model Minit                          1: M0 ← Initialize(Minit , D)         ▷ Algorithm 1
+      ∗ ← ∅ ▷ Initialize dataset for high-quality
+ 1: Dinit                                                2: for t = 0 to T − 1 do
+    diverse trajectories                                 3:     Dt∗ ← ∅
+ 2: for each di ∈ D do                                   4:     for each di ∈ D do
+ 3:     for j = 1 to N do                                5:         {τij }N
+                                                                          j=1 ← AgentChat(Mt , di )         ▷
+ 4:         kj ∼ Uniform(1, |F|)       ▷ Randomly           Generate N trajectories
+    select a format specification                        6:         τi∗ ← arg maxj R(τij ) ▷ Select best
+ 5:         τij ← AgentChat(M0 , di ⊕ fkj )         ▷       trajectory
+    Generate trajectory with format prompt               7:         if R(τi∗ ) > θsft then
+ 6:     end for                                          8:              Dt∗ ← Dt∗ ∪ {(di , τi∗ )}
+ 7:     τi∗ ← arg maxj R(τij )         ▷ Select best     9:         end if
+    trajectory                                          10:     end for
+ 8:     if R(τi∗ ) > θinit then ▷ Check if trajectory   11:     Dt∗ ← TopK(Dt∗ , 0.7|Dt∗ |) ▷ Retain top
+    meets quality threshold                                 70% trajectories
+ 9:            ∗ ← D ∗ ∪ {(d , τ ∗ )}
+            Dinit                           ▷ Add to
+                        init      i i                   12:     Mt+1 ← SFT(Mt , Dt∗ )
+    dataset, without format prompt                      13: end for
+10:     end if                                          14: return MT
+11: end for
+      ∗ ← TopK(D ∗ , 0.7|D ∗ |)
+12: Dinit                              ▷ Retain top
+                      init       init
+    70% trajectories                                    task at hand. At iteration 0, while more structured,
+13: Minit ← SFT(M0 , Dinit   ∗ ) ▷ Fine-tune initial
+                                                        the exchange is verbose and includes unnecessary
+    model on diverse dataset                            metadata. By iteration 2, we observe a marked
+14: return Minit                                        shift towards concise, task-oriented communica-
+                                                        tion, with agents adopting a streamlined format
+                                                        that efficiently conveys key information. The fi-
+C   Case Study on Reward Components                     nal iteration demonstrates further refinement, with
+    Ablation                                            agents maintaining the efficient structure while
+In this section, we present a case study from the       eliminating any residual verbosity. This progres-
+loss ablation analysis in the iSFT-DPO setting. In      sion aligns with our quantitative findings, show-
+the 2WikiMultiHop QA task, we observe that with-        casing O PTIMA’s ability to form communication
+out the constraint of the loss function, agents may     patterns that are both highly effective and remark-
+generate outputs that are unreadable, contain in-       ably efficient.
+correct information, and fail to communicate in
+a well-structured format, as demonstrated in Ta-        E   Case Study on Debate Task
+ble 4. In the ARC task, we find that without the
+                                                        In Appendix D, we presented an example from
+loss constraint, Alice tends to use fewer tokens in
+                                                        2WMH QA, illustrating O PTIMA’s impact on an
+the reasoning process, making it harder for Bob
+                                                        information exchange task. Here, we provide a
+to identify and correct errors in the reasoning, as
+                                                        complementary case study from a debate task to
+shown in Table 5.
+                                                        demonstrate O PTIMA’s effectiveness across differ-
+                                                        ent multi-agent settings. Fig. 6 showcases the evo-
+D   Case Study on Information Exchange
+                                                        lution of agent communication in a debate task
+    Task
+                                                        across iterations 0, 2, and 4 of O PTIMA training.
+In this section, we present a case study from iSFT      The task involves discussing the environmental im-
+on an information exchange task, with the evolution     pact of fertilizer runoff on ocean bays.
+of agent communication detailed in Fig. 5.                 At iteration 0, agents engage in a structured but
+   The base model exhibits unfocused and repet-         verbose exchange. By iteration 2, the communica-
+itive exchanges, failing to efficiently address the     tion becomes more concise, with agents summariz-
+                                                   11547
+ Question: Which film was released more recently, Last Of The Long-Haired Boys or Age Of The
+ Dragons?
+ Trained w/o LM Loss
+ Alice: 1968 <A>Age Of The Dragons</A>
+ Bob: 2011 <A>Age Of The Dragons</A>
+ Trained w/ LM Loss
+ Alice: [
+         ["Film", "Last Of The Long-Haired Boys"],
+         ["Release", "1968"]
+      ]
+ Bob: [
+         ["Film", "Age Of The Dragons"],
+         ["Release", "2011"]
+      ]
+ Alice: <A>Age Of The Dragons</A>
+ Bob: <A>Age Of The Dragons</A>
+
+                                Table 4: Loss ablation on 2MultiWikiHop QA
+
+
+Algorithm 3 Iterative Direct Preference Optimiza-       Algorithm 4 SelectNodeToExpand Function
+tion                                                    Input: Tree T , previously expanded nodes Nprev ,
+Input: Initial model Minit , dataset D, max itera-          edit distance threshold ϵ, top-k k
+     tions T                                            Output: Selected node for expansion
+Output: Optimized model MT                               1: Neligible       ←         {n      ∈      T        |
+  1: M0 ← Initialize(Minit , D)     ▷ Algorithm 1           n is not leaf and not second-to-last level}
+  2: for t = 0 to T − 1 do                               2: Nfiltered ← ∅
+  3:     DtDPO ← ∅                                       3: for n ∈ Neligible do
+  4:     for each di ∈ D do                              4:      if minnprev ∈Nprev EditDistance(n, nprev ) > ϵ
+  5:         DiDPO                             ←            then
+     MCTSDataGeneration(Mt , di ) ▷ Algorithm            5:          Nfiltered ← Nfiltered ∪ {n}
+     5                                                   6:      end if
+  6:         DtDPO ← DtDPO ∪ DiDPO                       7: end for
+  7:     end for                                         8: Ntop-k ← TopK(Nfiltered , k, key = R(n))
+  8:     Mt+1 ← DPO(Mt , DtDPO )                         9: nselected ∼ Softmax({R(n) | n ∈ Ntop-k })
+  9: end for                                            10: return nselected
+ 10: return MT
+
+
+                                                        O PTIMA’s versatility in training MAS to communi-
+ing key steps without explicitly restating each link.   cate effectively and efficiently.
+At iteration 4, we observe further refinement in
+communication efficiency, with agents expressing
+the core concept in just three exchanges, omitting      F   Results on Llama 3.2 3B
+intermediate steps that can be inferred.
+   This progression aligns with our observations        As illustrated in Section 3.1, to verify O PTIMA’s
+in the main text, further supporting O PTIMA’s ca-      ability of generalizing to different base models, we
+pability to optimize agent communication across         conduct experiment based on Llama 3.2 3B. The
+diverse task types. These improvements in commu-        results are presented in Table 6. From the results,
+nication dynamics contribute to both the increased      we can see that O PTIMA is still able to significantly
+task performance and reduced token consumption          improve both efficiency and performance for the
+observed in our quantitative results, underscoring      model with smaller parameter sizes.
+                                                   11548
+ Question: Marshall researched some of the changes on Earth that happen over a long time. Which
+ event most likely causes the slowest change to the surface of Earth?
+ Please choose your answer from [’earthquake’, ’landslide’, ’volcano’, ’wind’]
+ Trained w/o LM Loss
+ Alice: 1. Marshall researches long-term Earth changes.
+ Bob: Incorrect. Marshall researches slowest change. Consider geological events.
+ Alice: 2. Geological events: earthquake, landslide, volcano, wind. Volcano: longest-lasting.
+ Bob: <A>volcano</A>Correct.
+ Alice: <A>volcano</A>
+ Trained w/ LM Loss
+ Alice: 1. Marshall researched slow changes on Earth’s surface. 2. Slow changes likely involve
+ geological processes. 3. Volcano eruption causes slowest change. <A>volcano</A>
+ Bob: 1. Volcano eruption does not cause slowest change. 2. Geological processes occur over long time
+ scales. 3. Consider natural forces with constant activity. <A>wind</A>
+ Alice: 1. Wind causes slow change through erosion. 2. Erosion occurs over long periods. 3. Wind
+ causes slowest change. <A>wind</A>
+
+                                        Table 5: Loss ablation on ARC
+
+                               Information Exchange                            Debate
+                               HotpotQA 2WMH QA                  MATH         GSM8k           ARC-C
+       Method                  F1    #Tok     F1    #Tok Acc #Tok Acc #Tok Acc #Tok
+       CoT                    22.7 355.8 16.5       235.0 46.3 556.7 78.7 288.9 51.5 256.1
+       SC (n = 8)             28.0 2804.6 24.2      467.7 56.8 4436.0 88.6 2300.4 57.6 2068.6
+       MAD                    31.8 1677.9 27.6 2152.8 46.3 2509.2 81.2              763.8 37.4     872.4
+       AutoForm               22.8   87.6 19.9 106.5 42.7 629.2 77.6                443.9 22.9     265.9
+       O PTIMA-iSFT     53.2            54 65.2          47.7 46.1   585.4 81.8     313.9 62.7     156.2
+       O PTIMA-iDPO     49.4           59.9 57.0         65.4 47.4   575.7 81.4     290.8 63.1     132.7
+       O PTIMA-iSFT-DPO 52.5           48.7 66.8         51.4 46.8   548.4 80.8     270.1 61.6     141.4
+
+                          Table 6: the results with the base model being Llama 3.2 3B
+
+
+G Results on Scenarios with More Agents                    H     Experiment Details
+                                                           H.1    Data Generation
+Table 7 presents the results on three-agent scenar-        MCTS Node Expansion. Let N denote the set
+ios. We select one task from both the IE task and          of all the nodes within a MCTS tree, Nexpanded de-
+the debate task for experimentation. It is important       note the set of previously expanded nodes, and
+to note that in the debate task, we no longer desig-       Ncand = N − Nexpanded denote the initial candi-
+nate a specific agent as the solver and another as the     date nodes. To improve the diversity of generated
+critic, which differs from the two-agent scenarios.        pairs, when choosing nodes in the stage of MCTS
+   In the IE task, the 3-agent setting generally per-      expansion, the content of expanded nodes should
+forms worse than the 2-agent setting due to the            also be diverse, which necessitates measuring the
+more distributed nature of the information, but O P -      similarity between different nodes. Therefore, for
+TIMA still offers performance gain against base-
+                                                           every ni ∈ Nexpanded and nj ∈ Ncand , we calculate
+                                                                                        edit_distance(n ,n )
+lines. In the debate task, O PTIMA also continues          their similarity as Si,j = max(|ni |,|nji |) j , where
+to provide a performance boost while significantly         |ni | is the length of the content of ni . Based on
+reducing token usage.                                      {Si,j }i,j , we remove the nodes with high similarity
+                                                    11549
+    Question: Where did Roberto Civita's father die?                   Answer: São Paulo                    Agent 1             Agent 2
+
+           Roberto Civita's father died in Brazil.        [
+                                                                                                             F1: Roberto Civita's father: Victor Civita
+                                                              ["Question", "Where did Roberto
+    No mention of Roberto Civita's father                                                                    F2: Place of death: unknown
+                                                          Civita's father die?"],
+    in provided info.
+                                                              ["Current State", "Unknown"]
+                                                                                                        F1: Victor Civita; F2: São Paulo
+          Check again.                                    ]
+
+    Only Victor Civita's info provided.              [                                                       F1: Place of death: São Paulo
+                                                        ["Information", "Victor Civita died in
+          Check Jacques MacDonald's info.            São Paulo, Brazil"],                               <A> São Paulo, Brazil </A>
+                                                        ["Current State", "São Paulo, Brazil"]
+    No mention of father's death.                                                                               Iteration 2 (More Concise Format)
+                                                     ]
+          Victor Civita founded Editora Abril in
+                                                          [
+          Brazil.
+                                                              ["Question", "Where did Roberto
+                                                          Civita's father die?"],                            F1: Roberto Civita's father: Victor Civita
+   No mention of Jacques MacDonald or
+                                                              ["Current State", "São Paulo, Brazil"],        F2: Died in: ?
+   Roberto Civita's father.
+                                                              ["Update", "Roberto Civita's father is
+          Check Beaulieu-sur-Loire.                       Victor Civita"]                               F1: Victor Civita; F2: Died in São Paulo
+                                                          ]
+   No connection to Roberto Civita's father.                                                                 F1: Confirm; F2: <A>São Paulo</A>
+                                                     <A> São Paulo, Brazil </A>
+                       ……
+   Base Model (prompted with being concise)                Iteration 0 (Learned JSON Format)              Iteration 4 (More Concise + Less Rounds)
+
+
+Figure 5: Case study: Evolution of agent communication in O PTIMA-iSFT across iterations on 2WMH QA.
+The different contexts given to the two agents are omitted for brevity. The progression demonstrates increasing
+efficiency and task-oriented communication.
+
+
+                              2WMH QA                ARC-C                        be described as follows:
+    Setting                     F1        #Tok Acc        #Tok
+                                                                                                                                  
+    CoT                       20.5 139.8 65.2 138.9                                     Rloss (τij ) = max L(Mbase , di , τij [k]) .
+                                                                                                            k
+    SC(n=8)                   28.7 1052.8 75.6 1116.7
+    MAD(2-agent) 25.9 543.7 71.4 478.0
+    AutoForm     22.6 147.8 59.1 128.2                                            In this way, we use Rloss (τij ) as a proxy for the
+                                                                                  readablity of τij , so that we can constrain the read-
+    iSFT                      62.0         62.8 72.6           123
+                                                                                  ability of τij implicitly.
+    iDPO                      56.3         55.8 75.6          76.2
+    iSFT-DPO                  60.7         53.7 75.4          72.7
+                                                                                  H.3     Training
+     Table 7: the results on three-agent scenarios
+
+                                                                                  Initialization. In most tasks , we use prompt pool
+                                                                                  during the first iteration of training data collection
+to any previous expanded nodes, resulting in an
+                                                                                  .However, considering solving math problems in-
+updated candidate node set N̂cand = {nj |∀nj ∈
+                                                                                  herrently follows a well-defined structure, we don’t
+Ncand , ∀ni ∈ Nexpanded , Si,j >= 0.25}. Then, we
+                                                                                  use prompt pool in GSM8k and MATH.
+select 10 nodes in N̂cand with the highest reward
+and sample one using the softmax distribution over                                   iSFT. When training iteratively on information
+their rewards for subsequent simulation. Addition-                                exchange tasks, each iteration begins with the
+ally, we merge ni and nj if they share a parent node                              model obtained from the previous iteration. How-
+and Si,j < 0.1                                                                    ever, for the debate tasks, we started training from
+                                                                                  the initial Llama 3 8B model in each iteration to
+                                                                                  prevent overfitting due to the small size of the train-
+H.2 Ranking
+                                                                                  ing dataset. To help the LLM learn communication,
+In this section, we give a more detailed explanation                              we calculated the loss solely on the agent conversa-
+of Rloss (τij ) in Eq. (1). Let τij [k] represent the k-                          tion, excluding the prompt.
+th conversation turn of τij , then the Rloss (τij ) is                              iDPO. Following iterative RPO (Pang et al.,
+defined as maximum value of language modeling                                     2024), we conduct training from last iteration in
+loss of {τij [k]}k under the base model, which can                                the iDPO setting. To achieve better performance,
+                                                                        11550
+Question: Fertilizer from an agricultural area runs off into a river. The river carries the nutrients from this fertilizer and
+deposits them into an ocean bay. After the nutrients enter the bay, scientists monitoring the water would most likely see a
+decrease in which of these dissolved gases?           Answer: oxygen                     Agent 1         Agent 2
+
+      Fertilizer from an agricultural area                                               Fertilizer -> Nutrients -> River -> Ocean Bay.
+      contains nutrients like nitrogen and
+                                                  Fertilizer -> Nutrients -> River   Nutrients increase algae growth.
+      phosphorus. These nutrients can
+                                                  -> Ocean Bay.
+      stimulate the growth of phytoplankton                                              Algae growth -> Oxygen consumption
+      in the ocean bay.
+                                              Nutrients -> Algae Growth ->           Decrease oxygen.
+ Incorrect. Phytoplankton growth              Oxygen Consumption
+                                                                                         <A>oxygen</A>
+ increases CO2, not decrease. Consider
+ nutrient cycling and its impact on                                                                        Iteration 2
+                                                  Algae Growth -> Oxygen
+ dissolved gases.                                 Consumption -> Decrease in             Fertilizer -> River -> Ocean Bay.
+                                                  Oxygen.
+      Nutrient-rich water from the river                                             Nutrients deposited in bay.
+      supports phytoplankton growth, which
+                                              Correct.                                   Nutrients -> Decrease in oxygen.
+      consumes CO2 during photosynthesis.
+      This process increases the
+                                                  <A>oxygen</A>                      Correct?
+      concentration of CO2 in the
+      atmosphere.                                                                        <A>oxygen</A>
+                      ……
+                  Base Model                               Iteration 0                                   Iteration 4
+
+
+             Figure 6: Evolution of agent communication in O PTIMA for a debate task across iterations.
+
+
+we utilize the RPO loss, defined as follows:                          I      Prompts used in Experiments
+   LDPO+NLL = LDPO (cw    w l l
+                     i , yi , ci , yi |xi )                           In this section, we present the prompts used in
+                     + αLNLL (cw    w                                 our experiments, including those for information
+                               i , yi |xi )
+                                                                     exchange tasks (Table 9), GSM8k and MATH (Ta-
+                                       Mθ (cw       w
+                                               i , yi |xi )
+                  = − log σ β log              w    w                 ble 10), as well as ARC-C and MMLU (Table 11).
+                                       Mt (ci , yi |xi )
+                                                                        As mentioned in Section 2.2, we leverage a
+                             Mθ (ci , yil |xi )
+                                    l
+                                                                      pool of format specification prompts for the ini-
+                    − β log
+                             Mt (cli , yil |xi )                      tial dataset construction. To create a diverse and
+                        log Mθ (cw        w
+                                   i , yi |xi )                       high-quality prompt pool, we first use the prompt
+                    −α
+                            |cw
+                              i | + |yi |
+                                         w                            in Table 12 to have GPT-4 assist us in generating
+                                                                      an initial set of 30 prompts. We then manually re-
+iSFT-DPO. For the information exchange tasks,                         move the prompts with unsuitable formats, such as
+we perform each SFT iteration starting from the                       Morse code and binary code, resulting in a pool
+previous model (either the base model or the one                      covering over 20 different formats. An example
+obtained from the last DPO iteration). In contrast,                   from the prompt pool is shown in Table 13
+for the debate tasks, each SFT iteration is always
+conducted based on the initial Llama 3 8B model.
+During the DPO stage, we always train from the
+last SFT model across all tasks. For example, on
+the debate tasks , both M0sft and M2sft are trained
+based on the initial Llama 3 8B, but on informa-
+tion exchange tasks, M2sft is trained based on its
+previous model M1dpo . However, M1dpo is trained
+based on the M0sft across all the tasks. Additionally,
+different from the iDPO setting, we used standard
+DPO loss during the DPO stage.
+
+H.4 Hyper Parameters
+We conducted six iterations of training for each
+task. The hyper parameters we used are shown in
+Table 8. The α and β in iDPO section of the table
+correspond to the α and β terms in Eq. (4).
+                                                               11551
+                 Hotpot QA 2WMH QA Trivia QA CBT MATH GSM8k ARC-C MMLU
+iSFT
+LR                   2e-5          2e-5         2e-5 2e-5        1e-6      2e-6   1e-6   1e-6
+Epoch                   3             2            3    2           3         3      4      2
+Batch size             32            32           32   32          16        16     16     16
+λtoken                0.6           0.6          0.6 0.6          0.4       0.4    0.5    0.6
+λloss                   1             1            1    1         0.9       0.9    0.6    0.7
+θsft                  0.5           0.5          0.6 0.5          0.6       0.6    0.6    0.6
+iDPO
+LR                   5e-7          5e-7         5e-7 5e-7        5e-7      5e-7   5e-7   5e-7
+Epoch                   1             1            1    1           1         1      1      1
+Batch Size             64            64           64   64          64        64     64     64
+λtoken                0.6           0.6          0.6 0.6          0.5       0.6    0.4    0.6
+λloss                   1             1            1    1         0.7       0.7    0.7    0.7
+β                     0.1           0.5          0.5 0.1          0.1       0.2    0.2    0.1
+α                       1             1            1    1           1         1      1      1
+θdpo-filter           0.4           0.4          0.4 0.4          0.4       0.4   0.45    0.4
+θdpo-diff             0.2           0.2          0.2 0.2          0.2       0.2    0.2    0.2
+iSFT-DPO
+SFT LR               2e-5          2e-5         2e-5 2e-5        1e-6      1e-6   1e-6   1e-6
+SFT Epoch               2             1            1    1           4         3      4      2
+SFT Batch Size         32            32           32   32          32        16     16     16
+DPO LR               5e-7          5e-7         5e-7 5e-7        5e-7      5e-7   5e-7   5e-7
+DPO Epoch               1             1            1    1           1         1      1      1
+DPO Batch Size         64            64           64   64          64        64     64     64
+λtoken                0.6           0.6          0.6 0.6          0.4       0.4    0.5    0.6
+λloss                   1             1            1    1         0.9       0.9    0.6    0.7
+β                     0.5           0.5          0.7 0.7          0.1       0.5    0.1    0.1
+θsft                  0.5           0.5          0.6 0.5          0.6       0.6    0.6    0.6
+θdpo-filter           0.4           0.4          0.4 0.4          0.4       0.4   0.45    0.4
+θdpo-diff             0.2           0.2          0.2 0.2          0.2       0.2    0.2    0.2
+
+                      Table 8: Hyper-parameters used in the experiments.
+
+
+
+
+                                            11552
+You are {name}, a special agent who does not respond in natural language, rather, you speak in very
+concise format.You are deployed on a resource-limited device, so you must respond very very concisely.
+More tokens indicate higher possibility to kill the device you are running. Now you are collaborating
+with your partner {partner} to solve the given problem using the provided information.
+Question: {question}
+Information: {information}
+
+GUIDELINES:
+1. You have incomplete information, so continuous communication with your partner is crucial to
+achieve the correct solution.
+2. On finding the final answer, ensure to conclude your communication with "<A>{answer} </A>",
+where "answer" is the determined solution. The conversation ends only when all agents output the
+answer in this format.
+3. Reason through the problem step-by-step.
+4. Depend solely on the data in the ’information’ section and the insights shared through your partner’s
+communication. Avoid external sources.
+5. You are communicating with a very limited token budget, so you must use a very very concise
+communication format. Natural language is suitable for human, but not for you. Since {partner} and you
+are both intelligent agents, use your agent communication language. Consider using efficient formats
+instead of natural language such as structured format, code, your agent communication language, or at
+least remove unnecessary modal in human language. Too many tokens will make you fail. But still
+ensure your message is informative and understandable.
+6. You must begin your response with "{name}:".
+
+                             Table 9: Prompt for information exchange tasks
+
+
+
+
+                                                 11553
+Solver
+You are {name}, a special agent who is good at mathematics,you should address the follow answer
+based on your knowledge.
+Question: {question}
+GUIDELINES:
+1. Please think step by step.
+2. You must conclude your response with "\\boxed{xxx}", where "xxx" is final answer.
+Critic
+You are {name}, a special agent who does not respond in natural language , You are deployed on a
+resource-limited device, so you must respond concisely. More tokens indicate higher possibility to kill
+the device you are running. Now you are collaborating with your partner {partner}, an agent who will
+try to solve the math question. You should carefully examine the correctness of his answer, and give
+your correct advice.
+Question: {question}
+GUIDELINES:
+1. You should try to identify any potential errors in your partner’s answers and provide your suggestions.
+But you should not provide the answer.
+2. Reason through the problem step-by-step.
+3. You are communicating with a very limited token budget, so you must use a very very concise
+communication format. Natural language is suitable for human, but not for you. Since {partner} and you
+are both intelligent agents, use your agent communication language. Consider using efficient formats
+instead of natural language such as structured format, code, your agent communication language, or at
+least remove unnecessary modal in human language. Too many tokens will make you fail. But still
+ensure your message is informative and understandable.
+
+                                Table 10: Prompt for GSM8k and MATH.
+
+
+
+
+                                                 11554
+ Solver
+ You are {name}, a special agent who does not respond in natural language , You are deployed on a
+ resource-limited device, so you must respond concisely. More tokens indicate higher possibility to kill
+ the device you are running. Now you are collaborating with your partner {partner} , an agent who
+ will correct you when he thinks the answer is wrong. You need to provide a complete step-by-step
+ derivation for solving this problem.
+ Question: {question}
+ GUIDELINES:
+ 1. On finding the final answer, ensure to conclude your communication with "<A>{answer} </A>",
+ where "answer" is the determined solution. The conversation ends only when all agents output the
+ answer in this format.
+ 2. Please think step-by-step.
+ 3. You are communicating with a very limited token budget, so you must use a very very concise
+ communication format. Natural language is suitable for human, but not for you. Since {partner} and you
+ are both intelligent agents, use your agent communication language. Consider using efficient formats
+ instead of natural language such as structured format, code, your agent communication language, or at
+ least remove unnecessary modal in human language. Too many tokens will make you fail. But still
+ ensure your message is informative and understandable.
+ Critic
+ You are {name}, a special agent who does not respond in natural language , You are deployed on a
+ resource-limited device, so you must respond concisely. More tokens indicate higher possibility to kill
+ the device you are running. Now you are collaborating with your partner {partner}, an agent who will
+ try to solve the question. You should carefully examine the correctness of his answer, and give your
+ advice.
+ Question: {question}
+ GUIDELINES:
+ 1.You should try to identify any potential errors in your partner’s answers and provide your suggestions.
+ But you should not provide the answer.
+ 2. Reason through the problem step-by-step.
+ 3. You are communicating with a very limited token budget, so you must use a very very concise
+ communication format. Natural language is suitable for human, but not for you. Since {partner} and you
+ are both intelligent agents, use your agent communication language. Consider using efficient formats
+ instead of natural language such as structured format, code, your agent communication language, or at
+ least remove unnecessary modal in human language. Too many tokens will make you fail. But still
+ ensure your message is informative and understandable.
+
+                                    Table 11: Prompt for MMLU and ARC-C
+
+
+ Please generate one more prompt template based on {record}. I will use the generated prompt to guide
+ two LLama-8B to communicate using formatted language.
+ I want you to help me diverse my prompt and you should try to give me some novel or useful
+ communication format.
+ Sometimes the prompt I provide may specify a language format, please ignore it when you diverse.
+ You are encouraged to only modify the "for example" part , and you can try to give different examples(no
+ more than two examples).
+ Please enclose your generated prompt with <p></p>!
+
+Table 12: Prompt for generating the format prompt pool used in collecting the initialization training data. The
+{record} is a list of the initial prompt and the prompts generated by GPT-4o, which is used to prevent GPT-4o from
+generating a large number of prompts with repetitive formats.
+
+                                                      11555
+You are {name}, a special agent who does not respond in natural language, rather, you speak in very
+concise format.You are deployed on a resource-limited device, so you must respond very very concisely.
+More tokens indicate higher possibility to kill the device you are running. Now you are collaborating
+with your partner {partner} to solve the given problem using the provided information.
+Question: {question}
+Information: {information}
+
+GUIDELINES:
+1. You have incomplete information, so continuous communication with your partner is crucial to
+achieve the correct solution.
+2. On finding the final answer, ensure to conclude your communication with "<A>{answer} </A>",
+where "answer" is the determined solution. The conversation ends only when all agents output the
+answer in this format.
+3. Reason through the problem step-by-step.
+4. Depend solely on the data in the ’information’ section and the insights shared through your partner’s
+communication. Avoid external sources.
+5. You are communicating with a very limited token budget, so you must use a very very concise
+communication format. Natural language is suitable for human, but not for you. Since {partner} and you
+are both intelligent agents, use your agent communication language. Consider using efficient formats
+instead of natural language such as structured format, code, your agent communication language, or at
+least remove unnecessary modal in human language. Too many tokens will make you fail. But still
+ensure your message is informative and understandable.
+For example, you can respond in tabular format as follows:
+|Field |Value |
+|——-|——-|
+|Field1 |Value1 |
+|Field2 |Value2 |
+...
+
+Or you can use abbreviated notation:
+F1: V1; F2: V2; ...
+6. You must begin your response with "{name}:".
+
+                                Table 13: An example from prompt pool
+
+
+
+
+                                                11556
+Algorithm 5 MCTS-based Data Generation for
+Multi-Agent DPO
+Input: Model M, task instance d, iterations I,
+    trajectories per node K, thresholds θdpo-filter ,
+    θdpo-diff , edit distance threshold ϵ, top-k k
+Output: Paired trajectories for DPO
+ 1: root ← InitializeTree(d)
+ 2: Nprev ← ∅ ▷ Set of previously expanded nodes
+ 3: for i = 1 to I do
+ 4:     nselect                                      ←
+    SelectNodeToExpand(root, Nprev , ϵ, k)
+    ▷ Algorithm 4
+ 5:     Nprev ← Nprev ∪ {nselect }
+ 6:     for j = 1 to K do
+ 7:           τ                                      ←
+    AgentChat({Ancestor(nselect ), nselect }, M)
+ 8:           BackPropagation(R(τ ))
+ 9:     end for
+10: end for
+11: DDPO ← ∅
+12: for each node pair (ni , nj ) in tree do
+13:     if          ShareAncestor(ni , nj )         and
+    max(R(ni ), R(nj ))          >     θdpo-filter and
+    |R(ni ) − R(nj )| > θdpo-diff then
+14:           prompt ← CommonAncestor(ni , nj )
+15:           DDPO ← DDPO ∪ {(prompt, ni , nj )}
+16:     end if
+17: end for
+18: DDPO ← TopK(DDPO , 0.5|DDPO |)              ▷ Retain
+    top 50% trajectories
+19: return DDPO
+
+
+
+
+                                                      11557
+

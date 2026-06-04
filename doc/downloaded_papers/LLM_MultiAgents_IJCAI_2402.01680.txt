@@ -1,0 +1,955 @@
+                                         Large Language Model based Multi-Agents: A Survey of Progress and Challenges
+                                                      Taicheng Guo1 , Xiuying Chen2 , Yaqi Wang3∗ , Ruidi Chang , Shichao Pei4 ,
+                                                                    Nitesh V. Chawla1 , Olaf Wiest1 , Xiangliang Zhang1†
+                                                      1
+                                                        University of Notre Dame, 2 King Abdullah University of Science and Technology
+                                                   3
+                                                     Southern University of Science and Technology, 4 University of Massachusetts Boston
+                                                {tguo2, nchawla, owiest, xzhang33}@nd.edu, xiuying.chen@kaust.edu.sa, ywang84@nd.edu,
+                                                                        ruidic@alumni.cmu.edu, shichao.pei@umb.edu
+
+
+
+
+arXiv:2402.01680v2 [cs.CL] 19 Apr 2024
+                                                                    Abstract                                   decision-making in a wide range of contexts [Yao et al.,
+                                                                                                               2023; Shinn et al., 2023; Li et al., 2023d]. Timely survey
+                                              Large Language Models (LLMs) have achieved re-                   papers systematically summarize the progress of LLM-based
+                                              markable success across a wide array of tasks.                   agents, as seen in works [Xi et al., 2023; Wang et al., 2023b].
+                                              Due to the impressive planning and reasoning abil-
+                                                                                                                  Based on the inspiring capabilities of the single LLM-
+                                              ities of LLMs, they have been used as autonomous
+                                                                                                               based agent, LLM-based Multi-Agents have been proposed
+                                              agents to do many tasks automatically. Recently,
+                                                                                                               to leverage the collective intelligence and specialized pro-
+                                              based on the development of using one LLM as a
+                                                                                                               files and skills of multiple agents. Compared to systems us-
+                                              single planning or decision-making agent, LLM-
+                                                                                                               ing a single LLM-powered agent, multi-agent systems offer
+                                              based multi-agent systems have achieved consid-
+                                                                                                               advanced capabilities by 1) specializing LLMs into various
+                                              erable progress in complex problem-solving and
+                                                                                                               distinct agents, each with different capabilities, and 2) en-
+                                              world simulation. To provide the community with
+                                                                                                               abling interactions among these diverse agents to simulate
+                                              an overview of this dynamic field, we present this
+                                                                                                               complex real-world environments effectively. In this context,
+                                              survey to offer an in-depth discussion on the essen-
+                                                                                                               multiple autonomous agents collaboratively engage in plan-
+                                              tial aspects of multi-agent systems based on LLMs,
+                                                                                                               ning, discussions, and decision-making, mirroring the co-
+                                              as well as the challenges. Our goal is for readers to
+                                                                                                               operative nature of human group work in problem-solving
+                                              gain substantial insights on the following questions:
+                                                                                                               tasks. This approach capitalizes on the communicative ca-
+                                              What domains and environments do LLM-based
+                                                                                                               pabilities of LLMs, leveraging their ability to generate text
+                                              multi-agents simulate? How are these agents pro-
+                                                                                                               for communication and respond to textual inputs. Further-
+                                              filed and how do they communicate? What mech-
+                                                                                                               more, it exploits LLMs’ extensive knowledge across vari-
+                                              anisms contribute to the growth of agents’ capaci-
+                                                                                                               ous domains and their latent potential to specialize in spe-
+                                              ties? For those interested in delving into this field
+                                                                                                               cific tasks. Recent research has demonstrated promising re-
+                                              of study, we also summarize the commonly used
+                                                                                                               sults in utilizing LLM-based multi-agents for solving vari-
+                                              datasets or benchmarks for them to have convenient
+                                                                                                               ous tasks, such as software development [Hong et al., 2023;
+                                              access. To keep researchers updated on the latest
+                                                                                                               Qian et al., 2023], multi-robot systems [Mandi et al., 2023;
+                                              studies, we maintain an open-source GitHub repos-
+                                                                                                               Zhang et al., 2023c], society simulation [Park et al., 2023;
+                                              itory, dedicated to outlining the research on LLM-
+                                                                                                               Park et al., 2022], policy simulation [Xiao et al., 2023;
+                                              based multi-agent systems.
+                                                                                                               Hua et al., 2023], and game simulation [Xu et al., 2023c;
+                                                                                                               Wang et al., 2023c]. Due to the nature of interdisciplinary
+                                         1   Introduction                                                      study in this field, it has attracted a diverse range of re-
+                                                                                                               searchers, expanding beyond AI experts to include those from
+                                         Large Language Models (LLMs) have recently shown re-                  social science, psychology, and policy research. The vol-
+                                         markable potential in reaching a level of reasoning and plan-         ume of research papers is rapidly increasing, as shown in
+                                         ning capabilities comparable to humans. This ability ex-              Fig. 1 (inspired by the design in [Gao et al., 2023b]), thus
+                                         actly aligns with the expectations of humans for autonomous           broadening the impact of LLM-based Multi-Agent research.
+                                         agents that can perceive the surroundings, make decisions,            Nonetheless, earlier efforts were undertaken independently,
+                                         and take actions in response [Xi et al., 2023; Wooldridge and         resulting in an absence of a systematic review to summarize
+                                         Jennings, 1995; Russell and Norvig, 2009; Guo et al., 2023;           them, establish comprehensive blueprint of this field, and ex-
+                                         Liang et al., 2023]. Hence, LLM-based agent has been stud-            amine future research challenges. This underscores the sig-
+                                         ied and rapidly developed to understand and generate human-           nificance of our work and serves as the motivation behind pre-
+                                         like instructions, facilitating sophisticated interactions and        senting this survey paper, dedicated to the research on LLM-
+                                            ∗
+                                              This work was done when Yaqi was visiting students at the Uni-   based multi-agent systems.
+                                         versity of Notre Dame.                                                   We expect that our survey can make significant contribu-
+                                            †
+                                              Corresponding author.                                            tions to both the research and development of LLMs and to
+Figure 1: The rising trend in the research field of LLM-based Multi-Agents. For Problem Solving and World Simulation, we categorize
+current work into several categories and count the number of papers of different types at 3-month intervals. The number at each leaf node
+denotes the count of papers within that category.
+
+
+a wider range of interdisciplinary studies employing LLMs.            in specific ways; 3) agent communication, which examines
+Readers will gain a comprehensive overview of LLM-based               how agents exchange messages and collaborate; and 4) agent
+Multi-Agent (LLM-MA) systems, grasp the fundamental                   capability acquisition, which explores how agents develop
+concepts involved in establishing multi-agent systems based           their abilities to effectively solve problems. An additional
+on LLMs, and catch the latest research trends and applica-            perspective for reviewing studies about LLM-MA is their ap-
+tions in this dynamic field. We recognize that this field is in       plication. In Section 4, we categorize current applications
+its early stages and is rapidly evolving with fresh methodolo-        into two primary streams: multi-agents for problem-solving
+gies and applications. To provide a sustainable resource com-         and multi-agents for world simulation. To guide individuals
+plementing our survey paper, we maintain an open-source               in identifying appropriate tools and resources, we present
+GitHub repository1 . We hope that our survey will inspire fur-        open-source implementation frameworks for studying LLM-
+ther exploration and innovation in this field, as well as appli-      MA, as well as the usable datasets and benchmarks in Sec-
+cations across a wide array of research disciplines.                  tion 5. Based on the previous summary, we open the dis-
+   To assist individuals from various backgrounds in under-           cussion for future research challenges and opportunities in
+standing LLM-MA techniques and to complement existing                 Section 6. The conclusions are summarized in Section 7.
+surveys by tackling unresolved questions, we have organized
+our survey paper in the following manner. After laying out            2     Background
+the background knowledge in Section 2, we address a piv-              2.1    Single-Agent Systems Powered LLMs
+otal question: How are LLM-MA systems aligned with the
+collaborative task-solving environment? To answer this, we            We introduce the background by first outlining the capabili-
+present a comprehensive schema for positioning, differenti-           ties of a single-agent system based on LLMs, following the
+ating, and connecting various aspects of LLM-MA systems               discussion presented in [Weng, 2023].
+in Section 3. We delve into this question by discussing: 1)           Decision-making Thought: This term denotes the capabil-
+the agents-environment interface, which details how agents            ity of LLM-based agents, guided by prompts, to break down
+interact with the task environment; 2) agent profiling, which         complex tasks into smaller subgoals [Khot et al., 2023], think
+explains how an agent is characterized by an LLM to behave            through each part methodically (sometimes exploring mul-
+                                                                      tiple paths) [Yao et al., 2023], and learn from past experi-
+   1
+       https://github.com/taichengguo/LLM MultiAgents Survey Papers   ences [Shinn et al., 2023] to perform better decision-making
+on complex tasks. This capability enhances the autonomy          checking roles. Following these actions, agents receive feed-
+of a single LLM-based agent and bolsters its effectiveness in    back from the environment, informing them of the game’s
+problem-solving.                                                 current state. This information guides the agents in adjust-
+Tool-use: LLM-based agents’ tool-use capability allows           ing their strategies over time, responding to the evolving
+them to leverage external tools and resources to accom-          gameplay and interactions with other agents. The Agents-
+plish tasks, enhancing their functional capabilities and oper-   Environment Interface refers to the way in which agents in-
+ate more effectively in diverse and dynamic environments [Li     teract with and perceive the environment. It’s through this
+et al., 2023d; Ruan et al., 2023; Gao et al., 2023b].            interface that agents understand their surroundings, make de-
+                                                                 cisions, and learn from the outcomes of their actions. We
+Memory: This ability refers to the capability of LLM-            categorize the current interfaces in LLM-MA systems into
+based agent for conducting in-context learning [Dong et al.,     three types, Sandbox, Physcial, and None, as detailed in Ta-
+2023a] as short memory or external vector database [Lewis et     ble 1. The Sandbox refers to a simulated or virtual environ-
+al., 2021] as long memory to preserve and retrieve informa-      ment built by human where agents can interact more freely
+tion over prolonged periods [Wang et al., 2023b]. This ability   and experiment with various actions and strategies. This kind
+enables a single LLM-based agent to maintain contextual co-      of interface is widely used in software development (code
+herence and enhance learning from interactions.                  interpreter as simulated environment) [Hong et al., 2023],
+                                                                 gaming (using game rules as simulated environment) [Mao
+2.2    Single-Agent VS. Multi-Agent Systems                      et al., 2023], etc. The Physical is a real-world environment
+Single-Agent systems empowered by LLMs have shown in-            where agents interact with physical entities and obey real-
+spiring cognitive abilities [Sumers et al., 2023]. The con-      world physics and constraints. In physical space, agents nor-
+struction of such systems concentrates on formulating their      mally need to take actions that can have direct physical out-
+internal mechanisms and interactions with the external en-       comes. For example, in tasks such as sweeping the floor,
+vironment. Conversely, LLM-MA systems emphasize di-              making sandwiches, packing groceries, and arranging cab-
+verse agent profiles, inter-agent interactions, and collective   inets, robotic agents are required to perform actions itera-
+decision-making processes. From this perspective, more dy-       tively, observe the physical environment, and continuously
+namic and complex tasks can be tackled by the collaboration      refine their actions [Mandi et al., 2023]. Lastly, None refers
+of multiple autonomous agents, each of which is equipped         to scenarios where there is no specific external environment,
+with unique strategies and behaviors, and engaged in com-        and agents do not interact with any environment. For exam-
+munication with one another.                                     ple, many applications [Du et al., 2023; Xiong et al., 2023;
+                                                                 Chan et al., 2023] utilize multiple agents to debate a ques-
+3     Dissecting LLM-MA Systems: Interface,                      tion to reach a consensus. These applications primarily focus
+                                                                 on communication among agents and do not depend on the
+      Profiling, Communication, and Capabilities                 external environment.
+In this section, we delve into the intricacies of LLM-MA sys-
+tems, where multiple autonomous agents engage in collabo-        3.2   Agents Profiling
+rative activities akin to human group dynamics in problem-
+solving scenarios. A critical inquiry we address is how          In LLM-MA systems, agents are defined by their traits, ac-
+these LLM-MA systems are aligned to their operational envi-      tions, and skills, which are tailored to meet specific goals.
+ronments and the collective objectives they are designed to      Across various systems, agents assume distinct roles, each
+achieve. To shed light on this, we present the general ar-       with comprehensive descriptions encompassing characteris-
+chitecture of these systems in Fig. 2. Our analysis dissects     tics, capabilities, behaviors, and constraints. For instance,
+the operational framework of these systems, focusing on four     in gaming environments, agents might be profiled as players
+key aspects: the agents-environment interface, agent profil-     with varying roles and skills, each contributing differently to
+ing, agent communication, and agent capability acquisition.      the game’s objectives. In software development, agents could
+                                                                 take on the roles of product managers and engineers, each
+3.1    Agents-Environment Interface                              with responsibilities and expertise that guide the development
+The operational environments defines the specific contexts or    process. Similarly, in a debating platform, agents might be
+settings in which the LLM-MA systems are deployed and            designated as proponents, opponents, or judges, each with
+interact. For example, these environments can be like soft-      unique functions and strategies to fulfill their roles effectively.
+ware development [Hong et al., 2023], gaming [Mao et al.,        These profiles are crucial for defining the agents’ interactions
+2023], and various other domains such as financial markets       and effectiveness within their respective environments. Table
+[Li et al., 2023g] or even social behavior modeling [Park et     1 lists the agent Profiles in recent LLM-MA works.
+al., 2023]. The LLM-based agents perceive and act within            Regarding the Agent Profiling Methods, we categorized
+the environment, which in turn influences their behavior and     them into three types: Pre-defined, Model-Generated, and
+decision making. For example, in the Werewolf Game simu-         Data-Derived. In the Pre-defined cases, agent profiles are
+lation, the sandbox environment sets the game’s framework,       explicitly defined by the system designers. The Model-
+including transitions from day to night, discussion periods,     Generated method creates agent profiles by models, e.g.,
+voting mechanics, and reward rules. Agents, such as were-        large language models. The Data-Derived method involves
+wolves and the Seer, perform specific actions like killing or    constructing agent profiles based on pre-existing datasets.
+                                          Figure 2: The Architecture of LLM-MA Systems.
+
+
+3.3   Agents Communication
+The communication between agents in LLM-MA systems is
+the critical infrastructure supporting collective intelligence.
+We dissect agent communication from three perspectives: 1)
+Communication Paradigms: the styles and methods of in-
+teraction between agents; 2) Communication Structure: the
+organization and architecture of communication networks
+within the multi-agent system; and 3) Communication Con-
+tent exchanged between agents.
+Communication Paradigms: Current LLM-MA systems
+mainly take three paradigms for communication: Coopera-
+tive, Debate, and Competitive. Cooperative agents work to-
+gether towards a shared goal or objectives, typically exchang-
+ing information to enhance a collective solution. The Debate
+paradigm is employed when agents engage in argumentative
+interactions, presenting and defending their own viewpoints
+or solutions, and critiquing those of others. This paradigm
+is ideal for reaching a consensus or a more refined solution.
+Competitive agents work towards their own goals that might
+be in conflict with the goals of other agents.                             Figure 3: The Agent Communication Structure.
+Communication Structure: Fig. 3 shows four typical
+communication structures in LLM-MA systems. Layered
+communication is structured hierarchically, with agents at        work, where agents directly communicate with each other,
+each level having distinct roles and primarily interacting        a structure commonly employed in world simulation appli-
+within their layer or with adjacent layers. [Liu et al., 2023]    cations. Centralized communication involves a central agent
+introduces a framework called Dynamic LLM-Agent Net-              or a group of central agents coordinating the system’s com-
+work (DyLAN), which organizes agents in a multi-layered           munication, with other agents primarily interacting through
+feed-forward network. This setup facilitates dynamic inter-       this central node. Shared Message Pool is proposed by
+actions, incorporating features like inference-time agent se-     MetaGPT [Hong et al., 2023] to improve the communication
+lection and an early-stopping mechanism, which collectively       efficiency. This communication structure maintains a shared
+enhance the efficiency of cooperation among agents. De-           message pool where agents publish messages and subscribe
+centralized communication operates on a peer-to-peer net-         to relevant messages based on their profiles, thereby boosting
+communication efficiency.                                          to decide subsequent actions as seen in Memory-based solu-
+                                                                   tions, agents can dynamically self-evolve by modifying them-
+Communication Content: In LLM-MA systems, the                      selves such as altering their initial goals and planning strate-
+Communication Content typically takes the form of text. The        gies, and training themselves based on feedback or commu-
+specific content varies widely and depends on the particular       nication logs. [Nascimento et al., 2023] proposes a self-
+application. For example, in software development, agents          control loop process to allow each agent in the multi-agents
+may communicate with each other about code segments. In            systems to be self-managed and self-adaptive to dynamic en-
+simulations of games like Werewolf, agents might discuss           vironments, thereby improving the cooperation efficiency of
+their analyses, suspicions, or strategies.                         multiple agents.      [Zhang et al., 2023b] introduces ProA-
+                                                                   gent which anticipates teammates’ decisions and dynami-
+3.4   Agents Capabilities Acquisition                              cally adjusts each agent’s strategies based on the communi-
+The Agents Capabilities Acquisition is a crucial process in        cation logs between agents, facilitating mutual understand-
+LLM-MA, enabling agents to learn and evolve dynamically.           ing and improving collaborative planning capability. [Wang
+In this context, there are two fundamental concepts: the types     et al., 2023a] discusses a Learning through Communication
+of feedback from which agents should learn to enhance their        (LTC) paradigm, using the communication logs of multi-
+capabilities, and the strategies for agents to adjust themselves   agents to generate datasets to train or fine-tune LLMs. LTC
+to effectively solve complex problems.                             enables continuous adaptation and improvement of agents
+                                                                   through interaction with their environments and other agents,
+Feedback: Feedback involves the critical information that          breaking the limits of in-context learning or supervised fine-
+agents receive about the outcome of their actions, helping the     tuning, which don’t fully utilize the feedback received dur-
+agents learn the potential impact of their actions and adapt       ing interactions with the environment and external tools
+to complex and dynamic problems. In most studies, the for-         for continuous training. Self-Evolution enables agents’ au-
+mat of feedback provided to agents is textual. Based on the        tonomous adjustment in their profiles or goals, rather than
+sources from which agents receive this feedback, it can be         just learning from historical interactions. 3) Dynamic Gen-
+categorized into four types. 1) Feedback from Environ-             eration. In some scenarios, the system can generate new
+ment, e.g., from either real world environments or virtual         agents on-the-fly during its operation [Chen et al., 2023a;
+environments [Wang et al., 2023b]. It is prevalent in most         Chen et al., 2023c]. This capability enables the system to
+LLM-MA for problem-solving scenarios, including Software           scale and adapt effectively, as it can introduce agents that are
+Development (agents obtain feedback from Code Interpreter),        specifically designed to address current needs and challenges.
+and Embodied multi-agents systems (robots obtain feedback             With the scaling up LLM-MA with a larger number of
+from real-world or Simulated environments). 2) Feedback            agents, the escalating complexity of managing various kinds
+from Agents Interactions means that the feedback comes             of agents has been a critical problem. Agents Orchestration
+from the judgement of other agents or from agents communi-         emerged as a pivotal challenge and began to gain attention
+cations. It is common in problem-solving scenarios like sci-       in [Moura, 2023; Dibia, 2023]. We will further discuss this
+ence debates, where agents learn to critically evaluate and re-    topic in Section 6.4.
+fine the conclusions through communications. In world sim-
+ulation scenarios such as Game Simulation, agents learn to
+refine strategies based on previous interactions between other
+                                                                   4     Applications
+agents. 3) Human Feedback comes directly from humans               LLM-MA systems have been used in a wide range of appli-
+and is crucial for aligning the multi-agent system with hu-        cations. We summarize two kinds of applications in Table 1:
+man values and preferences. This kind of feedback is widely        Problem Solving and World Simulation. We elaborate on
+used in most “Human-in-the-loop” applications [Wang et al.,        these applications below. Note that this is a fast growing re-
+2021]. Last 4) None. In some cases, there is no feedback pro-      search field and new applications appear almost everyday. We
+vided to the agents. This often happens for world simulation       maintain an open source repository to report the latest work.
+works focused on analyzing simulated results rather than the
+planning capabilities of agents. In such scenarios, like prop-     4.1    LLM-MA for Problem Solving
+agation simulation, the emphasis is on result analysis, and        The main motivation of using LLM-MA for problem solving
+hence, feedback is not a component of the system.                  is to harness the collective capabilities of agents with spe-
+                                                                   cialized expertise. These agents, each acting as individuals,
+Agents Adjustment to Complex Problems: To enhance                  collaborate to address complex problems effectively, such as
+their capabilities, agents in LLM-MA systems can adapt             software development, embodied agents, science experiments
+through three main solutions. 1) Memory. Most LLM-                 and science debate. These application examples are intro-
+MA systems leverage a memory module for agents to ad-              duced next.
+just their behavior. Agents store information from previ-
+ous interactions and feedback in their memory. When per-           4.1.1 Software Development
+forming actions, they can retrieve relevant, valuable memo-        Given that software development is a complex endeavor re-
+ries, particularly those containing successful actions for simi-   quiring the collaboration of various roles like product man-
+lar past goals, as highlighted in [Wang et al., 2023b]. This       agers, programmers, and testers, LLM-MA systems are typ-
+process aids in enhancing their current actions. 2) Self-          ically set to emulate these distinct roles and collaborate to
+Evolution. Instead of only relying on the historical records       address the intricate challenge. Following the waterfall or
+                                                                                                                                               Agents
+                                                                            Agents-Env.            Agents Profiling                                                    Agents Capabilities Acquisition
+                                                                                                                                            Communication
+                                                                             Interface
+  Motivation       Research Domain & Goals                 Work                              Profiling           Profiles                                                                    Agents
+                                                                                                                                 Paradigms          Structure         Feedback from
+                                                                                             methods           (examples)                                                                  Adjustment
+                                                                                                                                                                       Environment,
+                                                                                           Pre-defined,           CTO,                                                                       Memory,
+                                                      [Qian et al., 2023]    Sandbox                                             Cooperative         Layered          Agent interaction,
+                                                                                          Model-Generated      programmer                                                                  Self-Evolution
+                                                                                                                                                                          Human
+                                                                                                                                                                       Environment,
+                                                                                                             Product Manager,                         Layered,                               Memory,
+                     Software development             [Hong et al., 2023]    Sandbox        Pre-defined                          Cooperative                          Agent interaction,
+                                                                                                                 Engineer                       Shared Message Pool                        Self-Evolution
+                                                                                                                                                                          Human
+                                                                                           Pre-defined,          Analyst,                                              Environment,          Memory,
+                                                     [Dong et al., 2023b]    Sandbox                                             Cooperative         Layered
+                                                                                          Model-Generated         coder                                               Agent interaction    Self-Evolution
+                                 Multi-robot                                 Sandbox,                                                              Centralized,        Environment,
+                                                     [Chen et al., 2023d]                   Pre-defined          Robots          Cooperative                                                 Memory
+                                  planning                                   Physical                                                              Decentralized      Agent interaction
+                Embodied         Multi-robot                                 Sandbox,                                                                                  Environment,
+                                                     [Mandi et al., 2023]                   Pre-defined          Robots          Cooperative       Decentralized                             Memory
+                 Agents         collaboration                                Physical                                                                                 Agent interaction
+                                Multi-Agents                                                                                                                           Environment,
+   Problem                                          [Zhang et al., 2023c]    Sandbox        Pre-defined          Robots          Cooperative       Decentralized                             Memory
+                                 cooperation                                                                                                                          Agent interaction
+   Solving
+                                                                                                             Strategy planers,
+                 Science        Optimization                                                                                                                            Environment,
+                                                     [Zheng et al., 2023]    Physical       Pre-defined          literature      Cooperative        Centralized                              Memory
+               Experiments        of MOF                                                                                                                                  Human
+                                                                                                             collector, coder
+                                  Improving
+                                                       [Du et al., 2023]       None         Pre-defined          Agents            Debate          Decentralized      Agent interaction      Memory
+                                  Factuality
+                                                                                                                Proponent,
+                 Science         Examining,                                                                                                        Centralized,
+                                                    [Xiong et al., 2023]       None         Pre-defined         Opponent,          Debate                             Agent interaction      Memory
+                 Debate       Inter-Consistency                                                                                                    Decentralized
+                                                                                                                  Judge
+                                Evaluators                                                                                                         Centralized,
+                                                    [Chan et al., 2023]        None         Pre-defined          Agents            Debate                             Agent interaction      Memory
+                                for debates                                                                                                        Decentralized
+                               Multi-Agents                                                                    Cardiology,        Debate,          Centralized,
+                                                     [Tang et al., 2023]       None         Pre-defined                                                               Agent interaction      Memory
+                              for Medication                                                                     Surgery         Cooperative       Decentralized
+                             Modest Community                                                                   Pharmacy,                                              Environment,
+                                                      [Park et al., 2023]    Sandbox      Model-generated                             -                  -                                   Memory
+                               (25 persons)                                                                    shopkeeper                                             Agent interaction
+                             Online community                                              Pre-defined,         Camping,                                                                     Dynamic
+                                                      [Park et al., 2022]      None                                                   -                  -            Agent interaction
+                              (1000 persons)                                              Model-generated         fishing                                                                   Generation
+                                                                                           Pre-defined,        Real-world
+                 Society     Emotion propagation     [Gao et al., 2023a]       None                                                   -                  -            Agent interaction      Memory
+                                                                                          Model-generated           user
+                                  Real-time                                                                    Real-world                                              Environment,
+                                                     [Kaiya et al., 2023]    Sandbox        Pre-defined                               -                  -                                   Memory
+                              social interactions                                                                   user                                              Agent interaction
+                                                                                                               NIN, NINL,
+                              Opinion dynamics       [Li et al., 2023a]        None         Pre-defined                               -                  -            Agent interaction      Memory
+                                                                                                                    NIL
+                                                                                                                   Seer,         Cooperative,
+                                                      [Xu et al., 2023b]                                                                                               Environment,
+                                  WereWolf                                   Sandbox        Pre-defined         werewolf,          Debate,         Decentralized                             Memory
+    World                                             [Xu et al., 2023c]                                                                                              Agent interaction
+                                                                                                                 villager        Competitive
+  Simulation
+                                                                                                                 Servant,        Cooperative,
+                                                    [Light et al., 2023a]                                                                                              Environment,
+                 Gaming            Avalon                                    Sandbox        Pre-defined          Merlin,           Debate,         Decentralized                             Memory
+                                                    [Wang et al., 2023c]                                                                                              Agent interaction
+                                                                                                                 Assassin        Competitive
+                                                                                                                                 Cooperative,                          Environment,
+                             Welfare Diplomacy      [Mukobi et al., 2023]    Sandbox        Pre-defined         Countries                          Decentralized                             Memory
+                                                                                                                                 Competitive                          Agent interaction
+                               Human behavior
+                                                    [Aher et al., 2023]      Sandbox        Pre-defined          Humans               -                  -            Agent interaction      Memory
+                                   Simulation
+                Psychology       Collaboration                                                                                   Cooperative,
+                                                    [Zhang et al., 2023d]      None         Pre-defined          Agents                            Decentralized      Agent interaction      Memory
+                                   Exploring                                                                                       Debate
+                               Macroeconomic                                               Pre-defined,
+                                                     [Li et al., 2023e]        None                               Labor          Cooperative       Decentralized      Agent interaction      Memory
+                                   simulation                                             Model-generated
+                                  Information                                              Pre-defined,                          Cooperative,                          Environment,
+                Economy                              [Anonymous, 2023]       Sandbox                              Buyer                            Decentralized                             Memory
+                                 Marketplaces                                              Data-Derived                          Competitive                          Agent interaction
+                                   Improving                                                                                                                           Environment,
+                                                     [Li et al., 2023g]      Physical       Pre-defined           Trader           Debate          Decentralized                             Memory
+                               financial trading                                                                                                                      Agent interaction
+                                                                                           Pre-defined,         Restaurant,                                            Environment,          Memory,
+                              Economic theories     [Zhao et al., 2023]      Sandbox                                             Competitive       Decentralized
+                                                                                          Model-Generated        Customer                                             Agent interaction    Self-Evolution
+                                  Simulating                                                                    Users from
+               Recommender                          [Zhang et al., 2023a]    Sandbox       Data-Derived                               -                  -              Environment          Memory
+                                user behaviors                                                                MovieLens-1M
+                  Systems
+                             Simulating user-item                                          Pre-defined,        User Agents                                             Environment,
+                                                    [Zhang et al., 2023e]    Sandbox                                             Cooperative       Decentralized                             Memory
+                                  interactions                                             Data-Derived        Item Agents                                            Agent interaction
+                                     Public
+                 Policy                             [Xiao et al., 2023]        None         Pre-defined         Residents        Cooperative       Decentralized      Agent interaction      Memory
+                               Administration
+                 Making
+                               War Simulation        [Hua et al., 2023]        None         Pre-defined         Countries        Competitive       Decentralized      Agent interaction      Memory
+                              Human Behaviors         [Ghaffarzadegan                      Pre-defined,        Conformity                                              Environment,
+                                                                             Sandbox                                             Cooperative       Decentralized                             Memory
+                 Disease         to epidemics           et al., 2023]                     Model-Generated         traits                                              Agent interaction
+                                                                                                                                                                                             Memory,
+                                                          [Williams                        Pre-defined,        Adults aged                                             Environment,
+                                Public health                                Sandbox                                             Cooperative       Decentralized                             Dynamic
+                                                         et al., 2023]                    Model-Generated       18 to 64                                              Agent interaction
+                                                                                                                                                                                            Generation
+
+
+Table 1: Summary of the LLM-MA studies. We categorize current work according to their motivation, research domains and goals, and detail
+each work from different aspects regarding Agents-Environment Interface, Agents Profiling, Agents Communication and Agents Capability
+Acquisition. “-” denotes that a particular element is not specifically mentioned in this work.
+
+
+Standardized Operating Procedures (SOPs) workflow of the                                                    in software development, autonomously collaborating to gen-
+software development, the communication structure among                                                     erate code. Moreover, [Qian et al., 2023] presents an end-to-
+agents is usually layered. Agents generally interact with the                                               end framework for software development, utilizing multiple
+code interpreter, other agents or human to iteratively refine                                               agents for software development without incorporating ad-
+the generated code. [Li et al., 2023b] first proposes a sim-                                                vanced human teamwork experience. [Hong et al., 2023] first
+ple role-play agent framework, which utilizes the interplay                                                 incorporates human workflow insights for more controlled
+of two roles to realize autonomous programming based on                                                     and validated performance. It encodes SOPs into prompts to
+one-sentence user instruction. It provides insights into the                                                enhance structured coordination. [Huang et al., 2023a] delves
+“cognitive” processes of communicative agents. [Dong et al.,                                                deeper into multi-agent based programming by solving the
+2023b] makes LLMs work as distinct “experts” for sub-tasks                                                  problem of balancing code snippet generation with effective
+test case generation, execution, and optimization.                by a joint debating process. Through multiple rounds of de-
+                                                                  bate, the agents converge on a single, consensus answer. [Du
+4.1.2 Embodied Agents                                             et al., 2023] leverages the multi-agents debate process on a
+Most embodied agents applications inherently utilize multi-       set of six different reasoning and factual accuracy tasks and
+ple robots working together to perform complex real-world         demonstrates that LLM-MA debating can improve factual-
+planning and manipulation tasks such as warehouse manage-         ity. [Xiong et al., 2023] focuses on the commonsense rea-
+ment with heterogeneous robot capabilities. Hence, LLM-           soning tasks and formulates a three-stage debate to align with
+MA can be used to model robots with different capabilities        real-world scenarios including fair debate, mismatched de-
+and cooperate with each other to solve real-world physical        bate, and roundtable debate. The paper also analyzes the
+tasks. [Dasgupta et al., 2023] first explores the potential to    inter-consistency between different LLMs and claims that de-
+use LLM as an action planner for embedded agents. [Mandi          bating can improve the inter-consistency. [Tang et al., 2023]
+et al., 2023] introduces RoCo, a novel approach for multi-        also utilizes multiple LLM-based agents as distinct domain
+robot collaboration that uses LLMs for high-level commu-          experts to do the collaborative discussion on a medical report
+nication and low-level path planning. Each robotic arm is         to reach a consensus for medical diagnosis.
+equipped with an LLM, cooperating with inverse kinemat-
+ics and collision checking. Experimental results demonstrate      4.2   LLM-MA for World Simulation
+the adaptability and success of RoCo in collaborative tasks.
+[Zhang et al., 2023c] presents CoELA, a Cooperative Em-           Another mainstream application scenario of LLM-MA is the
+bodied Language Agent, managing discussions and task plan-        world simulation. Research in this area is rapidly growing
+ning in an LLM-MA setting. This challenging setting is            and spans a diverse range of fields including social sciences,
+featured with decentralized control, complex partial observa-     gaming, psychology, economics, policy-making, etc. The key
+tion, costly communication, and multi-objective long-horizon      reason for employing LLM-MA in world simulations lies in
+tasks. [Chen et al., 2023d] investigates communication chal-      their exceptional role-playing abilities, which are crucial for
+lenges in scenarios involving a large number of robots, as        realistically depicting various roles and viewpoints in a sim-
+assigning each robot an LLM will be costly and unpracti-          ulated world. The environment of world simulation projects
+cal due to the long context. The study compares four com-         is usually crafted to reflect the specific scenario being simu-
+munication frameworks, centralized, decentralized, and two        lated, with agents designed in various profiles to match this
+hybrid models, to evaluate their effectiveness in coordinating    context. Unlike the problem solving systems that focus on
+complex multi-agent tasks. [Yu et al., 2023] proposes Co-         agent cooperation, world simulation systems involve diverse
+NavGPT for multi-robot cooperative visual target navigation,      methods of agent management and communication, reflecting
+integrating LLM as a global planner to assign frontier goals      the complexity and variety of real-world interactions. Next,
+to each robot. [Chen et al., 2023b] proposes an LLM-based         we explore simulations conducted in diverse fields.
+consensus-seeking framework, which can be applied as a co-        4.2.1 Societal Simulation
+operative planner to a multi-robot aggregation task.              In societal simulation, LLM-MA models are used to simu-
+4.1.3 Science Experiments                                         late social behaviors, aiming to explore the potential social
+Like multiple agents play as different specialists and cooper-    dynamics and propagation, test social science theories, and
+ate to solve the Software Development and Embodied Agents         populate virtual spaces and communities with realistic social
+problem, multiple agents can also be used to form a science       phenomena [Park et al., 2023]. Leveraging LLM’s capabili-
+team to conduct science experiments. One important differ-        ties, agents with unique profiles engage in extensive commu-
+ence from previous applications lies in the crucial role of hu-   nication, generating rich behavioral data for in-depth social
+man oversight, due to the high expenses of the science ex-        science analysis.
+periments and the hallucination of the LLM agents. Human             The scale of societal simulation has expanded over time,
+experts are at the center of these agents to process the infor-   beginning with smaller, more intimate settings and progress-
+mation of agents and give feedback to the agents. [Zheng et       ing to larger, more intricate ones. Initial work by [Park et al.,
+al., 2023] utilizes multiple LLM-based agents, each focusing      2023] introduces generative agents within an interactive sand-
+on specific tasks for the science experiments including strat-    box environment reminiscent of the sims, allowing end users
+egy planning, literature search, coding, robotic operations,      to engage with a modest community of 25 agents through nat-
+and labware design. All these agents interact with humans         ural language. At the same time, [Park et al., 2022] develops
+to work collaboratively to optimize the synthesis process of      Social Simulacra, which constructs a simulated community
+complex materials.                                                of 1,000 personas. This system takes a designer’s vision for
+                                                                  a community—its goals, rules, and member personas—and
+4.1.4 Science Debate                                              simulates it, generating behaviors like posting, replying, and
+LLM-MA can be set for science debating scenarios, where           even anti-social actions. Building on this, [Gao et al., 2023a]
+agents debate with each other to enhance the collective rea-      takes the concept further by constructing vast networks com-
+soning capabilities in tasks such as Massive Multitask Lan-       prising 8,563 and 17,945 agents, respectively, designed to
+guage Understanding (MMLU) [Hendrycks et al., 2020],              simulate social networks focused on the topics of Gender Dis-
+Math problems [Cobbe et al., 2021], and StrategyQA [Geva          crimination and Nuclear Energy. This evolution showcases
+et al., 2021]. The main idea is that each agent initially of-     the increasing complexity and size of simulated environments
+fers its own analysis of a problem, which is then followed        in recent research. Recent studies such as [Chen et al., 2023b;
+Kaiya et al., 2023; Li et al., 2023a; Li et al., 2023f; Ziems et    This method focuses on observing and analyzing their varied
+al., 2023] highlight the evolving complexity in multi-agent         behaviors through statistical methods. Here, each agent op-
+systems, LLM impacts on social networks, and their integra-         erates independently, without interacting with others, essen-
+tion into social science research.                                  tially representing different individuals. Another approach
+                                                                    aligns more closely with societal simulations, where multiple
+4.2.2 Gaming
+                                                                    agents interact and communicate with each other. In this sce-
+LLM-MA is well-suited for creating simulated gaming en-             nario, psychological theories are applied to understand and
+vironments, allowing agents to assume various roles within          analyze the emergent behavioral patterns. This method fa-
+games. This technology enables the development of con-              cilitates the study of interpersonal dynamics and group be-
+trolled, scalable, and dynamic settings that closely mimic          haviors, providing insights into how individual psychological
+human interactions, making it ideal for testing a range of          traits influence collective actions. [Ma et al., 2023] explores
+game theory hypotheses [Mao et al., 2023; Xu et al., 2023b;         the psychological implications and outcomes of employing
+Gong et al., 2023]. Most games simulated by LLM-MA rely             LLM-based conversational agents for mental well-being sup-
+heavily on natural language communication, offering a sand-         port. It emphasizes the need for carefully evaluating the use
+box environment within different game settings for exploring        of LLM-based agents in mental health applications from a
+or testing game theory hypotheses including reasoning, coop-        psychological perspective. [Kovač et al., 2023] introduces
+eration, persuasion, deception, leadership, etc.                    a tool named SocialAI school for creating interactive envi-
+    [Akata et al., 2023] leverages behavioral game theory to
+                                                                    ronments simulating social interactions. It draws from devel-
+examine LLMs’ behavior in interactive social settings, partic-      opmental psychology to understand how agents can acquire,
+ularly their performance in games like the iterated Prisoner’s      demonstrate, and evolve social skills such as joint attention,
+Dilemma and Battle of the Sexes. Furthermore, [Xu et al.,           communication, and cultural learning. [Zhang et al., 2023d]
+2023b] proposes a framework using ChatArena library [Wu             explores how LLM agents, with distinct traits and thinking
+et al., 2023b] for engaging LLMs in communication games             patterns, emulate human-like social behaviors such as confor-
+like Werewolf, using retrieval and reflection on past commu-        mity and majority rule. This integration of psychology into
+nications for improvement, as well as the Chain-of-Thought          the understanding of agent collaboration offers a novel lens
+mechanism [Wei et al., 2022]. [Light et al., 2023b] explores        for examining and enhancing the mechanisms behind LLM-
+the potential of LLM agents in playing Resistance Avalon, in-       based multi-agents systems. [Aher et al., 2023] introduces
+troducing AVALONBENCH, a comprehensive game environ-                Turing Experiments to evaluate the extent to which large lan-
+ment and benchmark for further developing advanced LLMs             guage models can simulate different aspects of human behav-
+and multi-agent frameworks. [Wang et al., 2023c] also fo-           iors. The Turing Experiments replicate classical experiments
+cuses on the capabilities of LLM Agents in dealing with mis-        and phenomena in psychology, economics, and sociology us-
+information in the Avalon game, proposing the Recursive             ing a question-answering format to mimic experimental con-
+Contemplation (ReCon) framework to enhance LLMs’ ability            ditions. They also design a prompt that is used to simulate
+to discern and counteract deceptive information. [Xu et al.,        the responses of multiple different individuals by varying the
+2023c] introduces a framework combining LLMs with rein-             name. By simulating various kinds of individuals via LLM,
+forcement learning (RL) to develop strategic language agents        they show that larger models replicate human behavior more
+for the Werewolf game. It introduces a new approach to use          faithfully, but they also reveal a hyper-accuracy distortion, es-
+RL policy in the case that the action and state sets are not pre-   pecially in knowledge-based tasks.
+defined but in the natural language setting. [Mukobi et al.,
+2023] designs the “Welfare Diplomacy”, a general-sum vari-          4.2.4 Economy
+ant of the zero-sum board game Diplomacy, where players
+must balance military conquest and domestic welfare. It also        LLM-MA is used to simulate economic and financial trading
+offers an open-source benchmark, aiming to help improve the         environments mainly because it can serve as implicit com-
+cooperation ability of multi-agent AI systems. On top of that,      putational models of humans. In these simulations, agents
+there is a work [Li et al., 2023c] in a multi-agent cooperative     are provided with endowments, and information, and set with
+text game testing the agents’ Theory of Mind (ToM), the abil-       pre-defined preferences, allowing for an exploration of their
+ity to reason about the concealed mental states of others and       actions in economic and financial contexts. This is similar to
+is fundamental to human social interactions, collaborations,        the way economists model ’homo economicus’, the character-
+and communications. [Fan et al., 2023] comprehensively as-          ization of man in some economic theories as a rational person
+sesses the capability of LLMs as rational players, and iden-        who pursues wealth for his own self-interest [Horton, 2023].
+tifies the weaknesses of LLM-based Agents that even in the          There are several studies demonstrate the diverse applications
+explicit game process, agents may still overlook or modify          of LLM-MA in simulating economic scenarios, encompass-
+refined beliefs when taking actions.                                ing macroeconomic activities, information marketplaces, fi-
+                                                                    nancial trading, and virtual town simulations. Agents in-
+4.2.3 Psychology                                                    teract in cooperative or debate, decentralized environments.
+In psychological simulation studies, like in the societal simu-     [Li et al., 2023e] employs LLMs for macroeconomic simu-
+lation, multiple agents are utilized to simulate humans with        lation, featuring prompt-engineering-driven agents that emu-
+various traits and thought processes. However, unlike so-           late human-like decision-making, thereby enhancing the real-
+cietal simulations, one approach in psychology involves di-         ism of economic simulations compared to rule-based or other
+rectly applying psychological experiments to these agents.          AI agents. [Anonymous, 2023] explores the buyer’s inspec-
+        Motivation         Domain                 Datasets and Benchmarks                       Used by                 Data Link
+                                                  HumanEval                                     [Hong et al., 2023]     Link
+                           Software Development   MBPP                                          [Hong et al., 2023]     Link
+                                                  SoftwareDev                                   [Hong et al., 2023]     Link
+                                                  RoCoBench                                     [Mandi et al., 2023]    Link
+                                                  Communicative Watch-And-Help (C-WAH)          [Zhang et al., 2023c]   Link
+                           Embodied AI                                                          [Zhang et al., 2023c]
+                                                  ThreeDWorld Multi-Agent Transport (TDW-MAT)                           Link
+        Problem Solving                           HM3D v0.2                                     [Yu et al., 2023]       Link
+                                                  MMLU                                          [Tang et al., 2023]     Link
+                                                  MedQA                                         [Tang et al., 2023]     Link
+                                                  PubMedQA                                      [Tang et al., 2023]     Link
+                           Science Debate                                                       [Du et al., 2023]
+                                                  GSM8K                                                                 Link
+                                                  StrategyQA                                    [Xiong et al., 2023]    Link
+                                                  Chess Move Validity                           [Du et al., 2023]       Link
+                                                  SOTOPIA                                       [Zhou et al., 2023b]    /
+                           Society                Gender Discrimination                         [Gao et al., 2023a]     /
+                                                  Nuclear Energy                                [Gao et al., 2023a]     /
+                                                  Werewolf                                      [Xu et al., 2023b]      /
+                                                  Avalon                                        [Light et al., 2023b]   /
+                                                  Welfare Diplomacy                             [Mukobi et al., 2023]   /
+                           Gaming                                                               [Agashe et al., 2023]
+                                                  Layout in the Overcooked-AI environment                               /
+        World Simulation                          Chameleon                                     [Xu et al., 2023a]      Link
+                                                  Undercover                                    [Xu et al., 2023a]      Link
+                                                  Ultimatum Game TE                             [Aher et al., 2023]     Link
+                           Psychology             Garden Path TE                                [Aher et al., 2023]     Link
+                                                  Wisdom of Crowds TE                           [Aher et al., 2023]     Link
+                                                  MovieLens-1M                                  [Zhang et al., 2023a]   Link
+                           Recommender System                                                   [Zhang et al., 2023e]
+                                                  Amazon review dataset                                                 /
+                           Policy Making          Board Connectivity Evaluation                 [Hua et al., 2023]      Link
+
+           Table 2: Datasets and Benchmarks commonly used in LLM-MA studies. “ / ” denotes the unavailability of data link.
+
+
+tion paradox in an information marketplace, reveals improved          causal relationships in recommendation tasks. In Agent4Rec
+decision-making and answer quality when agents temporar-              work, agents are used to simulate users and they do not com-
+ily access information before purchase. [Li et al., 2023g]            municate with each other. Different from Agent4Rec work,
+presents an LLM-MA framework for financial trading, em-               [Zhang et al., 2023e] treats both users and items as agents,
+phasizing a layered memory system, debate mechanisms, and             optimizing them collectively to reflect and adjust to real-
+individualized trading characters, thereby fortifying decision-       world interaction disparities. This work emphasizes simulat-
+making robustness. [Zhao et al., 2023] utilizes LLM-based             ing user-item interactions and propagates preferences among
+Agents to simulate a virtual town with restaurant and cus-            agents, capturing the collaborative filtering essence.
+tomer agents, yielding insights aligned with sociological and
+economic theories. These studies collectively illuminate the
+                                                                      4.2.6   Policy Making
+broad spectrum of applications and advancements in employ-
+ing LLMs for diverse economic simulation scenarios.                   Similar to simulations in gaming and economic scenarios,
+                                                                      Policy Making requires strong decision-making capabilities
+4.2.5 Recommender Systems                                             to realistic and dynamic complex problems. LLM-MA can
+The use of the LLM-MA in recommender systems is similar               be used to simulate the policy making via simulating a virtual
+to that in psychology since studies in both fields involve the        government or simulating the impact of various policies on
+consideration of extrinsic and intrinsic human factors such as        different communities. These simulations provide valuable
+cognitive processes and personality [Lex and Schedl, 2022].           insights into how policies are formulated and their potential
+One way to use LLM-MA in recommender systems is to di-                effects, aiding policymakers in understanding and anticipat-
+rectly introduce items to multiple LLM-based agents within            ing the consequences of their decisions [Farmer and Axtell,
+diverse traits and conduct statistics of the preferences of dif-      2022]. The research outlined in [Xiao et al., 2023] is cen-
+ferent agents. Another way is to treat both users and items           tered on simulating a township water pollution crisis. It sim-
+as agents and the user-item communication as interactions,            ulated a town located on an island including a demographic
+simulating the preference propagation. To bridge the gap be-          structure of different agents and township head and advisor.
+tween offline metrics and real-world performance in recom-            Within the water pollution crisis simulation, this work pro-
+mendation systems, Agent4Rec [Zhang et al., 2023a] intro-             vides an in-depth analysis of how a virtual government entity
+duces a simulation platform based on LLM-MA. 1000 gener-              might respond to such a public administration challenge and
+ative agents are initialized with the MovieLens-1M dataset to         how information transfer in the social network in this crisis.
+simulate complex user interactions in a recommendation en-            [Hua et al., 2023] introduces WarAgent to simulate key his-
+vironment. Agent4Rec shows that LLM-MA can effectively                torical conflicts and provides insights for conflict resolution
+mimic real user preferences and behaviors, provide insights           and understanding, with potential applications in preventing
+into phenomena like the filter bubble effect, and help uncover        future international conflicts.
+4.2.7 Disease Propagation Simulation                               search applications use different datasets and benchmarks.
+Leveraging the societal simulation capabilities of LLM-MA          In the Problem solving scenarios, most datasets and bench-
+can also be used to simulate disease propagation. The most         marks are used to evaluate the planning and reasoning capa-
+recent study in [Williams et al., 2023] delves into the use of     bilities by Multiple agents cooperation or debate. In World
+LLM-MA in simulating disease spread. The research show-            Simulation scenarios, datasets and benchmarks are used to
+cases through various simulations how these LLM-based              evaluate the alignment between the simulated world and real-
+agents can accurately emulate human responses to disease           world or analyze the behaviors of different agents. However,
+outbreaks, including behaviors like self-quarantine and iso-       in certain research applications like Science Team operations
+lation during heightened case numbers. The collective be-          for experiments and economic modeling, there is still a need
+havior of these agents mirrors the complex patterns of multi-      for comprehensive benchmarks. The development of such
+ple waves typically seen in pandemics, eventually stabilizing      benchmarks would greatly enhance the ability to gauge the
+into an endemic state. Impressively, their actions contribute      success and applicability of LLM-MA in these complex and
+to the attenuation of the epidemic curve. [Ghaffarzadegan et       dynamic fields.
+al., 2023] also discusses the epidemic propagation simulation
+and decomposes the simulation into two parts: the Mechanis-        6     Challenges and Opportunities
+tic Model which represents the information or propagation of
+the virus and the Decision-Making Model which represents           Studies of LLM-MA frameworks and applications are ad-
+the agents’ decision-making process when facing the virus.         vancing rapidly, giving rise to numerous challenges and op-
+                                                                   portunities. We identified several critical challenges and po-
+                                                                   tential areas for future study.
+5     Implementation Tools and Resources
+5.1    Multi-Agents Framework                                      6.1    Advancing into Multi-Modal Environment
+We provide a detailed introduction to three open-source            Most previous work on LLM-MA has been focused on text-
+multi-agent frameworks: MetaGPT [Hong et al., 2023],               based environments, excelling in processing and generating
+CAMEL [Li et al., 2023b], and Autogen [Wu et al., 2023a].          text. However, there is a notable lack in multi-modal set-
+They are all frameworks that utilize language models for           tings, where agents would interact with and interpret data
+complex task-solving with a focus on multi-agent collabora-        from multiple sensory inputs and generate multiple outputs
+tion, but they differ in their approaches and applications.        such as images, audio, video, and physical actions. Inte-
+   MetaGPT is designed to embed human workflow processes           grating LLMs into multi-modal environments presents addi-
+into the operation of language model agents, thereby reducing      tional challenges, such as processing diverse data types and
+the hallucination problem that often arises in complex tasks.      enabling agents to understand each other and respond to more
+It does this by encoding Standard Operating Procedures into        than just textual information.
+the system and using an assembly line approach to assign spe-
+cific roles to different agents.                                   6.2    Addressing Hallucination
+   CAMEL, or Communicative Agent Framework, is oriented            The hallucination problem is a significant challenge in LLMs
+towards facilitating autonomous cooperation among agents.          and single LLM-based Agent systems. It refers to the phe-
+It uses a novel technique called inception prompting to guide      nomenon where the model generates text that is factually in-
+conversational agents towards fulfilling tasks that are consis-    correct [Huang et al., 2023b]. However, this problem takes
+tent with human objectives. This framework also serves as a        on an added layer of complexity in a multi-agent setting. In
+tool for generating and studying conversational data, help-        such scenarios, one agent’s hallucination can have a cascad-
+ing researchers understand how communicative agents be-            ing effect. This is due to the interconnected nature of multi-
+have and interact.                                                 agent systems, where misinformation from one agent can be
+   AutoGen is a versatile framework that allows for the cre-       accepted and further propagated by others in the network.
+ation of applications using language models. It is distinctive     Therefore, detecting and mitigating hallucinations in LLM-
+for its high level of customization, enabling developers to pro-   MA is not just a crucial task but also presents a unique set
+gram agents using both natural language and code to define         of challenges. It involves not only correcting inaccuracies at
+how these agents interact. This versatility enables its use in     the level of individual agents but also managing the flow of
+diverse fields, from technical areas such as coding and math-      information between agents to prevent the spread of these in-
+ematics to consumer-focused sectors like entertainment.            accuracies throughout the system.
+   More recently, [Chen et al., 2023c; Chen et al., 2023a]
+introduce frameworks for dynamic multi-agent collabora-            6.3    Acquiring Collective Intelligence
+tion, while [Zhou et al., 2023a; Li et al., 2023h; Xie et          In traditional multi-agent systems, agents often use reinforce-
+al., 2023] present platforms and libraries for building au-        ment learning to learn from offline training datasets. How-
+tonomous agents, emphasizing their adaptability in task-           ever, LLM-MA systems mainly learn from instant feedback,
+solving and social simulations.                                    such as interactions with the environment or humans, as we
+                                                                   discussed in Section 3. This learning style requires a reli-
+5.2    Datasets and Benchmarks                                     able interactive environment and it would be tricky to design
+We summarize commonly used datasets or benchmarks for              such an interactive environment for many tasks, limiting the
+LLM-MA study in Table 2. We observe that different re-             scalability of LLM-MA systems. Moreover, the prevailing
+approaches in current research involve employing Memory            6.6    Applications and Beyond
+and Self-Evolution techniques to adjust agents based on feed-      The potential of LLM-MA systems extends far beyond their
+back. While effective for individual agents, these methods do      current applications, holding great promise for advanced
+not fully capitalize on the potential collective intelligence of   computational problem-solving in fields such as finance, edu-
+the agent network. They adjust agents in isolation, overlook-      cation, healthcare, environmental science, urban planning and
+ing the synergistic effects that can emerge from coordinated       so on. As we have discussed, LLM-MA systems possess the
+multi-agent interactions. Hence, jointly adjusting multiple        capability to tackle complex problems and simulate various
+agents and achieving optimal collective intelligence is still a    aspects of the real world. While the current role-playing ca-
+critical challenge for LLM-MA.                                     pabilities of LLMs may have limitations, ongoing advance-
+                                                                   ments in LLM technology suggest a bright future. It is an-
+6.4   Scaling Up LLM-MA Systems                                    ticipated to have more sophisticated methodologies, applica-
+LLM-MA systems are composed of a number of individual              tions, datasets, and benchmarks tailored for diverse research
+LLM-based agents, posing a significant challenge of scala-         fields. Furthermore, there are opportunities to explore LLM-
+bility regarding the number of agents. From the computa-           MA systems from various theoretical perspectives, such as
+tional complexity perspective, each LLM-based agent, typ-          Cognitive Science [Sumers et al., 2023], Symbolic Artificial
+ically built on large language models like GPT-4, demands          Intelligence, Cybernetics, Complex Systems, and Collective
+substantial computational power and memory. Scaling up the         Intelligence. Such a multi-faceted approach could contribute
+number of these agents in an LLM-MA system significantly           to a more comprehensive understanding and innovative appli-
+increases resource requirements. In scenarios with limited         cations in this rapidly evolving field.
+computational resource, it would be challenging to develop
+these LLM-MA systems.                                              7     Conclusion
+   Additionally, as the number of agents in an LLM-MA sys-         LLM-based Multi-Agents have shown inspiring collective in-
+tem increases, additional complexities and research opportu-       telligence and rapidly garnered increasing interest among re-
+nities emerge, particularly in areas like efficient agent coor-    searchers. In this survey, we first systematically review the
+dination, communication, and understanding the scaling laws        development of LLM-MA systems by positioning, differen-
+of multi-agents. For instance, with more LLM-based agents,         tiating, and connecting them from various aspects, regard-
+the intricacy of ensuring effective coordination and commu-        ing the agents-environment interface, the characterization of
+nication rises significantly. As highlighted in [Dibia, 2023],     agents by LLMs, the strategies for managing agent communi-
+designing advanced Agents Orchestration methodologies is           cation and the paradigms for capability acquisition. We also
+increasingly important. These methodologies aim to opti-           summarized LLM-MA applications for problem-solving and
+mize agents workflows, task assignments tailored to differ-        world simulation. By also highlighting the commonly used
+ent agents, and communication patterns across agents such as       datasets and benchmarks and discussing challenges and fu-
+communication constraints between agents. Effective Agents         ture opportunities, we hope that this survey can serve as a use-
+Orchestration facilitates harmonious operation among agents,       ful resource for researchers across various research fields, in-
+minimizing conflicts and redundancies. Additionally, explor-       spiring future research to explore the potential of LLM-based
+ing and defining the scaling laws that govern the behavior and     Multi-Agents.
+efficiency of multi-agent systems as they grow larger remains
+an important area of research. These aspects highlight the         References
+need for innovative solutions to optimize LLM-MA systems,          [Agashe et al., 2023] Saaket Agashe, Yue Fan, and Xin Eric
+making them both effective and resource-efficient.                   Wang. Evaluating multi-agent coordination abilities in
+                                                                     large language models, 2023.
+6.5   Evaluation and Benchmarks
+                                                                   [Aher et al., 2023] Gati Aher, Rosa I. Arriaga, and
+We have summarized the datasets and benchmarks currently             Adam Tauman Kalai. Using large language models
+available for LLM-MA in Table 2. This is a starting point, and       to simulate multiple humans and replicate human subject
+far from being comprehensive. We identify two significant            studies, 2023.
+challenges in evaluating LLM-MA systems and benchmark-             [Akata et al., 2023] Elif Akata, Lion Schulz, Julian Coda-
+ing their performance against each other. Firstly, as discussed      Forno, Seong Joon Oh, Matthias Bethge, and Eric Schulz.
+in [Xu et al., 2023a], much of the existing research focuses         Playing repeated games with large language models. arXiv
+on evaluating individual agents’ understanding and reason-           preprint arXiv:2305.16867, 2023.
+ing within narrowly defined scenarios. This focus tends to
+overlook the broader and more complex emergent behaviors           [Anonymous, 2023] Anonymous. Rethinking the buyer’s in-
+that are integral to multi-agent systems. Secondly, there is a       spection paradox in information markets with language
+notable shortfall in the development of comprehensive bench-         agents. In Submitted to The Twelfth International Con-
+marks across several research domains, such as Science Team          ference on Learning Representations, 2023. under review.
+for Experiment Operations, Economic analysis, and Disease          [Chan et al., 2023] Chi-Min Chan, Weize Chen, Yusheng
+propagation simulation. This gap presents an obstacle to ac-         Su, Jianxuan Yu, Wei Xue, Shanghang Zhang, Jie Fu, and
+curately assessing and benchmarking the full capabilities of         Zhiyuan Liu. Chateval: Towards better llm-based evalua-
+LLM-MA systems in these varied and crucial fields.                   tors through multi-agent debate, 2023.
+[Chen et al., 2023a] Guangyao Chen, Siwei Dong, Yu Shu,             large language model-empowered agents. arXiv preprint
+   Ge Zhang, Jaward Sesay, Börje F Karlsson, Jie Fu, and           arXiv:2307.14984, 2023.
+   Yemin Shi. Autoagents: A framework for automatic agent         [Gao et al., 2023b] Yunfan Gao, Yun Xiong, Xinyu Gao,
+   generation. arXiv preprint arXiv:2309.17288, 2023.
+                                                                    Kangxiang Jia, Jinliu Pan, Yuxi Bi, Yi Dai, Jiawei
+[Chen et al., 2023b] Huaben Chen, Wenkang Ji, Lufeng Xu,            Sun, and Haofen Wang. Retrieval-augmented generation
+   and Shiyu Zhao. Multi-agent consensus seeking via large          for large language models: A survey. arXiv preprint
+   language models. arXiv preprint arXiv:2310.20151, 2023.          arXiv:2312.10997, 2023.
+[Chen et al., 2023c] Weize Chen, Yusheng Su, Jingwei Zuo,         [Geva et al., 2021] Mor Geva, Daniel Khashabi, Elad Segal,
+   Cheng Yang, Chenfei Yuan, Chen Qian, Chi-Min Chan,               Tushar Khot, Dan Roth, and Jonathan Berant. Did aris-
+   Yujia Qin, Yaxi Lu, Ruobing Xie, et al. Agentverse: Facil-       totle use a laptop? a question answering benchmark with
+   itating multi-agent collaboration and exploring emergent         implicit reasoning strategies, 2021.
+   behaviors in agents. arXiv preprint arXiv:2308.10848,
+   2023.                                                          [Ghaffarzadegan et al., 2023] Navid Ghaffarzadegan, Aritra
+                                                                    Majumdar, Ross Williams, and Niyousha Hosseinichimeh.
+[Chen et al., 2023d] Yongchao Chen, Jacob Arkin, Yang               Generative agent-based modeling: Unveiling social sys-
+   Zhang, Nicholas Roy, and Chuchu Fan. Scalable multi-             tem dynamics through coupling mechanistic models
+   robot collaboration with large language models: Cen-             with generative artificial intelligence. arXiv preprint
+   tralized or decentralized systems?           arXiv preprint      arXiv:2309.11456, 2023.
+   arXiv:2309.15943, 2023.
+                                                                  [Gong et al., 2023] Ran Gong, Qiuyuan Huang, Xiaojian
+[Cobbe et al., 2021] Karl Cobbe, Vineet Kosaraju, Moham-
+                                                                    Ma, Hoi Vo, Zane Durante, Yusuke Noda, Zilong Zheng,
+   mad Bavarian, Mark Chen, Heewoo Jun, Lukasz Kaiser,
+                                                                    Song-Chun Zhu, Demetri Terzopoulos, Li Fei-Fei, et al.
+   Matthias Plappert, Jerry Tworek, Jacob Hilton, Reiichiro
+                                                                    Mindagent: Emergent gaming interaction. arXiv preprint
+   Nakano, et al. Training verifiers to solve math word prob-
+                                                                    arXiv:2309.09971, 2023.
+   lems. arXiv preprint arXiv:2110.14168, 2021.
+[Dasgupta et al., 2023] Ishita Dasgupta, Christine Kaeser-        [Guo et al., 2023] Taicheng Guo, Kehan Guo, Zhengwen
+   Chen, Kenneth Marino, Arun Ahuja, Sheila Babayan,                Liang, Zhichun Guo, Nitesh V Chawla, Olaf Wiest, Xi-
+   Felix Hill, and Rob Fergus. Collaborating with lan-              angliang Zhang, et al. What indeed can gpt models do
+   guage models for embodied reasoning. arXiv preprint              in chemistry? a comprehensive benchmark on eight tasks.
+   arXiv:2302.00763, 2023.                                          arXiv preprint arXiv:2305.18365, 2023.
+[Dibia, 2023] Victor Dibia.         Multi-agent llm applica-      [Hendrycks et al., 2020] Dan Hendrycks, Collin Burns,
+   tions — a review of current research, tools, and                 Steven Basart, Andy Zou, Mantas Mazeika, Dawn Song,
+   challenges.            https://newsletter.victordibia.com/p/     and Jacob Steinhardt. Measuring massive multitask lan-
+   multi-agent-llm-applications-a-review, 2023.                     guage understanding. arXiv preprint arXiv:2009.03300,
+                                                                    2020.
+[Dong et al., 2023a] Qingxiu Dong, Lei Li, Damai Dai,
+   Ce Zheng, Zhiyong Wu, Baobao Chang, Xu Sun, Jingjing           [Hong et al., 2023] Sirui Hong, Xiawu Zheng, Jonathan
+   Xu, Lei Li, and Zhifang Sui. A survey on in-context learn-       Chen, Yuheng Cheng, Ceyao Zhang, Zili Wang, Steven
+   ing, 2023.                                                       Ka Shing Yau, Zijuan Lin, Liyang Zhou, Chenyu Ran,
+[Dong et al., 2023b] Yihong Dong, Xue Jiang, Zhi Jin, and           et al. Metagpt: Meta programming for multi-agent col-
+                                                                    laborative framework. arXiv preprint arXiv:2308.00352,
+   Ge Li. Self-collaboration code generation via chatgpt,
+                                                                    2023.
+   2023.
+[Du et al., 2023] Yilun Du, Shuang Li, Antonio Torralba,          [Horton, 2023] John J Horton. Large language models as
+   Joshua B. Tenenbaum, and Igor Mordatch. Improving fac-           simulated economic agents: What can we learn from homo
+   tuality and reasoning in language models through multia-         silicus? Technical report, National Bureau of Economic
+   gent debate, 2023.                                               Research, 2023.
+[Fan et al., 2023] Caoyun Fan, Jindou Chen, Yaohui Jin, and       [Hua et al., 2023] Wenyue Hua, Lizhou Fan, Lingyao Li,
+   Hao He. Can large language models serve as rational play-        Kai Mei, Jianchao Ji, Yingqiang Ge, Libby Hemphill, and
+   ers in game theory? a systematic analysis. arXiv preprint        Yongfeng Zhang. War and peace (waragent): Large lan-
+   arXiv:2312.05488, 2023.                                          guage model-based multi-agent simulation of world wars,
+                                                                    2023.
+[Farmer and Axtell, 2022] J. Doyne Farmer and Robert L.
+   Axtell. Agent-Based Modeling in Economics and Finance:         [Huang et al., 2023a] Dong Huang, Qingwen Bu, Jie M.
+   Past, Present, and Future. INET Oxford Working Papers            Zhang, Michael Luck, and Heming Cui. Agentcoder:
+   2022-10, Institute for New Economic Thinking at the Ox-          Multi-agent-based code generation with iterative testing
+   ford Martin School, University of Oxford, June 2022.             and optimisation, 2023.
+[Gao et al., 2023a] Chen Gao, Xiaochong Lan, Zhihong Lu,          [Huang et al., 2023b] Lei Huang, Weijiang Yu, Weitao Ma,
+   Jinzhu Mao, Jinghua Piao, Huandong Wang, Depeng Jin,             Weihong Zhong, Zhangyin Feng, Haotian Wang, Qiang-
+   and Yong Li. S3 : Social-network simulation system with          long Chen, Weihua Peng, Xiaocheng Feng, Bing Qin, et al.
+  A survey on hallucination in large language models: Prin-      [Li et al., 2023g] Yang Li, Yangyang Yu, Haohang Li, Zhi
+  ciples, taxonomy, challenges, and open questions. arXiv           Chen, and Khaldoun Khashanah. Tradinggpt: Multi-agent
+  preprint arXiv:2311.05232, 2023.                                  system with layered memory and distinct characters for
+[Kaiya et al., 2023] Zhao Kaiya, Michelangelo Naim, Jo-             enhanced financial trading performance, 2023.
+  vana Kondic, Manuel Cortes, Jiaxin Ge, Shuying Luo,            [Li et al., 2023h] Yuan Li, Yixuan Zhang, and Lichao Sun.
+  Guangyu Robert Yang, and Andrew Ahn. Lyfe agents:                 Metaagents: Simulating interactions of human behaviors
+  Generative agents for low-cost real-time social interac-          for llm-based task-oriented coordination via collaborative
+  tions. arXiv preprint arXiv:2310.02172, 2023.                     generative agents. arXiv preprint arXiv:2310.06500, 2023.
+[Khot et al., 2023] Tushar Khot, Harsh Trivedi, Matthew          [Liang et al., 2023] Zhenwen Liang, Wenhao Yu, Tanmay
+  Finlayson, Yao Fu, Kyle Richardson, Peter Clark, and              Rajpurohit, Peter Clark, Xiangliang Zhang, and Ashwin
+  Ashish Sabharwal. Decomposed prompting: A modular                 Kaylan. Let gpt be a math tutor: Teaching math word prob-
+  approach for solving complex tasks, 2023.                         lem solvers with customized exercise generation. arXiv
+                                                                    preprint arXiv:2305.14386, 2023.
+[Kovač et al., 2023] Grgur Kovač, Rémy Portelas, Peter Ford
+  Dominey, and Pierre-Yves Oudeyer. The socialai school:         [Light et al., 2023a] Jonathan Light, Min Cai, Sheng Shen,
+  Insights from developmental psychology towards artificial         and Ziniu Hu. Avalonbench: Evaluating llms playing the
+  socio-cultural agents. arXiv preprint arXiv:2307.07871,           game of avalon, 2023.
+  2023.                                                          [Light et al., 2023b] Jonathan Light, Min Cai, Sheng Shen,
+[Lewis et al., 2021] Patrick Lewis, Ethan Perez, Aleksan-           and Ziniu Hu. From text to tactic: Evaluating llms play-
+                                                                    ing the game of avalon. arXiv preprint arXiv:2310.05036,
+   dra Piktus, Fabio Petroni, Vladimir Karpukhin, Naman
+                                                                    2023.
+   Goyal, Heinrich Küttler, Mike Lewis, Wen tau Yih,
+   Tim Rocktäschel, Sebastian Riedel, and Douwe Kiela.          [Liu et al., 2023] Zijun Liu, Yanzhe Zhang, Peng Li, Yang
+   Retrieval-augmented generation for knowledge-intensive           Liu, and Diyi Yang. Dynamic llm-agent network: An llm-
+   nlp tasks, 2021.                                                 agent collaboration framework with agent team optimiza-
+                                                                    tion. arXiv preprint arXiv:2310.02170, 2023.
+[Lex and Schedl, 2022] Elisabeth Lex and Markus Schedl.
+   Psychology-informed recommender systems: A human-             [Ma et al., 2023] Zilin Ma, Yiyang Mei, and Zhaoyuan Su.
+   centric perspective on recommender systems. In Proceed-          Understanding the benefits and challenges of using large
+   ings of the 2022 Conference on Human Information In-             language model-based conversational agents for mental
+   teraction and Retrieval, CHIIR ’22, page 367–368, New            well-being support. arXiv preprint arXiv:2307.15810,
+   York, NY, USA, 2022. Association for Computing Ma-               2023.
+   chinery.                                                      [Mandi et al., 2023] Zhao Mandi, Shreeya Jain, and Shuran
+[Li et al., 2023a] Chao Li, Xing Su, Chao Fan, Haoying Han,         Song. Roco: Dialectic multi-robot collaboration with large
+   Cong Xue, and Chunmo Zheng. Quantifying the impact               language models. arXiv preprint arXiv:2307.04738, 2023.
+   of large language models on collective opinion dynamics.      [Mao et al., 2023] Shaoguang Mao, Yuzhe Cai, Yan Xia,
+   arXiv preprint arXiv:2308.03313, 2023.                           Wenshan Wu, Xun Wang, Fengyi Wang, Tao Ge, and Furu
+[Li et al., 2023b] Guohao Li, Hasan Abed Al Kader Ham-              Wei. Alympics: Language agents meet game theory. arXiv
+                                                                    preprint arXiv:2311.03220, 2023.
+   moud, Hani Itani, Dmitrii Khizbullin, and Bernard
+   Ghanem. Camel: Communicative agents for” mind” ex-            [Moura, 2023] João Moura. Crewai. https://github.com/
+   ploration of large scale language model society. arXiv           joaomdmoura/crewAI, 2023.
+   preprint arXiv:2303.17760, 2023.                              [Mukobi et al., 2023] Gabriel Mukobi, Hannah Erlebach,
+[Li et al., 2023c] Huao Li, Yu Quan Chong, Simon Stepput-           Niklas Lauffer, Lewis Hammond, Alan Chan, and Jesse
+   tis, Joseph Campbell, Dana Hughes, Michael Lewis, and            Clifton. Welfare diplomacy: Benchmarking language
+   Katia Sycara. Theory of mind for multi-agent collabora-          model cooperation. arXiv preprint arXiv:2310.08901,
+   tion via large language models, 2023.                            2023.
+[Li et al., 2023d] Minghao Li, Yingxiu Zhao, Bowen Yu,           [Nascimento et al., 2023] Nathalia Nascimento, Paulo Alen-
+   Feifan Song, Hangyu Li, Haiyang Yu, Zhoujun Li, Fei              car, and Donald Cowan. Self-adaptive large language
+   Huang, and Yongbin Li. Api-bank: A comprehensive                 model (llm)-based multiagent systems. In 2023 IEEE
+   benchmark for tool-augmented llms, 2023.                         International Conference on Autonomic Computing and
+                                                                    Self-Organizing Systems Companion (ACSOS-C), pages
+[Li et al., 2023e] Nian Li, Chen Gao, Yong Li, and Qingmin          104–109. IEEE, 2023.
+   Liao. Large language model-empowered agents for simu-         [Park et al., 2022] Joon Sung Park, Lindsay Popowski, Car-
+   lating macroeconomic activities, 2023.
+                                                                    rie Cai, Meredith Ringel Morris, Percy Liang, and
+[Li et al., 2023f] Siyu Li, Jin Yang, and Kui Zhao. Are you         Michael S Bernstein. Social simulacra: Creating popu-
+   in a masquerade? exploring the behavior and impact of            lated prototypes for social computing systems. In Pro-
+   large language model driven social bots in online social         ceedings of the 35th Annual ACM Symposium on User In-
+   networks. arXiv preprint arXiv:2307.10337, 2023.                 terface Software and Technology, pages 1–18, 2022.
+[Park et al., 2023] Joon Sung Park, Joseph C O’Brien, Car-    [Williams et al., 2023] Ross Williams, Niyousha Hos-
+   rie J Cai, Meredith Ringel Morris, Percy Liang, and          seinichimeh, Aritra Majumdar, and Navid Ghaffarzade-
+   Michael S Bernstein.       Generative agents: Interac-       gan. Epidemic modeling with generative agents. arXiv
+   tive simulacra of human behavior.        arXiv preprint      preprint arXiv:2307.04986, 2023.
+   arXiv:2304.03442, 2023.                                    [Wooldridge and Jennings, 1995] Michael Wooldridge and
+[Qian et al., 2023] Chen Qian, Xin Cong, Wei Liu, Cheng         Nicholas R. Jennings. Intelligent agents: theory and prac-
+  Yang, Weize Chen, Yusheng Su, Yufan Dang, Jiahao Li,          tice. The Knowledge Engineering Review, 10:115 – 152,
+  Juyuan Xu, Dahai Li, Zhiyuan Liu, and Maosong Sun.            1995.
+  Communicative agents for software development, 2023.        [Wu et al., 2023a] Qingyun Wu, Gagan Bansal, Jieyu Zhang,
+[Ruan et al., 2023] Jingqing Ruan, Yihong Chen, Bin Zhang,      Yiran Wu, Shaokun Zhang, Erkang Zhu, Beibin Li,
+  Zhiwei Xu, Tianpeng Bao, Guoqing Du, Shiwei Shi,              Li Jiang, Xiaoyun Zhang, and Chi Wang. Autogen: En-
+  Hangyu Mao, Ziyue Li, Xingyu Zeng, and Rui Zhao. Tptu:        abling next-gen llm applications via multi-agent conversa-
+  Large language model-based ai agents for task planning        tion framework. arXiv preprint arXiv:2308.08155, 2023.
+  and tool usage, 2023.                                       [Wu et al., 2023b] Yuxiang Wu, Zhengyao Jiang, Akbir
+[Russell and Norvig, 2009] Stuart Russell and Peter Norvig.     Khan, Yao Fu, Laura Ruis, Edward Grefenstette, and Tim
+  Artificial Intelligence: A Modern Approach. Prentice Hall     Rocktäschel. Chatarena: Multi-agent language game en-
+  Press, USA, 3rd edition, 2009.                                vironments for large language models. GitHub repository,
+                                                                2023.
+[Shinn et al., 2023] Noah Shinn, Federico Cassano, Edward
+                                                              [Xi et al., 2023] Zhiheng Xi, Wenxiang Chen, Xin Guo,
+   Berman, Ashwin Gopinath, Karthik Narasimhan, and
+   Shunyu Yao. Reflexion: Language agents with verbal re-       Wei He, Yiwen Ding, Boyang Hong, Ming Zhang, Jun-
+   inforcement learning, 2023.                                  zhe Wang, Senjie Jin, Enyu Zhou, Rui Zheng, Xiaoran
+                                                                Fan, Xiao Wang, Limao Xiong, Yuhao Zhou, Weiran
+[Sumers et al., 2023] Theodore R Sumers, Shunyu Yao,            Wang, Changhao Jiang, Yicheng Zou, Xiangyang Liu,
+   Karthik Narasimhan, and Thomas L Griffiths. Cogni-           Zhangyue Yin, Shihan Dou, Rongxiang Weng, Wensen
+   tive architectures for language agents. arXiv preprint       Cheng, Qi Zhang, Wenjuan Qin, Yongyan Zheng, Xipeng
+   arXiv:2309.02427, 2023.                                      Qiu, Xuanjing Huang, and Tao Gui. The rise and potential
+[Tang et al., 2023] Xiangru Tang, Anni Zou, Zhuosheng           of large language model based agents: A survey, 2023.
+   Zhang, Yilun Zhao, Xingyao Zhang, Arman Cohan, and         [Xiao et al., 2023] Bushi Xiao, Ziyuan Yin, and Zixuan
+   Mark Gerstein. Medagents: Large language models as col-      Shan. Simulating public administration crisis: A novel
+   laborators for zero-shot medical reasoning, 2023.            generative agent-based simulation system to lower tech-
+[Wang et al., 2021] Zijie J. Wang, Dongjin Choi, Shenyu         nology barriers in social science research. arXiv preprint
+                                                                arXiv:2311.06957, 2023.
+  Xu, and Diyi Yang. Putting humans in the natural lan-
+  guage processing loop: A survey, 2021.                      [Xie et al., 2023] Tianbao Xie, Fan Zhou, Zhoujun Cheng,
+                                                                Peng Shi, Luoxuan Weng, Yitao Liu, Toh Jing Hua, Jun-
+[Wang et al., 2023a] Kuan Wang, Yadong Lu, Michael San-
+                                                                ning Zhao, Qian Liu, Che Liu, et al. Openagents: An open
+  tacroce, Yeyun Gong, Chao Zhang, and Yelong Shen.             platform for language agents in the wild. arXiv preprint
+  Adapting llm agents through communication, 2023.              arXiv:2310.10634, 2023.
+[Wang et al., 2023b] Lei Wang, Chen Ma, Xueyang Feng,         [Xiong et al., 2023] Kai Xiong, Xiao Ding, Yixin Cao, Ting
+  Zeyu Zhang, Hao Yang, Jingsen Zhang, Zhiyuan Chen, Ji-        Liu, and Bing Qin. Examining inter-consistency of large
+  akai Tang, Xu Chen, Yankai Lin, Wayne Xin Zhao, Zhewei        language models collaboration: An in-depth analysis via
+  Wei, and Ji-Rong Wen. A survey on large language model        debate, 2023.
+  based autonomous agents, 2023.
+                                                              [Xu et al., 2023a] Lin Xu, Zhiyuan Hu, Daquan Zhou,
+[Wang et al., 2023c] Shenzhi Wang, Chang Liu, Zilong            Hongyu Ren, Zhen Dong, Kurt Keutzer, See Kiong Ng,
+  Zheng, Siyuan Qi, Shuo Chen, Qisen Yang, Andrew Zhao,         and Jiashi Feng. Magic: Investigation of large language
+  Chaofei Wang, Shiji Song, and Gao Huang. Avalon’s game        model powered multi-agent in cognition, adaptability, ra-
+  of thoughts: Battle against deception through recursive       tionality and collaboration, 2023.
+  contemplation. arXiv preprint arXiv:2310.01320, 2023.
+                                                              [Xu et al., 2023b] Yuzhuang Xu, Shuo Wang, Peng Li,
+[Wei et al., 2022] Jason Wei, Xuezhi Wang, Dale Schuur-         Fuwen Luo, Xiaolong Wang, Weidong Liu, and Yang
+  mans, Maarten Bosma, Fei Xia, Ed Chi, Quoc V Le,              Liu. Exploring large language models for communication
+  Denny Zhou, et al. Chain-of-thought prompting elicits         games: An empirical study on werewolf. arXiv preprint
+  reasoning in large language models. Advances in Neural        arXiv:2309.04658, 2023.
+  Information Processing Systems, 35:24824–24837, 2022.       [Xu et al., 2023c] Zelai Xu, Chao Yu, Fei Fang, Yu Wang,
+[Weng, 2023] Lilian Weng.             Llm powered au-           and Yi Wu. Language agents with reinforcement learning
+  tonomous agents.      https://lilianweng.github.io/posts/     for strategic play in the werewolf game. arXiv preprint
+  2023-06-23-agent/, 2023.                                      arXiv:2310.18940, 2023.
+[Yao et al., 2023] Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak
+   Shafran, Thomas L. Griffiths, Yuan Cao, and Karthik
+   Narasimhan. Tree of thoughts: Deliberate problem solving
+   with large language models, 2023.
+[Yu et al., 2023] Bangguo Yu, Hamidreza Kasaei, and Ming
+   Cao. Co-navgpt: Multi-robot cooperative visual semantic
+   navigation using large language models, 2023.
+[Zhang et al., 2023a] An Zhang, Leheng Sheng, Yuxin
+   Chen, Hao Li, Yang Deng, Xiang Wang, and Tat-Seng
+   Chua. On generative agents in recommendation, 2023.
+[Zhang et al., 2023b] Ceyao Zhang, Kaijie Yang, Siyi Hu,
+   Zihao Wang, Guanghe Li, Yihang Sun, Cheng Zhang,
+   Zhaowei Zhang, Anji Liu, Song-Chun Zhu, et al. Proa-
+   gent: Building proactive cooperative ai with large lan-
+   guage models. arXiv preprint arXiv:2308.11339, 2023.
+[Zhang et al., 2023c] Hongxin Zhang, Weihua Du, Jiaming
+   Shan, Qinhong Zhou, Yilun Du, Joshua B Tenenbaum,
+   Tianmin Shu, and Chuang Gan. Building cooperative
+   embodied agents modularly with large language models.
+   arXiv preprint arXiv:2307.02485, 2023.
+[Zhang et al., 2023d] Jintian Zhang, Xin Xu, and Shumin
+   Deng. Exploring collaboration mechanisms for llm agents:
+   A social psychology view, 2023.
+[Zhang et al., 2023e] Junjie Zhang, Yupeng Hou, Ruobing
+   Xie, Wenqi Sun, Julian McAuley, Wayne Xin Zhao, Leyu
+   Lin, and Ji-Rong Wen. Agentcf: Collaborative learning
+   with autonomous language agents for recommender sys-
+   tems, 2023.
+[Zhao et al., 2023] Qinlin Zhao, Jindong Wang, Yixuan
+   Zhang, Yiqiao Jin, Kaijie Zhu, Hao Chen, and Xing Xie.
+   Competeai: Understanding the competition behaviors in
+   large language model-based agents, 2023.
+[Zheng et al., 2023] Zhiling Zheng, Oufan Zhang, Ha L.
+   Nguyen, Nakul Rampal, Ali H. Alawadhi, Zichao Rong,
+   Teresa Head-Gordon, Christian Borgs, Jennifer T. Chayes,
+   and Omar M. Yaghi. Chatgpt research group for optimiz-
+   ing the crystallinity of mofs and cofs. ACS Central Sci-
+   ence, 9(11):2161–2170, 2023.
+[Zhou et al., 2023a] Wangchunshu Zhou, Yuchen Eleanor
+   Jiang, Long Li, Jialong Wu, Tiannan Wang, Shi Qiu, Jin-
+   tian Zhang, Jing Chen, Ruipu Wu, Shuai Wang, et al.
+   Agents: An open-source framework for autonomous lan-
+   guage agents. arXiv preprint arXiv:2309.07870, 2023.
+[Zhou et al., 2023b] Xuhui Zhou, Hao Zhu, Leena Mathur,
+   Ruohong Zhang, Haofei Yu, Zhengyang Qi, Louis-
+   Philippe Morency, Yonatan Bisk, Daniel Fried, Graham
+   Neubig, and Maarten Sap. Sotopia: Interactive evaluation
+   for social intelligence in language agents, 2023.
+[Ziems et al., 2023] Caleb Ziems, Omar Shaikh, Zhehao
+   Zhang, William Held, Jiaao Chen, and Diyi Yang. Can
+   large language models transform computational social sci-
+   ence? Computational Linguistics, pages 1–53, 2023.
+

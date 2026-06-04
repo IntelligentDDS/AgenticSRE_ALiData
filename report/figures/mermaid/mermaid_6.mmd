@@ -1,0 +1,15 @@
+graph TB
+    R["中央推理引擎<br/>Thought → Action → Observation"]
+    M["Metric Agent"] 
+    L["Log Agent"]
+    T["Trace Agent"]
+    E["Event Agent"]
+    
+    R -->|"调用决策"| M
+    R -->|"调用决策"| L
+    R -->|"调用决策"| T
+    R -->|"调用决策"| E
+    M -->|"观测结果"| R
+    L -->|"观测结果"| R
+    T -->|"观测结果"| R
+    E -->|"观测结果"| R

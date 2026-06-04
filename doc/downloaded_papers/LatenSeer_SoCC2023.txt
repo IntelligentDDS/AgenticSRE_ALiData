@@ -1,0 +1,1164 @@
+    LatenSeer: Causal Modeling of End-to-End Latency
+     Distributions by Harnessing Distributed Tracing
+              Yazhuo Zhang∗                                        Rebecca Isaacs†                                 Yao Yue†
+                Emory University                                  Amazon Web Services                             IOP Systems
+
+              Juncheng Yang                                             Lei Zhang                             Ymir Vigfusson
+        Carnegie Mellon University                                 Princeton University                 Emory University & Keystrike
+Abstract                                                                          ACM Reference Format:
+   End-to-end latency estimation in web applications is cru-                      Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang,
+cial for system operators to foresee the effects of potential                     and Ymir Vigfusson. 2023. LatenSeer: Causal Modeling of End-
+                                                                                  to-End Latency Distributions by Harnessing Distributed Tracing.
+changes, helping ensure system stability, optimize cost, and
+                                                                                  In ACM Symposium on Cloud Computing (SoCC ’23), October 30–
+improve user experience. However, estimating latency in                           November 1, 2023, Santa Cruz, CA, USA. ACM, New York, NY, USA,
+microservices-based architectures is challenging due to the                       18 pages. https://doi.org/10.1145/3620678.3624787
+complex interactions between hundreds or thousands of
+loosely coupled microservices. Current approaches either
+track only latency-critical paths or require laborious bespoke
+                                                                                  1   Introduction
+instrumentation, which is unrealistic for end-to-end latency                         Latency estimation enables operators managing large-
+estimation in complex systems.                                                    scale web applications [12, 33, 42, 49] to anticipate the im-
+   This paper presents LatenSeer, a modeling framework for                        pacts of potential changes before scaling their services, opti-
+estimating end-to-end latency distributions in microservice-                      mizing costs, adding features or adapting to changes in hard-
+based web applications. LatenSeer proposes novel data struc-                      ware configuration or cloud computing deployments [33, 44,
+tures to accurately represent causal relationships between                        47, 83]. For instance, the operators may wish to assess how
+services, overcoming the drawbacks of simple dependency                           introducing a novel machine learning pipeline or migrating
+representations that fail to capture the complexity of mi-                        some subset of services to a different data center would af-
+croservices. LatenSeer leverages distributed tracing data to                      fect customer-perceived latency. Such estimation is crucial to
+practically and accurately model end-to-end latency at scale.                     prevent performance regression and to protect the end-user
+Our evaluation shows that LatenSeer predicts latency within                       experience: Google, Amazon, and Akamai have all noted
+a 5.35% error, outperforming the state-of-the-art that has an                     significant drops in traffic or revenue following a modest
+error rate of more than 9.5%.                                                     (100+ ms) increase in latency [1, 22, 37, 76].
+                                                                                     To be pragmatic, operators of web applications desire a
+CCS Concepts                                                                      latency estimation framework that meets the following goals.
+• General and reference → Performance; • Computing                                (G1) Easy deployment. The system integrates with exist-
+methodologies → Modeling methodologies.                                                  ing data collection systems, eschewing invasive and
+Keywords                                                                                 labor-intensive custom instrumentation.
+                                                                                  (G2) Flexible scenarios. The system estimates end-to-end
+microservices, distributed tracing, latency estimation, end-
+                                                                                         latency given hypothetical latency changes in any of
+to-end latency
+                                                                                         its constituent services, informing advanced decision-
+∗ Work done during the internship at Twitter.                                            making.
+† Work done at Twitter.
+                                                                                  (G3) Realistic forecasts. The system should express con-
+                                                                                         fidence in its results—sound decisions require sound
+Permission to make digital or hard copies of part or all of this work for
+personal or classroom use is granted without fee provided that copies are                data and models.
+not made or distributed for profit or commercial advantage and that copies           In large-scale systems, however, these goals are challeng-
+bear this notice and the full citation on the first page. Copyrights for third-   ing to fulfill. At scale, modern applications often comprise
+party components of this work must be honored. For all other uses, contact        hundreds or thousands of loosely coupled microservices [13,
+the owner/author(s).
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA
+                                                                                  29, 45, 71, 77, 89], where a single user request may touch thou-
+© 2023 Copyright held by the owner/author(s).                                     sands of instances before generating a response [56, 71, 88].
+ACM ISBN 979-8-4007-0387-4/23/11.                                                 In microservices architectures, a single service often inter-
+https://doi.org/10.1145/3620678.3624787                                           acts with many others, forming a complex web of serial or
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA            Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang, and Ymir Vigfusson
+
+                                                                                                                                                        End-to-end latencies
+parallel calls to fulfill a user request. Modifications in one                      Distributed end-to-end traces            LatenSeer                  (stratified by groups)
+can thus affect others, leading to varied impacts on the end-                          time
+to-end latency of different requests.                                                     service A span                      Latency-endowed     predict        Baseline
+                                                                                          B            C                      Dependency Tree                    distribution
+   State-of-the-art solutions fall short of meeting all three                            D E
+                                                                                          F
+                                                                                                   G       H
+                                                                                                                              (L-tree)
+                                                                                                                         y
+objectives. Several works [33, 63, 64] require explicit instru-                                                ap
+                                                                                                                    pl
+
+mentation that makes them difficult and expensive to deploy                                    Hypothetical
+                                                                                                                              Modified L-tree     predict                        predict
+                                                                                                scenario
+in different environments (G1). Other methods, which use                                                                      based on scenario                   Predicted
+                                                                                               G   ⇨       G
+                                                                                                                                                                  distribution
+purely data-driven techniques, either do not target microservice-                   Operator
+
+based web applications [30, 49, 75, 81], or are restricted to                                                   predic
+
+making predictions for a subset of services [16, 88] (G2). Fi-                     Figure 1: Overview of LatenSeer. Operators can pose hypothet-
+nally, the trend of leveraging deep machine learning models                        ical scenarios into a trace-driven causal model and predict how
+for latency estimation would attempt to draw causal conclu-                        end-user latency would change relative to baseline.
+sions through black-box methods that fundamentally can
+derive only associations [58, 59], and are thus set up to fail                     Moreover, a single service might be involved in multiple top-
+goal (G3) [67].                                                                    level APIs. As a result, aggregating the distributed traces re-
+   We present LatenSeer, a framework for estimating the                            quires a data structure that is simultaneously succinct while
+end-to-end latency distribution for large-scale microservices                      maintaining sufficient diversity of requests to ensure accu-
+applications, that is explicitly designed to fulfill goals (G1)—                   rate latency estimation [38]. A key idea in LatenSeer is the
+(G3). As shown in the upper left of Fig. 1, LatenSeer piggy-                       use of set nodes to efficiently cluster traces that exhibit similar
+backs on the proliferation of distributed end-to-end trac-                         execution paths.
+ing in large-scale systems, such as Jaeger [32] or Open-                              Second, the latency of a parent service is a composite of
+Telemetry [53], rather than demanding custom instrumen-                            its child services’ latencies, underscoring the importance of
+tation (G1). LatenSeer allows an operator (bottom left) to                         discerning all causal relationships. Identifying causal depen-
+answer the question: How will the end-users be impacted                            dencies from single requests is straightforward but aggregat-
+by some hypothetical changes to the latencies of the underly-                      ing them is complex due to clock skews and path-dependent
+ing microservices (G2)? LatenSeer accepts hypothetical la-                         executions. To address this, LatenSeer introduces the succes-
+tency changes to services as inputs, and outputs the changed                       sion time alongside set nodes to aid in deducing the causal
+end-to-end latency distribution. We apply LatenSeer on two                         dependencies in child RPCs demonstrating similar execution
+use cases of latency estimation: service placement (UC1)—                          execution paths
+reasoning about the end user latency impact of resource                               Finally, to improve the accuracy of latency estimation,
+provisioning or service migration, and slack analysis (UC2)—                       LatenSeer profiles the joint distribution of child service la-
+determining the latency budget available to alter a microser-                      tency, departing from the convenient but misleading assump-
+vice without impacting the overall response times of requests.                     tion of mutual independence upon which most traditional
+We validate LatenSeer via null prediction 1 on distributed                         approaches have relied. Joint latency profiling accounts for
+traces from two production sources to show that the under-                         scenarios where the latency of different child services may
+lying model is sound, and conduct controlled experiments                           be interrelated, thus making latency estimates more accurate
+using a social network microservices-based benchmark to                            than what previous models could achieve.
+evaluate the accuracy of latency estimation (G3).                                     We implemented LatenSeer as a Python package, and use
+   Inside LatenSeer, we cast the latency estimation problem                        it in a social network prototype built from the DeathStar-
+as a causal model 2 of latency components through a sim-                           Bench microservices benchmark (DSB) [26]. We evaluate
+ple principle: a complex service decomposes into the causal                        LatenSeer’s ability to make accurate latency predictions
+interactions between its constituent microservices. The end-                       through two real world scenarios, service placement (UC1)
+to-end latency distribution for the entire application is thus                     and slack analysis (UC2). Our results show that LatenSeer
+the combination of each component’s latency distributions.                         predicts end-to-end latency distributions within a 5.35% error
+   LatenSeer overcomes multiple technical challenges that                          (D-statistic) with a mean of 2.7%. In contrast, the state-of-the-
+arise when forecasting latency in large-scale systems. First,                      art gives a minimum error surpassing 9.5% with a mean of
+distributed traces, which record the requests within dis-                          14.5%. Finally, we evaluate LatenSeer using two production
+tributed applications, often exhibit diverse execution paths.                      traces (Alibaba [45] and Twitter). We verify the soundness
+1 Null prediction refers to the experiments where LatenSeer derives the
+                                                                                   of latency prediction through null prediction experiments
+predicted latency distribution under conditions of zero injected delay.
+                                                                                   and demonstrate the scalability of LatenSeer on massive
+2 In distributed tracing, "causality" usually refers to the order of events or     production workloads.
+operations as they happened in relation to each other                                 This work makes the following contributions.
+LatenSeer: Causal Modeling of End-to-End Latency Distributions             SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA
+
+
+• We propose trace-driven causal modeling as a methodol-              Latency estimation questions are interventionist: they con-
+  ogy for answering interventional latency estimation ques-       cern hypothesizing how a running system will behave after
+  tions in large microservices architectures.                     it is changed. Conventional statistical and machine learning
+• We detail the design of the LatenSeer framework for ex-         tools, relying on observational data, fall short in answering
+  tracting causal inter-service dependencies from traces gen-     these queries due to their associative nature [60] and sus-
+  erated by off-the-shelf distributed tracing systems to gen-     ceptibility to confounding variables [59]. Moreover, while
+  erate causal models of end-to-end latency.                      randomized controlled trials offer more precise results, they
+• We demonstrate LatenSeer’s utility by accurately answer-        are resource-heavy and inflexible [25, 74].
+  ing hypothetical questions on realistic scenarios with an
+  estimation error within 5.35% (D-statistic), outperforming
+                                                                  2.2    The state of the art
+  the state-of-the-art.                                              End-to-end latency estimation is important to engineering
+• We show LatenSeer’s scalability through experiments on          planning, performance analysis and optimization, however,
+  real-world traces from large-scale, complex production          the traditional approaches are deficient. To explain, we ex-
+  systems.                                                        amine the main strategies deployed in practice.
+                                                                  Canarying releases. The canary release strategy, widely
+2 Background and related work                                     utilized in production, facilitates risk reduction by incremen-
+2.1 The latency estimation problem                                tally introducing software updates to a limited user group
+   Software systems are constantly evolving; these changes        before broader deployment [82]. With scarce engineering
+can affect latency. Tech giants such as Amazon, Google, and       resources, operators wish to conduct latency estimation be-
+Netflix implement thousands of daily deployments and pro-         fore expensive engineering efforts are spent on the project.
+duction changes across hundreds of services that comprise         Such a feasibility review should precede any live traffic anal-
+their production environments [24, 40, 68]. Estimating the        ysis or A/B experimentation—canarying—on the resulting
+impact of these frequent production changes ahead of time         component [79] to minimize cost and customer impact of
+is crucial, especially for managing risk, ensuring system sta-    potentially poor design decisions.
+bility, and maintaining Service Level Objectives (SLOs).          Service dependency graphs. A common technique for un-
+   Latency estimation is the task of predicting the impact        derstanding the causal dependencies between services is to
+of hypothetical service changes on end-to-end latency—the         chart service dependencies, a method widely adopted in pro-
+entire execution latency of requests to some top-level API        duction [35, 45, 46, 73, 80]. Large-scale applications requests
+endpoint across all the services involved in its execution.       are represented as call paths through service dependency
+The operators of large-scale services are accountable for bal-    graphs, which capture communication-based dependencies
+ancing the service response times with features, resource         between microservice instances. The call paths show how re-
+utilization, policy constraints, and costs. When evaluating       quests flow among microservices by following parent-child
+potential changes to a service, the operators face the conun-     relationship chains. As such, service dependency graphs
+drum of assessing how the modifications might impact the          serve an important tools in discerning the complex interplay
+response time—a critical factor in end-user experience.           of services and optimizing application performance.
+   To further elucidate, we highlight the importance of la-          Many distributed tracing visualization tools [32, 35, 73, 90]
+tency estimation by considering several “high-stakes” service     aggregate traces to construct service dependency graphs at
+changes.                                                          various detail levels (we will introduce distributed tracing
+Adding a new microservice. Introducing a new feature              in §2.3). Yet, none, to our knowledge, have integrated latency
+often involves adding one or more microservices. While this       distribution into the service dependency graphs. Introduc-
+can improve customer experience, it may also slow down re-        ing latency estimation to a microservice-based dependency
+sponse times as requests navigate through the added service.      graph faces hurdles. Alibaba [45] shows that the latency
+Scaling strategies. For a video streaming service, scaling        of a service is stable among call graphs of similar topolo-
+up infrastructure can handle more users but may add latency       gies but varies significantly across different topologies, and
+                                                                  the latency of a service is stable when the call rate varies.
+due to increased server interactions or data replication across
+                                                                  Some works [46, 80] use dependency graphs to guide auto-
+multiple sites.
+                                                                  scaling and service migration. Tprof [31] aggregated traces in
+Policy changes. Regulatory requirements might necessi-            a fine-grained manner of sub-span analysis for performance
+tate deployment changes, like storing user data in specific       debugging.
+locations. This could lengthen end-to-end latency due to             While a service dependency graph outlines relationships
+longer data transfer times. Latency estimation can guide          between services, it fails to detail the micro-level dynamics of
+operators in assessing and mitigating these impacts.
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA   Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang, and Ymir Vigfusson
+
+
+                                                                                                                                      nginx-
+                                                                                                                                       web-
+                                                                                                                                      server
+
+
+
+                                                                                                                                     compose
+                                                                                                                                       post
+
+
+
+
+                                                                                                         home-              post-              unique-            user-
+                                                                                                                   media               text              user
+                                                                                                        timeline           storage                id            timeline
+
+
+
+
+Figure 2: An example trace from Jaeger. The left diagram shows the trace in a timeline view, and the right diagram shows the service
+dependency graph generated by Jaeger.
+
+
+ Table 1: LatenSeer compared to state-of-the-art systems.                 theoretical frameworks to understand the latency profile of
+                                                                          arbitrary black box services [37, 55], which, like more recent
+       LatenSeer    ORION     CRISP   WebPerf    MysteryMachine           work over microservices [44], is focused around anomaly de-
+  G1          ✓                   ✓                          ✓            tection. More recent white-box approaches to performance
+  G2          ✓          ✓                  ✓                ✓
+  G3          ✓          ✓                  ✓
+                                                                          modeling have also been proposed [2, 62].
+                                                                             Facebook’s Mystery machine [12] shares the motivation
+                                                                          of constructing a causal model using pre-existing data, pre-
+execution order, including the nature of sibling relationships,           dating modern tracing infrastructure, that works by initially
+whether parallel or sequential. For instance, the service de-             hypothesizing all possible pairwise relationships and grad-
+pendency graph in Fig. 2 illustrates service compose-post                 ually rejecting the causality of each dependency through
+must await the responses from all seven child services to                 counterexamples. Regrettably, the ensuing predictions are
+complete its task. Yet, if we aim to comprehend how changes               brittle owing to incomplete methods for producing causal di-
+in the media service affect compose-post, the service de-                 agrams [34] and cannot handle various issues in tracing data,
+pendency graph falls short. This limitation impedes accu-                 such as clock skew and missing span. CRISP [88] shares a
+rate latency estimation, posing a risk of relying on models               similar motivation (G1) but lacks a causal treatise of latency
+grounded in potentially incorrect assumptions about the                   estimation. Similarly, Orion [49] also uses latency propa-
+interrelationships of child services.                                     gation technique to calculate end-to-end latency. However,
+Latency-critical paths. In microservice dependency graphs,                it focuses on known service DAGs and fails to address the
+the latency-critical path represents the slowest sequence                 causality in service dependencies. The study most closely
+of dependent tasks [84]. While its analysis facilitates the               aligned with our objectives is WebPerf [33], which crafts
+identification of optimization prospects and bottlenecks in               techniques surrounding service dependencies and latency
+distributed systems [7, 9, 12, 16, 21, 35, 61, 88], it can inadver-       propagation. However, WebPerf is specifically tailored to
+tently obscure potential issues in off-path services. Hence,              Microsoft’s Azure environment and relies on Azure-specific
+incorporating slack time analysis for off-path services is ad-            hints to work. WebPerf employs domain-specific binary in-
+vocated, aiding in refined capacity planning and mitigating               strumentation, presenting a solution that isn’t universally
+risks arising from shared-resource contention [16].                       adaptable. In contrast, LatenSeer advances this approach by
+   CRISP [88] uses critical path analysis on Uber traces to               adopting a data-driven strategy, relying on trace data that
+help developers understand and optimize important ser-                    are commonly available in today’s production systems.
+vices. However, services off the latency-critical path are eas-              Latency prediction is a well-trodden field with substan-
+ily trimmed from the results. For example, service media                  tial research in areas such as service selection [19, 85], ser-
+in Fig. 2 are not shown in the final results of CRISP. A singu-           vice composition [3–5, 10, 87], and business process model-
+lar focus on the latency-critical paths paints an incomplete              ing [14, 66]. Notably, with the rising popularity of serverless
+and misleading picture for end-to-end latency estimation,                 workflows in many applications, there has been a surge in
+emphasizing the need for a more holistic approach that in-                research efforts aimed at latency prediction for these work-
+corporates the dynamic roles of all services in the system.               flows. These efforts predominantly focus on resource op-
+                                                                          timization and reducing communication latency in server-
+Latency modeling and performance prediction. Glean-
+                                                                          less workflows [17, 18, 50]. Distinctively, LatenSeer, not con-
+ing causal dependencies in existing large-scale systems, such
+                                                                          strained by predefined workflows, offers a flexible solution
+as building causal models of latency, has been explored in
+                                                                          to latency predictions in microservice-based applications.
+the past decade. Researchers from Google, for example, built
+LatenSeer: Causal Modeling of End-to-End Latency Distributions                        SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA
+
+
+2.3    The proliferation of distributed tracing                          1.0                                      1.0
+                                                                            0.8                                       0.8
+   Distributed end-to-end tracing tracks requests’ execution
+paths in a distributed system or application across different            0.6                                      0.6
+                                                                      CDF                                       CDF
+components, including frontend devices, backend services,                   0.4                                       0.4
+
+and databases. Many production systems deploy distributed                0.2                                      0.2
+
+tracing frameworks, such as OpenTracing [54], Zipkin [90],               0.0                                      0.0
+                                                                                  0        10000        20000               5   10     15   20
+and Jaeger [32], to track request traces and aggregated met-                              Spans/trace                           Max depth
+rics, which is useful to examine hand-off between system
+                                                                        (a) Median spans/trace=11676 (b) Median max call path depth=9
+components [8, 57, 72], and to troubleshoot practical sys-
+tem problems such as slow responses and errors [6, 20, 23,                              Figure 3: Twitter trace characteristics.
+27, 35, 43, 48, 53, 78]. The primary use cases of distributed         Yet aggregation techniques to produce service dependency
+end-to-end tracing systems concern active system monitor-             graphs exhibit significant blind spots. Chief among them is
+ing [8, 57, 72], anomaly detection [6, 11, 27, 39, 47, 65, 69, 73],   the problem that sibling nodes may themselves have com-
+and root-cause analysis [55, 83].                                     plex interdependencies that, when uncaptured, can result in
+   In our context, trace aggregation can be used to delineate         an incomplete portrayal of the performance dynamics and
+the interdependencies among all services within a microser-           intricacies, particularly in hypothetical scenarios, thereby
+vices system—allowing for data that is routinely collected to         undermining the accuracy of latency estimation. Neverthe-
+be useful for latency estimation (G1). The left side of Fig. 2        less, a cautious and careful approach can overcome these
+shows a visual example of a trace constructed by Jaeger [32],         limitations, as shown in §3, allowing distributed tracing to
+a state-of-the-art open source tracing framework, for a com-          be valuable resource for latency estimation.
+pose post request to a benchmark of social network appli-
+cation [26]. An end-to-end trace represents an execution              (2) Small inaccuracies can snowball. The inevitability
+path through the system, whereas a span represents a logical          of clock skew is a major issue for nuanced processing of
+operation from a function. A span maintains not only the              distributed tracing data. In a distributed tracing deployment,
+causal relationship by keeping a reference to a parent span           spans are timestamped using the local machine’s clock upon
+but also the runtime execution details, such as start and end         start and finish. However, the clocks on different machines in
+timestamps to represent the duration of the operation. A              a distributed system invariably drift apart, even with periodic
+trace can be considered as a directed acyclic graph (DAG) of          synchronization using the Network Time Protocol (NTP) [36,
+spans, where each edge represents the causal relationships,           41, 51, 52, 70]. This well-understood problem in distributed
+such as RPC calls, between two spans [72]. Besides tracking           computer stems from various factors, such as clock hardware
+causal relationships, a trace also captures temporal order            differences, environmental conditions, network latency, and
+between a group of child spans that are concurrently called           the resolution of the system clock. Consequently, this can
+by the same span.                                                     lead to misinterpretations in system performance analysis
+   We show an illustration of a service dependency graph,             and incorrect event ordering [12, 88], with minor errors
+created from 20 traces of compose-post requests, in the               potentially amplifying to significantly impact conclusions
+right-hand-side diagram of Fig. 2. The completion of service          on performance behavior.
+compose-post is contingent on even other services, such               (3) The problem of scale. A single trace is not representa-
+as service media and service text. Below, we refer to the             tive of the full service—any interventional questions must
+services that are invoked by the same “parent” service in a           account for the diversity of traces that execute in a produc-
+service dependency graph as sibling nodes.                            tion environment. At Twitter, for instance, a request involves
+                                                                      12,000 spans on average, with some traces encompassing as
+2.4    Challenges of using distributed traces                         many as 25,000 (Fig. 3a). The call graphs for one endpoint
+       to predict latency                                             comprise between 1 and 25,000 spans at tree depths between
+   Distributed tracing confers a great opportunity for pig-           2 to 22 (Fig. 3b) and encompass widths between 1–5,000.
+gybacking latency estimation on existing data, providing              Uber, similarly, operates nearly 4,000 microservices, and a
+end-to-end visibility, and revealing service dependencies. Yet        single request trace can have up to more than 11,000 spans
+this direction cannot provide end-to-end latency estimation           nested 40 levels deep [88]. Existing tracing tools focus on
+out of the box due to multiple challenges.                            providing the operator with a single, specific trace [31, 48],
+(1) Raw traces fail to capture interdependencies. The                 such as to identify an edge-case in Jaeger [86], or analyzing
+perspective offered by each individual trace is too insular           the path of a single request [48]. How to properly aggregate
+to fully encapsulate the complexity of the entire system.             thousands, or even millions, of distributed traces to gather
+                                                                      insights is a nascent and understudied area [88].
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA   Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang, and Ymir Vigfusson
+
+
+                                                                                            A                                   A
+# Load distributed trace data
+model = LatenSeer(data="s3://trace_bucket")                                       B             E      G              B             E      G
+                                                                                C D             F                   C D             F
+# UC1:Add hypothetical 30ms delay to service 'LBS'
+scenario = model.apply('LBS'=lambda x:x+30)
+# Get the changed end-to-end latency distribution
+                                                                            Figure 5: Child service latency may affect parent service.
+E2E = scenario.predict()
+# UC2:Determine slack of 'LBS' service                                       The underlying concept is simple: the latency of a parent
+LBSslack = model.slack('LBS')                                             service can be deduced from the latencies of its child ser-
+                                                                          vices. For example, Fig. 5 illustrates a trace consisting of a
+Figure 4: LatenSeer Example. Estimate latency distribution if             parent service 𝐴 and six child services (𝐵-𝐺), where 𝐵, 𝐸, and
+load balancing services are migrated to another data center with          𝐺 are on the latency-critical path. We define the following
+30ms extra delay.                                                         functions on a particular trace: L (𝑥) the latency of service
+                                                                          𝑥, and L (N ) which accounts for the network latency or
+3    Design                                                               other processing time on the latency-critical path. For in-
+   LatenSeer is an offline tool for conducting latency estima-            stance, it includes the duration between 𝐵’s finish time and
+tion from distributed traces. This tool permits the system                𝐸’s start time. Consequently, the latency of the span 𝐴 can
+operators to infer how end-to-end latency would be affected               be expressed as L (𝐴) = L (𝐵) + L (𝐸) + L (𝐺) + L (N ).
+when the latencies of specific services are changed. In this                 Now we discuss how latency changes on different child
+section, we describe how LatenSeer overcomes the aforemen-                services impact the latency of the parent service. Since ser-
+tioned challenges to derive a causal model of steady-state                vices 𝐵, 𝐸, and 𝐺 are on the latency-critical path, any delay
+latency from historic distributed trace data of the system.               in these services will increase the latency of 𝐴. However, the
+Interface. Fig. 4 shows LatenSeer in action, estimating end-              latency of 𝐴 can also be affected by other services that are off
+user latency distributions under the assumption that load-                the latency-critical path, such as 𝐶, 𝐷, and 𝐹 in this example.
+balancing services have been migrated to a distant data cen-              We summarize four scenarios of latency change on a service
+ter (UC1). The operator first obtains a baseline model of laten-          and their impacts3 :
+cies based on trace data. As input, the operator poses an inter-          (1) An increase in the latency of a child on the latency-critical
+ventional query to the model by defining a subset of services                 path invariably leads to an increase in the parent latency
+to move (e.g., ‘LBS’), and the delay incurred (or reduced) from           (2) A decrease in the latency of a child on the latency-critical
+the movement (e.g., a normal distribution centered on 30 ms)                  path can result in unchanged or reduced parent latency,
+triggering the latency propagation via model.apply which                      potentially altering the latency-critical path itself.
+returns a latency-modified model, obtaining a predicted la-               (3) When a child off the latency-critical path experiences
+tency distribution as output (via scenario.predict). Sep-                     increased latency, the parent latency might remain the
+arately, the operator also determines the available latency                   same or increase, contingent upon changes to the latency-
+budget for the LBS service through a model.slack call,                        critical path.
+which returns CDFs of latency slacks for all services (UC2).              (4) A decrease in the latency of a child off the latency-critical
+The latency distributions in LatenSeer can be further strati-                 path leaves the parent latency unaffected.
+fied by arbitrary groups (e.g., to assess latency impacts on              Fig. 5 provides two examples demonstrating cases (1) and (3)
+customers in certain regions)—we focus on a single group                  respectively.
+for the clarity of presentation.                                             As previously discussed, the latency-critical path exhibits
+Key properties. To estimate end-to-end latency under po-                  dynamism due to latency changes in different services. To as-
+tential alterations in any component services, LatenSeer con-             sess the impact of these changes on the latency of a parent ser-
+structs a model that fulfills the following properties: (1) it            vice, we construct an invocation graph for the child services.
+delineates the causal dependencies between microservices.                 This graph captures the sequential execution order of the
+(2) it recognizes the range of request routes within the sys-             child services within a specific trace. In the invocation graph,
+tem, accounting for the different paths a request might take              an edge E (𝑥, 𝑦) represents service 𝑦 finishes before service
+and the specific services it might encounter. (3) it maintains            𝑥 happens. Node start, end, and sync are virtual nodes that
+the latency distributions of interactions (e.g., RPC or REST)             denote the starting, finishing, and synchronization points, re-
+between each pair of communicating services.                              spectively. For example, node 𝐺 will not start until both nodes
+                                                                          𝐸 and 𝐹 have finished. Fig. 6 shows a comparison between a
+3.1 Modeling latency with invocation graph
+  We begin by elucidating the principles behind latency                   3We can effectively calculate the latency changes on multiple services. For
+
+calculation using a single trace as an illustrative example.              ease of presentation, we only show latency change on one service.
+LatenSeer: Causal Modeling of End-to-End Latency Distributions                        SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA
+
+
+           A                            B              E                                             A                                 A
+                                                sync       sync   G            Trace 1
+  B C D E F G
+                            start
+                                    C       D          F
+                                                                      end
+                                                                                                 B            C                   S            S
+                                                                                                     A                         B C
+                                                                               Trace 2                                                     B D
+Figure 6: From service dependency tree to invocation graph.                                      B            D
+                                                                                              time                                    L-TREE
+standard service dependency tree and an invocation graph
+derived from the same trace (Fig. 5). Invocation graphs rep-                              Figure 7: Aggregate traces to L-tree.
+resents child relationships with finer granularity, a detail not            latency change occurs in any given service, we can identify
+captured by service dependency trees. Moreover, each node                   the slowest path within the invocation graph, thus determin-
+is endowed with a latency value corresponding to its service.               ing the overall latency of the parent service.
+The latency of the parent service can be expressed as L (𝐴) =
+𝑚𝑎𝑥 (L (𝐵), L (𝐶)+L (𝐷))+𝑚𝑎𝑥 (L (𝐸), L (𝐹 ))+L (𝐺). Given                   3.2     Aggregating traces with L-tree
+this formulation, any alterations in a child service’s latency                 We have presented the foundational principles of latency
+allow for a direct computation of the resulting impact on the               modeling. In this section, we detail the construction of a
+parent service’s latency.                                                   latency-endowed service dependency tree, referred to as
+   We now describe how the conventional service depen-                      the L-tree, which aims to refine aggregate-level latency
+dency tree can be converted to an invocation graph. We use                  calculations.
+serial and parallel to describe the relationship between any                   The construction of the L-tree is a top-down process by
+two spans. Consider, for example, spans 𝐵 and 𝐸 depicted in                 two main steps. Firstly, we iterate through traces to establish
+Fig. 5, we define the succession time as the difference between             set nodes between parent spans and their direct children,
+the starting time of 𝐸 and the finishing time of 𝐵. Given that              merging identical spans where necessary. This forms an ini-
+𝐵 starts before 𝐸 from the vantage point of the parent ob-                  tial L-tree structured by set nodes, albeit without invocation
+server, we say that 𝐵 happens before 𝐸. If the succession time              graphs. Secondly, we traverse this preliminary tree to con-
+is positive, we declare the two spans to be serial. Conversely,             struct invocation graphs at each set node, drawing upon
+a negative succession time, such as the overlapping time                    stored latency profiles. This produces a detailed L-tree. The
+frames of 𝐸 and 𝐹 , indicates a parallel relationship between               subsequent parts of this section will delve deeper into each
+two spans.                                                                  stage of this construction process.
+   The initial step involves identifying sync points, which                 Set node. The set node functions to effectively cluster to-
+serve to demarcate nodes into chronological groups. Each                    gether traces that exhibit similar invocation graphs. Each
+group is characterized such that services from a preceding                  regular node in the L-tree therefore denotes a span in the
+group must complete their execution before the services in                  original traces. When multiple traces include the same span,
+the succeeding group initiate. To establish these groups, we                the corresponding node in the L-tree represents aggregate
+construct a graph G𝑝 comprising child nodes and connect                     information of that particular span across the traces of the
+nodes that are in parallel relationships. Subsequently, we                  same call path. Each regular node records how many traces
+identify the connected components in the graph. Illustrating                had the span to which it corresponds. A set node connects
+with the child nodes (𝐵-𝐺) in Fig. 6, we can construct a graph              a regular node with a collection of regular child nodes and
+G𝑝 consisting of nodes 𝐵, 𝐶, 𝐷, 𝐸, 𝐹 , and 𝐺, interconnected                indicates an identical set of child nodes—the same set of
+through edges 𝐵-𝐶, 𝐵-𝐷, and 𝐸-𝐹 . Consequently, the con-                    spans4 . We iteratively input traces, and merge the new input
+nected components are {𝐵, 𝐶, 𝐷}, {𝐸, 𝐹 }, and {𝐺}. To complete              trace into L-tree; if a new set of child spans occur, we create
+this step, we arrange these groups chronologically based on                 a new set node. Moreover, each set node remains a record
+the earliest start time among the nodes within each group.                  of the number of traces it encompasses, thereby providing
+   The next step is to identify the causal orders among nodes               insights into the different branch ratios present in the L-tree.
+within each group. Within each group, we establish con-                     For instance, Trace 1 and Trace 2 in Fig. 7 have same parent
+nection between pairs of child nodes that are in serial rela-               span 𝐴, but different sets of child spans {𝐵, 𝐶} and {𝐵, 𝐷}. The
+tionship, forming a graph denoted as G𝑠 . In this graph, the                right diagram in Fig. 7 shows a L-tree for these two traces,
+maximal cliques, or independent sets in graph theory par-                   where two set nodes are created to connect the parent node
+lance [28] are the nodes with serial relationships. And the                 𝐴 and two different sets of child nodes.
+nodes within each maximal clique are then ordered by their                     Set nodes can cluster traces that exhibit similar invocation
+starting timestamps. For example, in the first group {𝐵, 𝐶, 𝐷},             graphs, which effectively retain the diverse characteristics
+maximal cliques are {𝐵} and {𝐶, 𝐷}.                                         of calling relationships, thereby enhancing the modeling
+   Drawing upon the aforementioned two steps, we can de-
+termine the invocation order of the child nodes. When a                     4 A set node effectively represents a hyperedge in a tree-based hypergraph.
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA   Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang, and Ymir Vigfusson
+
+
+of latency distribution. In constructing the tree from the
+top down, traces sharing the same set of child RPC calls
+from a single parent call are clustered at each level. This ap-
+proach strikes a balance between coarse aggregation (group-
+ing all spans without differentiation) and fine-grained aggre-
+gation (grouping traces only if they share identical invoca-
+tion graphs).
+                                                                              (a) Known serial siblings.       (b) Known parallel siblings.
+Joint latency profiling. Traditional service dependency
+modeling methods only store latency for each node indepen-                Figure 8: Succession time CDF for production services at
+dently [33, 49], which misses the finer-granular causalities              Twitter over a 24-hour period.
+between child services. L-tree maintains latency profiles
+differently, by jointly considering the latencies of sibling              service 𝐵 is delayed by Δ𝐵 in Fig. 7, LatenSeer propagates the
+nodes. When forming a tree from a single trace and extend-                increased latency Δ𝐵 , calculates the changed latency Δ𝐴 for
+ing it to multiple traces, the latency data associated with               service 𝐴, and outputs 𝐴’s new latency distribution L (𝐴) ′ .
+each node is profiled as a distribution, rather than a single                 With the collection of traces, LatenSeer models node la-
+value. The set node manages the latency profiles of its child             tency as probability distributions. Formally, for serial nodes
+nodes. Besides maintaining the latency distribution for each              with latency distributions represented as random variables
+child node, we also profile the succession time distribution              𝑋 1 ,... 𝑋𝑘 , we define Add operator to estimate their combined
+                                                                                                         Í
+between pairwise sibling nodes, which is crucial to construct             distribution as: P(𝑍 = 𝑧) = P(𝑋 1 = 𝑥 1, ..., 𝑋𝑘 = 𝑥𝑘 ), where
+                                                                                  Í𝑘
+an invocation graph for the sibling nodes.                                𝑧 = 𝑖=1 𝑥𝑖 . On the other hand, we define Max operator
+Constructing invocation graphs in L-tree. Finally, we                     to estimate their combined latency: P(𝑍 ≤ 𝑧) = P(𝑋 1 ≤
+describe the construction of invocation graph in L-tree. This             𝑧, ..., 𝑋𝑘 ≤ 𝑧).
+process resembles the one described in §3.1, but with a key               Node latency estimation. We estimate the latency distri-
+modification: we use the median of the succession time distri-            bution of node 𝑣 through its set nodes and corresponding
+bution between two sibling nodes as a threshold to determine              invocations graphs of their child nodes. Suppose that a set
+their serial and parallel relationships. We hypothesize that              node 𝑠 connects an invocation graph G containing 𝑚 sync
+service invocations that occur in series should consistently              points. Assume there are 𝑝 𝑗 paths between two sync points
+have positive succession time between them, whereas paral-                and 𝑛 𝑗 nodes on 𝑗-th path. We use 𝑃 𝑖𝑗 to denote the set of
+lel spans may show negative succession time in some traces.               nodes on 𝑗-th path between (𝑖 − 1)th and 𝑖th sync points.
+Unfortunately, in production settings, the measurements are               Then the combined latency ℓ𝑖 of nodes between (𝑖 − 1)th and
+not always clear-cut, as shown in Fig. 8, due to clock skew               𝑖th sync points can be calculated as:
+and other instrumentation artifacts. The adoption of the me-
+dian value as the classification threshold serves to mitigate                          ℓ𝑖 = Max(Add(𝑃1𝑖 ), ..., Add(𝑃𝑝𝑖 1 ))
+these challenges, promoting a more accurate delineation of                Finally, the latency of set node 𝑠 is calculated as:
+serial and parallel relationships.
+   This concludes our construction of L-tree, where each                                     L (𝑠) = Add(ℓ1, ..., ℓ𝑚 )
+regular node links to one or more set nodes indicating differ-               Suppose the latency distribution of the node 𝑣 depends on
+ent call paths. Each set node maintains an invocation graph               𝑘 set nodes, denoted as 𝑠𝑖 . The latency L (𝑣) can be expressed
+between the child nodes of the set node’s parent node. Conse-             as a weighted sum of the latencies of these set nodes, rep-
+quently, L-tree not only maintains similar call paths across                            Í
+                                                                          resented as 𝑘𝑖=1 𝑤𝑖 L (𝑠𝑖 ), where 𝑤𝑖 ∈ [0, 1] denotes relative
+different tree branches but also captures the sequential exe-                            Í
+                                                                          weights with 𝑘𝑖=1 𝑤𝑖 = 1. The relative weight is determined
+cution order of child services.                                           based on the number of traces recorded by each set node.
+3.3    End-to-end latency estimation                                      End-to-end latency estimation. LatenSeer combines the
+   LatenSeer estimates the end-to-end request time by com-                estimated latency distributions of all nodes in the L-tree to
+bining the latency distributions in L-tree, propagating them              produce one estimated distribution of end-to-end latency. We
+bottom-up from leaves to the root. If an operator thus mod-               first inject the changed latency (Δ ∈ R) to the target nodes
+ifies the latency of specific nodes within the L-tree that                that correspond to the services for which the operator wants
+corresponding to the services they tend to change, LatenSeer              to intervene. (In causal modeling, this change emulates a do-
+will infer the latency impact from these changes through the              operator [59, 60]). The algorithm works bottom-up, taking as
+modified latency distribution of the root node. For example,              input the L-tree, and the set of hypothetical services to be al-
+                                                                          tered with their corresponding latency (Alg. 1). The changes
+LatenSeer: Causal Modeling of End-to-End Latency Distributions                                                     SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA
+
+                                                                                                                                                           1.0
+Algorithm 1 Latency Estimation                                                                                                   Identical graphs
+
+
+
+
+                                                                            Frequency (in thousands)
+                                                                                                       75                        Set nodes                 0.8
+Require: L-tree 𝐺; a “what-if” scenario 𝑆                                                                                                                  0.6
+                                                                                                                                                         CDF
+                                                                                                       50
+Ensure: Estimated end-to-end latency distribution                                                                                                                                             Rank   0
+                                                                                                                                                           0.4
+                                                                                                                                                                                              Rank   1
+ 1: function Predict(𝐺, 𝑆)                                                                             25
+                                                                                                                                                           0.2                                Rank   2
+ 2:    𝑟 ← root node of 𝐺                                                                                                                                  0.0
+                                                                                                                                                                                              Rank   3
+
+ 3:    𝐴 ← Apply(𝑟 , 𝑆)                    ⊲ Nodes affected by scenario 𝑆                                   0     10   20    0     40     50        60           0   1000    2000    3000     4000   5000
+                                                                                                                            an                                        End-to-End latency (ms)
+ 4:    𝑑 ← greatest depth among nodes in 𝐴
+ 5:    while 𝑑 > 0 do                                                       (a) Frequency of identical depen- (b) Latency distribution of differ-
+ 6:       Nodes ← 𝐴[𝑑 ]                                                     dency graphs and set nodes.       ent set nodes from same parent
+ 7:       for each regular parent 𝑝 of a node in Nodes do                                                     node.
+ 8:           ℓ, affected ← LatencyPropagation(𝑝, 𝐴)
+ 9:           if affected then                                                                                  Figure 9: Set node justification via Twitter traces.
+10:               update distribution of 𝑝 with ℓ
+                                                                            that exhibit similar invocation. We now provide a more de-
+11:               𝐴[𝑝.depth].insert(𝑝)
+                                                                            tailed explanation behind this design decision. Given the
+12:       𝑑 ←𝑑 −1
+13:    return updated distribution of root node 𝑟                           diverse call patterns in large-scale systems, clustering traces
+                                                                            based on identical dependency graphs is often impractical.
+                                                                            For instance, a service invoking four cache-get operations
+trigger bottom-up latency propagation within the L-tree                     and a service executing five cache-get operations would
+from the affected nodes toward the root. If a node displays                 fall into separate clusters when using an identical cluster-
+variable latency, we recalibrate its parent node’s latency us-              ing approach. Fig. 9a illustrates the frequency of identical
+ing the Add and Max operators, following the structure of                   dependency graphs and set nodes of a root node (a front-end
+the invocation graph. Importantly, any modification in the                  service) in Twitter, derived from examining 190,087 traces
+latency of a parent node prompts a subsequent recalculation                 with the same front-end API. The rank in Fig. 9a refers to the
+of its own parent, continuing this chain recursively up to the              ranking of identical dependency graphs or set nodes based
+root node.                                                                  on their frequency. In this context, we focus exclusively on
+3.4     Making LatenSeer practical for                                      the first depth of the full graph: the root node and its im-
+                                                                            mediate child nodes. Recall that the identical dependency
+        production workloads                                                graphs are those where child nodes exhibit precisely the
+   LatenSeer’s design aims to solve latency estimation for                  same sequence of invocations, and the set node groups the
+real-world usages at scale. We discuss some design choices                  traces which have the same set of child nodes. Fig. 9a reveals
+and optimizations that make LatenSeer practical, especially                 that the number of different identical dependency graphs
+from our experiences when dealing with massive trace data                   is twice that of set nodes. This set node concept, therefore,
+at Twitter.                                                                 offers a more practical and effective way of grouping traces
+(1) Handling clock skew and miss data. To derive the                        for latency modeling in complex systems.
+serial and parallel relationships between nodes, we must                       The adoption of set nodes is substantiated by their ability
+compare the timestamps on two spans. These spans often                      to identify similar call patterns in traces sharing the same
+represent RPCs that are likely emanating from different ma-                 set of child RPC calls. Conversely, different set nodes usually
+chines, which poses a potential issue as the clocks across                  correspond to varying latency distributions, a consequence
+these machines are not perfectly synchronized, thus could                   of the unique call paths each trace navigates, as exemplified
+introduce inaccuracies in our comparisons. We mitigate this                 in Fig. 9b. Further supporting this approach, we’ve observed
+issue by using client-side timestamps, which record the times               that the top two ranks of identical service dependency graphs
+on the same machine where the RPC calls are invoked. In                     exhibit the same latency distributions and belong to the same
+other words, the start and finish times of child spans that                 set node (the finding is not shown in the paper due to space
+we use are the timestamps recorded from a machine where                     constraints.). This consistency lends further credibility to
+the parent span locates. In this manner, the duration of a                  the concept of the set node, underscoring its practicality and
+child span consists of both its processing time and network                 relevance in understanding and modeling system latencies.
+latency. Handling missing or erroneous data in tracing sys-                 (3) Pre-merging parallel spans. The traces in large-scale
+tems is an open problem. We tackle this by truncating traces                applications tend to be complex, with a typical request touch-
+at the initial missing span connection. Comparisons on Al-                  ing tens to thousands of individual microservices, producing
+ibaba traces revealed minimal latency differences between                   service dependency trees that are up to 20 levels deep. To
+complete and truncated traces.                                              reduce the complexity of computation, we presume some
+(2) Set nodes for clustering traces. As mentioned in §3.2,                  sibling spans are parallel and coalesce these spans into the
+we introduce the concept of set node to cluster together traces             same (regular) node. According to observations of a large
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA      Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang, and Ymir Vigfusson
+
+
+number of Twitter traces, we found most simultaneous RPCs
+                                                                                                     Wisconsin                             Wisconsin
+to cache and storage are parallel. For example, hundreds of
+cache-get happening simultaneously often have a parallel
+                                                                                              HT
+relationship. Pre-merging such spans significantly reduce                                       TP
+                                                                                                    req
+                                                                                                        ues
+                                                                                                            ts
+                                                                                                                                    HT
+                                                                                                                                      TP
+                                                                                                                                           req
+                                                                                                                                               ues
+                                                                                           HT
+the L-tree complexity.                                                             Utah      TP
+                                                                                                                 Client          HT                ts
+                                                                                                res
+                                                                                                   pon
+                                                                                                       ses                Utah     TP
+                                                                                                                                      res
+                                                                                                                                          pon
+                                                                                                                                                        Client
+                                                                                                                                              ses
+
+(4) Building LatenSeer trees in parallel. LatenSeer must                                                     Clemson                                Clemson
+be efficient enough to process an enormous volume of traces
+for large-scale applications. To facilitate this, we parallelize
+                                                                             Figure 10: Prototype experiment setup using three Cloudlab
+the tree-building process. The traces are initially partitioned              sites. The left shows the single-site deployment where all microser-
+based on their top-level API endpoint, as identical API calls                vices run in the Utah cluster; the right shows multi-site deployment
+tend to exhibit similar calling patterns. Subsequently, traces               where some microservices run in the Wisconsin cluster.
+within the same API endpoint are evenly distributed into the
+same bucket, and a subtree is constructed for each batch of                  (Haswell 28-core with 256 GB RAM and 10 Gbps network).
+traces. Finally, subtrees for traces with the same top-level API             Microservices in Utah and Wisconsin ran on node types
+endpoint are merged. This merging process commences from                     "xl170" (Broadwell 10-core with 64 GB RAM and 25 Gbps
+the top and progresses downwards. When nodes are identical,                  network) and "c220g5" (Skylake 20-core with 192 GB RAM
+they are merged along with their latency profiles. If nodes                  and 10 Gbps network), respectively. RPC latencies within
+are distinct, the unique node is simply incorporated. This                   a single site are < 1 ms, while latencies between Utah and
+methodology ensures that the final tree accurately represents                Wisconsin are in the range 38–42 ms.
+the diverse and complex calling patterns inherent in the                     Methods. Both the traces and our measurements report the
+large volume of trace data. We implemented L-Tree using a                    end-to-end request processing latency at the API gateway.
+distributed data-parallel processing framework in Twitter.                   We call the latency distribution that LatenSeer outputs for
+The framework can produce the results daily or weekly based                  a specific service change scenario the prediction. We term a
+on requirements.                                                             measured latency distribution for a given scenario ground
+4     Evaluation                                                             truth and use it to quantify the accuracy of the corresponding
+                                                                             prediction. When we exercise LatenSeer to make a prediction
+  In this section, we evaluate LatenSeer to answer the fol-
+                                                                             without perturbing the model latencies (typically to validate
+lowing questions.
+                                                                             the model itself), we call the output latency distribution the
+• Can LatenSeer provide accurate end-to-end latency esti-                    null prediction.
+  mation results?                                                               Except for the sensitivity experiment that varies the re-
+• How well is LatenSeer estimating the end-to-end latency                    quest mix, the workload generator sends requests to three
+  with real-world use cases?                                                 endpoints using the default read-dominated ratio of 1:3:6,
+• How is LatenSeer compared with the state-of-the-art?                       with one compose-post request for every three calls to
+• How effectively can LatenSeer handle large-scale traces?                   read-user-timeline and six read-home-timeline re-
+4.1     Experimental Setup                                                   quests. We use the same request rate of 500 RPS in all cases.
+                                                                                Each experiment proceeds as follows. We first run our
+Prototype system. We implement LatenSeer5 in ≈ 3,000                         workload for 10 minutes in the baseline configuration to
+lines of Python3 code and test it with DeathStarBench mi-                    collect the traces for building the model in LatenSeer. Next,
+croservice benchmark (DSB) [26] on Social Network applica-                   we inject an estimated latency delta (specifically, the average
+tion, which consists of 31 unique microservices. We leverage                 value from a ping test) into the model at the appropriate
+DSB’s default workload generator to produce client requests.                 microservices and invoked scenario.predict to generate
+Furthermore, we fulfill all the missing function-level instru-               a latency prediction. We then run the workload again on the
+mentation in DSB.                                                            changed deployment for 10 minutes in order to measure the
+   We set up experiments on CloudLab [15] under two de-                      ground truth latency distribution. We compare prediction
+ployment topologies using three different physical sites, as                 results with the ground truth. All traces are collected using
+shown in Fig. 10. We deploy the benchmark on 6 machines                      Jaeger at a 10% sampling rate.
+at the Utah site, 6 machines at the Wisconsin site, and 1 ma-
+chine at the Clemson site. In both scenarios, we run the work-               Metrics. For a prediction latency CDF 𝐹 pred , and a ground
+load generator at the Clemson site on a node type "c6320"                    truth latency CDF 𝐹 true , we report prediction accuracy using
+                                                                             two metrics:
+5 LatenSeer is open-sourced at https://github.com/yazhuo/LatenSeer, and      (1) The D-statistic in the K-S (Kolmogorov-Smirnov) test,
+the Twitter traces will be released upon legal approval.                         which is the difference between two CDF curves at the
+LatenSeer: Causal Modeling of End-to-End Latency Distributions                                                              SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA
+
+                                 start                          1.00                                           1.0                                               1.0
+                       text   user     media   uniqueid         0.75                                           0.8                                               0.8
+                                     sync                                                                      0.6                                               0.6
+                                                          CDF
+
+      compose-post
+                                                                                                                                                           CDF
+                                                                0.50
+                              post-storage                                                               CDF   0.4
+                                                                                      Groundtruth                                                                0.4
+                               usetimeline
+                                                                0.25                  LatenSeer                                           Groundtruth                                     Groundtruth
+                                                                                                               0.2                                               0.2
+                                                                                      WebPerf                                             Prediction                                      Prediction
+                              hometimeline                      0.00                                           0.0                                               0.0
+                                                                       5     10        15           20               100       101         102       103               0   1000 2000 3000 4000          5000
+                                     end
+                                                                            E2E Latency (ms)                                 End-to-End latency (ms)                         End-to-End latency (ms)
+
+                     (a) Ground truth                            (b) LatenSeer vs. WebPerf                                   (a) Alibaba                                     (b) Twitter
+    Figure 11: LatenSeer compared with state-of-the-art.                                                              Figure 12: Null prediction on production traces.
+    point of maximum divergence. It is defined as
+    𝐷 = max𝑥 𝐹 pred (𝑥) − 𝐹 true (𝑥) ∈ [0, 1].
+(2) The maximum and average of the relative
+                                                latency error at                                       relationships present in the true graph. Fig. 11a presents a
+                                             −1           −1 (𝑦)
+    each percentile. It is defined as 𝐸 = (𝐹 pred (𝑦) − 𝐹 true                                           section of the L-tree at its highest complexity, which also
+       −1 (𝑦) ∈ R, where 𝑦 ∈ [0, 1]. A negative value implies                                            aligns with the trace depicted in Fig. 2.
+    /𝐹 true
+                                                                                                            We then conduct a null prediction experiment to validate
+    that the prediction is lower than the ground truth; a
+                                                                                                         the soundness of our model. In this setup, we inject a "null"
+    positive value means that the prediction is higher latency
+                                                                                                         latency into the leaf nodes, triggering the latency propaga-
+    than the ground truth. We focus on the mean and max
+                                                                                                         tion procedure to traverse all the nodes in the tree. We expect
+    relative error, denoted as 𝐸 avg and 𝐸 max .
+                                                                                                         that the prediction aligns closely with the ground truth. As
+   The K-S statistic is a standard metric for comparing two                                              shown in Fig. 11b, LatenSeer precisely calculates the end-
+CDFs, but because it captures only the most extreme point of                                             to-end latency distribution, while WebPerf generates larger
+misprediction, it can be large even when the two CDFs are                                                errors with 𝐷 = 15%, 𝐸𝑚𝑎𝑥 = 8.8% and 𝐸𝑎𝑣𝑔 = −2.0%. The
+mostly similar. In practice, it is also useful to know how well                                          superior accuracy of LatenSeer over WebPerf can be attrib-
+LatenSeer predicted latency across the entire distribution                                               uted to the assumptions made by each tool regarding latency.
+relative to the absolute values of the ground truth. Therefore                                           WebPerf operates under the assumption that latencies on
+we also report the relative error metric.                                                                different components are independent of one another, while
+Traces. To evaluate scalability of LatenSeer in handling                                                 LatenSeer takes a more holistic approach by profiling the
+production-scale traces, we use two production traces from                                               latencies jointly for sibling nodes.
+Twitter and Alibaba. The Twitter traces consist of up to                                                    Since the ground truth of causal dependency graphs for
+25,000 spans, with a depth spanning from 2 to 18 hops. The                                               the production traces is not available, we limit our exami-
+Alibaba traces possess up to 6,625 spans with 1 to 14 hops.                                              nation to whether the model accurately predicts the latency
+   For latency estimation experiments, we operate our proto-                                             distribution of the input traces through null prediction exper-
+type system and gather traces using Jaeger [32] as part of the                                           iments on two production traces. The results in Fig. 12 show
+DSB deployment. The collected DSB trace set encompasses                                                  that predictions align closely with the ground truth for both
+a variable number of spans, fluctuating between 5 and 33,                                                Alibaba traces (Fig. 12a) and Twitter traces (Fig. 12b), con-
+with the maximum depth ranging from 2 to 6 RPC hops.                                                     firming that the internal service relationships are modeled
+Baseline. We compare LatenSeer with WebPerf [33], the                                                    faithfully.
+state-of-the-art latency estimation work. We reimplement                                                 4.3               Case Studies
+WebPerf’s model because it’s not open-sourced, and tame                                                    We evaluate how well LatenSeer models end-to-end re-
+WebPerf’s model to fit our scenarios. WebPerf is based on                                                quest latency in a microservices environment using DSB. To
+customized low-level instrumentation for the extraction of                                               examine the key properties, we focus on the two use cases:
+causal dependency graphs, which we find not practical in                                                 service placement (UC1) and latency slack (UC2).
+today’s tracing framework usages in most production en-
+vironments. We resort to examining the DSB codebase to                                                   4.3.1 Service placement (UC1) We study the accuracy of la-
+discern these dependencies and construct the corresponding                                               tency predictions under real, albeit controlled, conditions by
+graph to meet WebPerf’s requirements.                                                                    comparing the predicted and measured latency distribution
+                                                                                                         following wide-area service migration. In order to experi-
+4.2                  Estimation Accuracy                                                                 mentally exercise as much of LatenSeer’s model as possible,
+   Through code reading for DSB benchmark, we derive an                                                  we use three API endpoints: read-home-timeline, read-
+true causal dependency graph. This graph is then compared                                                user-timeline, and compose-post, and select three mi-
+with the L-tree generated by LatenSeer. Our analysis shows                                               croservices for migration: user-timeline-service, user-
+that LatenSeer accurately replicated the same dependency                                                 service, and media-service.
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA                                             Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang, and Ymir Vigfusson
+
+      1.00                                                    1.00                                                         1.00                                                   1.00
+
+      0.75                                                    0.75                                                         0.75                                                   0.75
+
+CDF   0.50                                              CDF   0.50            single-site (measured)                 CDF   0.50
+                                                                                                                                        single-site (measured)              CDF   0.50
+                                                                                                                                                                                                   single-site (measured)
+                     single-site (measured)
+                     multi-site (measured)                                    multi-site (measured)                                     multi-site (measured)                                      multi-site (measured)
+      0.25                                                    0.25                                                         0.25                                                   0.25
+                     multi-site (WebPerf-pred)                                multi-site (WebPerf-pred)                                 single-site (WebPerf-pred)                                 single-site (WebPerf-pred)
+                     multi-site (LatenSeer-pred)                              multi-site (LatenSeer-pred)                               single-site (LatenSeer-pred)                               single-site (LatenSeer-pred)
+      0.00                                                    0.00                                                         0.00                                                   0.00
+             0      20           40                60                0   50       100       150             200                   22      23     24      25            26                   22         24          26
+                 End-to-End Latency (ms)                                 End-to-End Latency (ms)                                   End-to-End Latency (ms)                                    End-to-End Latency (ms)
+
+
+(a) Migration of parallel services, (b) Migration of serial services,                                                (a) Parallel services migration, af- (b) Serial services migration, af-
+affecting a single endpoint         affecting two endpoints                                                          fecting a single endpoint            fecting two endpoints
+Figure 13: Prediction accuracy for migrating from local to                                                          Figure 14: Prediction accuracy for migrating from remote to
+remote.                                                                                                             local.
+                                                                                                                              Table 2: Results of service placement experiments.
+• The read-home-timeline endpoint does not interact
+                                                                                                                      Experiments                         Model                     𝐷(%)       𝐸 max (%)           𝐸 avg (%)
+  with any of the chosen services, hence unaffected by their
+                                                                                                                      Parallel services                   LatenSeer                  1.31         2.30               -0.21
+  migration.
+                                                                                                                      -> remote (Fig. 13a)                WebPerf                   18.60        27.00                9.30
+• The read-user-timeline endpoint only interacts with                                                                 Serial services                     LatenSeer                  4.68        11.50               -0.11
+  user-timeline-service.                                                                                              -> remote (Fig. 13b)                WebPerf                   19.04        28.00               -1.20
+• The compose-post endpoint interacts with all three ser-                                                             Parallel services                   LatenSeer                  1.45         1.10                0.22
+  vices, and invokes them both in parallel (user-service                                                              -> local (Fig. 14a)                 WebPerf                   10.50        10.70                0.60
+  and media-service) and serially (user-service and                                                                   Serial services                     LatenSeer                  5.35         8.00                1.50
+  user-timeline-service).                                                                                             -> local (Fig. 14b)                 WebPerf                    9.50         8.90               -0.80
+In the following experiments, we explore how accurately
+LatenSeer predicts end-to-end latency when selected mi-                                                              the average relative error is extremely low at -0.11%. In com-
+croservices are migrated over the wide area network from                                                             parison, WebPerf shows much lower accuracy with 19% and
+one CloudLab site to another. We set up the experiments as                                                          -1.22% for 𝐷 statistic and average relative error, respectively.
+described in §4.1, generating the model from the single-site                                                         Note how the shape of the CDF changes when some services
+deployment, measuring ground truth in the multi-site de-                                                             are placed remotely: the jumps reflect the workload mix and
+ployment, and using the average ping time measurement of                                                             how the three request types are affected (or not) by the migra-
+38.7 ms between the Wisconsin and Utah sites as the injected                                                         tion. Thus Fig. 13a has just one jump at around the 90th per-
+latency delta.                                                                                                       centile (because 10% of requests are compose-post), while
+                                                                                                                     Fig. 13b shows two jumps for read-user-timeline and
+Migration that increases latency. Fig. 13 shows the pre-
+                                                                                                                     compose-post, both of which touch the migrated services.
+diction vs ground truth CDFs for experiments with two dif-
+                                                                                                                    The change in the shape of the latency distribution high-
+ferent pairs of services, each graph showing the top-level
+                                                                                                                     lights that one cannot simply estimate the latency impact
+request latency distribution measured at the single-site (dot-
+                                                                                                                     of service migration by offsetting the baseline distribution
+ted line), the ground truth measured with the multi-site de-
+                                                                                                                    with a constant value and emphasizes the importance of
+ployment (solid line), the prediction from WebPerf (dash-
+                                                                                                                     LatenSeer’s modeling techniques.
+dot line), and the prediction from LatenSeer (dashed line).
+For the left-hand graph, Fig. 13a, the user-service and                                                              Migration that decreases latency. This experiment in-
+media-service were moved from Utah to the Wisconsin                                                                 verts the previous: we build the model from traces collected
+site. Only one endpoint, compose-post, should be affected                                                            using the multi-site deployment and predict the single-site
+by this migration. This endpoint comprises 10% of the de-                                                            end-to-end latency distribution by injecting the negative
+fault workload mix, and the two microservices have a parallel                                                        delay value (-38.7ms) to the target nodes. Fig. 14 shows the
+relationship within requests for that endpoint.                                                                      results; the left-side plot delineates the effects on moving
+   Fig. 13b shows the prediction when user-timeline-                                                                 the parallel services (user-service and media-service),
+service and user-service were migrated. These microser-                                                             while the right-side plot shows the results of moving serial
+vices affect not only compose-post, with a serial relation-                                                          services (user-service and user-timeline-service).
+ship therein, but also impact read-user-timeline, which                                                              Once again, the prediction accuracy is very good, with av-
+is called 30% of the time. Note that in both cases, latency is                                                       erage relative errors for both experiments below 2% and
+extended by different amounts depending on the number of                                                             D-statistic less than 5.35%. As a comparison, WebPerf shows
+cross-site calls introduced by the service migration.                                                                errors of more than 9.5%.
+   LatenSeer shows highly accurate predictions for both sce-                                                        4.3.2 Slack Analysis (UC2) LatenSeer can be used to infer
+narios, as summarized in Table 2. Even though the K-S 𝐷                                                             the latency budget of specific microservices: it traverses
+statistic for LatenSeer for the right-hand graph is almost 5%,                                                      the L-tree top-down, from the root node to all leaves, to
+LatenSeer: Causal Modeling of End-to-End Latency Distributions                                                SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA
+
+  1.0          user_service                   95%                                                   Table 3: Results of sensitivity analysis on the injected latency
+                                                                        Off-CP (groundtruth)
+               media_service                  50%
+  0.8                                                                   Off-CP (prediction)         for the experiment shown in Fig. 13a.
+               unique_id_service
+  0.6          user_mention_service           95%
+                                            CDF
+CDF
+                                                         On-CP (groundtruth)
+                                              50%
+  0.4                                                    On-CP (prediction)
+                                                                                                          Diff from ping time(%)     𝐷(%)    𝐸𝑚𝑎𝑥 (%)    𝐸𝑎𝑣𝑔 (%)
+                                              95%
+  0.2                                                            Changing-CP (groundtruth)
+                                              50%
+                                                                 Changing-CP (prediction)
+                                                                                                                    -10                9.5      2.3        -0.96
+  0.0
+        0.5   1.0    1.5     2.0      2.5           10      15     20     25     30            35                    -5                7.8      2.3        -0.58
+               Slack Latency (ms)                           End-to-End Latency (ms)
+                                                                                                                     -2                3.5      2.3        -0.36
+(a) Latency slack distributions (b) Latency prediction from per-                                                     -1                1.8      2.3        -0.29
+output from LatenSeer           turbation guided by latency slack                                                   +1                 2.5      2.3        -0.01
+                Figure 15: Latency slack analysis.                                                                  +2                 4.6      2.3        -0.06
+                                                                                                                    +5                 8.0      4.4        0.16
+                                                                                                                    +10                9.6      8.6        5.40
+compute the available latency slack for services. Fig. 15a
+shows four services with latency slack under our experimen-
+tal workload: unique-id-service, user-service, and
+media-service have similar latency slack distributions —                                            that this experiment injects the same magnitude of latency
+three of the services exhibited at least 2.3 ms slack, while the                                    change as the previous one (albeit into different microser-
+latency slack for user-mention-service is much smaller.                                             vices), but the resulting distribution is markedly different,
+Other services, not shown, had zero latency slack, meaning                                          and moreover, LatenSeer successfully predicts this difference
+they were on the latency-critical path, and any increase in                                         (𝐷 = 0.02%, 𝐸𝑚𝑎𝑥 = 0.3%, 𝐸𝑎𝑣𝑔 = 0.1%).
+latency of these services would affect end-to-end latency.                                          4.4     Sensitivity Analysis
+   We evaluate the accuracy of the latency slack identified
+                                                                                                       We conduct a sensitivity analysis on injected latency and
+by LatenSeer at individual services, using the slack to sys-
+                                                                                                    on changes to the workload request mix, showing how the
+tematically perturb the latency distributions of services on
+                                                                                                    metrics degrade as the model diverges further from condi-
+and off the latency-critical path. For these experiments, we
+                                                                                                    tions experienced in the prediction environment.
+use the single-site deployment configuration and perturb
+latency in a controlled fashion by using the tc utility to                                          Injected latency. In the service migration experiments, we
+induce delay at the network level of the Docker container of                                        use the average ping time between two sites to approximate
+the target service. The same delay value is injected into the                                       the additional latency introduced by the new placement. This
+target service in LatenSeer’s model, which then updates the                                         is obviously a low-fidelity value – single packet timings at the
+latency slack at each node in a top-down fashion.                                                   network layer are not the same as timings of RPC over TCP,
+   We evaluate the accuracy of slack estimates in each of the                                       across a WAN link, with varying payload size. However, we
+three ways that injected latency can perturb the L-tree: (i)                                        also claim that this is a realistic starting point in an industry
+when the injected latency is off the latency-critical path; (ii)                                    setting, offering a simple-to-obtain, "good enough" value for
+when the injected latency extends or reduces the duration of                                        many real-world scenarios that require only an approximate
+the latency-critical path; and (iii) when the injected latency                                      answer to a what-if question.
+changes the latency-critical path itself.                                                              To better characterize the impact of such inaccuracy, we
+   Off-CP: For the first prediction experiment, we inject 2 ms                                      repeat the first service placement experiment with various la-
+of latency – well within the slack time – at user-service                                           tency injections as fractions of the ping value. Table 3 shows
+that is off the latency-critical path. Fig. 15b “Off CP” indeed                                     the results: the K-S statistic, 𝐷, in particular, reports increas-
+confirms this, with the prediction almost unchanged from                                            ingly large divergences between prediction and ground truth,
+ground truth (𝐷 = 4.26%, 𝐸𝑚𝑎𝑥 = −1.0%, 𝐸𝑎𝑣𝑔 = −0.65%).                                              although overall relative error does not vary much from the
+   On-CP: We then inject 5 ms of latency to user-timeline                                           baseline we use in the experiments reported above.
+service that is inferred to be on the latency-critical path                                         Workload mix. LatenSeer predicts latency using the his-
+(zero latency slack). The new dominating latency distribution                                       torical data. In the real world, it is not unusual for the mix of
+bubbles up through the levels of the L-tree to the root node.                                       request types to change over time, and so we look here at how
+Fig. 15b “On CP” shows the results with 𝐷 = 2.01%, 𝐸𝑚𝑎𝑥 =                                           varying the relative request proportions affects the quality
+0.7%, 𝐸𝑎𝑣𝑔 = −0.11%.                                                                                of the prediction. In this experiment, we first collect traces
+   Changing-CP: For the third injection experiment, we                                              in the single-site scenario, which comprises a 50:50 mixture
+change the critical path by again adding latency to user-                                           of request types read-home-timeline and read-user-
+service. In this case, however, the injected latency of 5 ms                                        timeline. Then, we migrate user-timeline-service
+exceeds the available slack, causing the change in end-to-end                                       to the multi-site scenario and collect ground truth using
+latency. We show the results in Fig. 15b “Changing CP”. Note                                        90:10 and 20:80 mixtures.
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA           Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang, and Ymir Vigfusson
+
+              95%                                                                                                                      0.6                           0.4
+                                                                                                         0.14
+              50%                                                                                        0.12
+                                                                                                                                       0.5
+                                                                                                                                                                     0.3
+                                            single-site (50:50)
+                                                                                                                                                                     0.2
+                                                                                                                                       0.4
+              95%                                                                                        0.10
+
+
+
+                                                                                           D statistic
+                         End-to-End
+                                                                                                                               E_max                        E_avg
+                                                                                                                                                                     0.1
+        CDF                                  multi-site (90:10)                                          0.08
+              50%                                                                                                                      0.3
+
+                                             predict (90:10)                                             0.06                                                        0.0
+                                                                                                                                       0.2
+              95%       multi-site (20:80) Latency (ms)                                                  0.04                                                       −0.1
+                        -to-End                                                                                                        0.1
+              50%       predict (20:80)                                                                  0.02                                                       −0.2
+                                                                                                                                       0.0
+                                                                                                                 1   01   1                   1   01   1                    1   01   1
+                    0      50      100     150                 200
+                                                                                                                00   0.   0.                 00   0.   0.                  00   0.   0.
+                                                                                                            0.                           0.                            0.
+                          End-to-End Latency (ms)                                                                               Sample Rate (R)
+
+Figure 16: Latency prediction. Sensitivity to different work-                     Figure 17: Error analysis. Relative errors of prediction for
+load distributions.                                                               different sampling rates.
+   Fig. 16 shows the model’s accurate predictions up to ap-
+proximately the 90th percentile, but results degrade at the
+tail. This decline is attributed to a higher cache hit ratio dur-                 minutes. The number of spans in our DSB trace set ranged
+ing skewed workloads, a detail not covered by LatenSeer’s                         from 5-33, and the depth extended from 2-6 RPC hops. How-
+modeling, hence the anticipated inaccuracy.                                       ever, this timing can significantly vary in real-world settings,
+                                                                                  owing to the complexity of the traces involved.
+Threshold for succession time distribution. As discussed
+                                                                                     For instance, the number of spans in our DSB trace set
+in §3.2, we choose the median value from the succession time
+                                                                                  ranged from 5-33, and the depth extended from 2-6 RPC hops.
+CDF as our classification for all experiments. Here we repeat
+                                                                                  This complexity is dwarfed when we consider Alibaba and
+the first service placement experiment, adjusting the clas-
+                                                                                  Twitter traces. Alibaba traces can contain up to 6,625 spans
+sification threshold between 1% and 99% to extract causal
+                                                                                  with depths between 1-14 hops. In contrast, Twitter traces
+dependencies. Our results indicate same values for 𝐷, 𝐸 max ,
+                                                                                  can encompass up to 25,000 spans and depths ranging from
+and 𝐸 avg across all classification thresholds. This consistency
+                                                                                  2-18 hops. Given these complexities, the time to build the L-
+can be attributed to the relatively low level of noise present
+                                                                                  tree in real-world scenarios can be considerably longer. For
+within the benchmark environment. However, it’s important
+                                                                                  71,055 Alibaba traces, the model-building process requires
+to recognize that this threshold may not be universally appli-
+                                                                                  approximately 66 minutes. Similarly, for 2,618 traces from
+cable. It is recommended that the threshold be evaluated and
+                                                                                  Twitter, the construction process takes about an hour.
+potentially adjusted to suit the unique conditions of different
+production environments.                                                          5    Conclusion
+Varying trace sampling rate. As tracing systems only                                 We present LatenSeer, a modeling framework for estimat-
+capture a subset of requests, we evaluate the accuracy of pre-                    ing end-to-end latency distributions in microservice-based
+diction with different sampling rates over 4 sets of migration                    web applications. LatenSeer can accurately predict interven-
+experiments. We randomly sample the traces that are used                          tional end-to-end latency by leveraging distributed tracing
+to build the model in the previous experiments as sample                          data. We evaluated LatenSeer in two realistic scenarios: ser-
+traces, then we use the sample traces to build the model and                      vice placement and latency slack analysis. Our evaluation
+conduct prediction. Unless otherwise stated, we repeat this                       shows that LatenSeer achieves high precision accuracy with
+experiment 20 times for each sampling rate.                                       an estimation error less than 5.35% (D-statistic), outperform-
+   The box plots in Fig. 17 show the error metrics (𝐷, 𝐸 max ,                    ing the start-of-the-art that has more than 9.5% estimation
+and 𝐸 avg ) between prediction from sample traces and ground                      error. Moreover, our results on real-world production traces
+truth for different sample rates. Overall, the 𝐷 statistic is                     show that LatenSeer is practical and scalable enough to sup-
+small, even for low sampling rates. Sampling with R = 0.001                       port complexities in production environments.
+results in E2E latency prediction with 𝐷 statistic of between
+                                                                                  Acknowledgments
+0.05 and 0.14. 𝐸𝑚𝑎𝑥 and 𝐸𝑎𝑣𝑔 show more over-prediction
+when the sampling rate is too low.                                                  We thank the anonymous reviewers for their valuable
+                                                                                  feedback and our shepherd Vivien Quéma for constructive
+4.5    LatenSeer Performance                                                      suggestions. We are grateful to the organizations that have
+   Building the LatenSeer model, or L-tree, is dependent on                       generously open-sourced and shared production traces. We
+the internal structure of the aggregated trace tree. In con-                      thank CloudLab [15] for the infrastructure support for run-
+trolled experiments, we have found that constructing the                          ning experiments. We also appreciate the members of Sim-
+LatenSeer from 30,000 DSB traces took approximately 11                            BioSys for their interest, insights, feedback, and support.
+LatenSeer: Causal Modeling of End-to-End Latency Distributions                            SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA
+
+
+References                                                                     [15] Dmitry Duplyakin, Robert Ricci, Aleksander Maricq, Gary Wong,
+ [1] Akamai Technologies. 2017.            Akamai Online Retail Perfor-             Jonathon Duerig, Eric Eide, Leigh Stoller, Mike Hibler, David Johnson,
+     mance Report: Milliseconds Are Critical.               Retrieved April         Kirk Webb, et al. 2019. The design and operation of CloudLab. In 2019
+     2022 from https://www.akamai.com/newsroom/press-release/akamai-                USENIX Annual Technical Conference (USENIX ATC’19). Association
+     releases-spring-2017-state-of-online-retail-performance-report.                for Computing Machinery, New York, NY, USA, 1–14.
+ [2] Omid Alipourfard, Hongqiang Harry Liu, Jianshu Chen, Shivaram             [16] Brian Eaton, Jeff Stewart, Jon Tedesco, and N Cihan Tas. 2022. Dis-
+     Venkataraman, Minlan Yu, and Ming Zhang. 2017. CherryPick: Adap-               tributed Latency Profiling through Critical Path Tracing: CPT can
+     tively Unearthing the Best Cloud Configurations for Big Data Ana-              provide actionable and precise latency analysis. Queue 20, 1 (2022),
+     lytics. In 14th USENIX Symposium on Networked Systems Design and               40–79.
+     Implementation (NSDI’17). USENIX Association, USA, 469–482.               [17] Simon Eismann, Long Bui, Johannes Grohmann, Cristina Abad, Nikolas
+ [3] Mohammad Alrifai and Thomas Risse. 2009. Combining global opti-                Herbst, and Samuel Kounev. 2021. Sizeless: Predicting the optimal
+     mization with local selection for efficient QoS-aware service composi-         size of serverless functions. In Proceedings of the 22nd International
+     tion. In Proceedings of the 18th international conference on World wide        Middleware Conference. 248–259.
+     web. 881–890.                                                             [18] Simon Eismann, Johannes Grohmann, Erwin Van Eyk, Nikolas Herbst,
+ [4] Mohammad Alrifai, Dimitrios Skoutas, and Thomas Risse. 2010. Se-               and Samuel Kounev. 2020. Predicting the costs of serverless workflows.
+     lecting skyline services for QoS-based web service composition. In             In Proceedings of the ACM/SPEC international conference on performance
+     Proceedings of the 19th international conference on World wide web.            engineering. 265–276.
+     11–20.                                                                    [19] Joyce El Hadad, Maude Manouvrier, and Marta Rukoz. 2010. TQoS:
+ [5] Danilo Ardagna and Barbara Pernici. 2007. Adaptive service composi-            Transactional and QoS-aware selection algorithm for automatic Web
+     tion in flexible processes. IEEE Transactions on software engineering          service composition. IEEE Transactions on Services Computing 3, 1
+     33, 6 (2007), 369–384.                                                         (2010), 73–85.
+ [6] Emre Ates, Lily Sturmann, Mert Toslali, Orran Krieger, Richard Meg-       [20] Úlfar Erlingsson, Marcus Peinado, Simon Peter, Mihai Budiu, and Glo-
+     ginson, Ayse K Coskun, and Raja R Sambasivan. 2019. An automated,              ria Mainar-Ruiz. 2012. Fay: Extensible distributed tracing from kernels
+     cross-layer instrumentation framework for diagnosing performance               to clusters. ACM Transactions on Computer Systems (TOCS) 30, 4 (2012),
+     problems in distributed applications. In Proceedings of the ACM Sym-           1–35.
+     posium on Cloud Computing (SOCC’19). Association for Computing            [21] Brian Fields, Shai Rubin, and Rastislav Bodik. 2001. Focusing processor
+     Machinery, New York, NY, USA, 165–170.                                         policies via critical-path prediction. In Proceedings of the 28th annual
+ [7] Paul Barford and Mark Crovella. 2000. Critical path analysis of TCP            international symposium on Computer architecture. Association for
+     transactions. ACM SIGCOMM Computer Communication Review 30, 4                  Computing Machinery, New York, NY, USA, 74–85.
+     (2000), 127–138.                                                          [22] Tobias Flach, Nandita Dukkipati, Andreas Terzis, Barath Raghavan,
+ [8] Paul Barham, Austin Donnelly, Rebecca Isaacs, and Richard Mortier.             Neal Cardwell, Yuchung Cheng, Ankur Jain, Shuai Hao, Ethan Katz-
+     2004. Using Magpie for request extraction and workload modelling. In           Bassett, and Ramesh Govindan. 2013. Reducing Web Latency: The
+     USENIX Symposium on Operating Systems Design and Implementation                Virtue of Gentle Aggression. In Proceedings of the 2013 Conference of
+     (OSDI’04), Vol. 4. Association for Computing Machinery, New York,              the ACM Special Interest Group on Data Communication (SIGCOMM’13)
+     NY, USA, 18–33.                                                                (Hong Kong, China) (SIGCOMM ’13). ACM, New York, NY, USA, 159–
+ [9] David Böhme, Markus Geimer, Lukas Arnold, Felix Voigtlaender, and              170. https://doi.org/10.1145/2486001.2486014
+     Felix Wolf. 2016. Identifying the root causes of wait states in large-    [23] Rodrigo Fonseca, George Porter, Randy H Katz, and Scott Shenker.
+     scale parallel applications. ACM Transactions on Parallel Computing            2007. X-trace: A pervasive network tracing framework. In 4th USENIX
+     (TOPC) 3, 2 (2016), 1–24.                                                      Symposium on Networked Systems Design & Implementation (NSDI’07).
+[10] Laura Carnevali, Riccardo Reali, and Enrico Vicario. 2021. Composi-       [24] Nicole Forsgren, Dustin Smith, Jez Humble, and Jessie Frazelle. 2019.
+     tional evaluation of stochastic workflows for response time analysis of        2019 Accelerate State of DevOps Report. Technical Report. Google.Inc.
+     composite web services. In Proceedings of the ACM/SPEC International           http://cloud.google.com/devops/state-of-devops/
+     Conference on Performance Engineering. 177–188.                           [25] Thomas R Frieden. 2017. Evidence for health decision making—beyond
+[11] Mike Y Chen, Anthony Accardi, Emre Kiciman, Jim Lloyd, Dave Pat-               randomized, controlled trials. New England Journal of Medicine 377, 5
+     terson, Armando Fox, and Eric Brewer. 2004. Path-based failure and             (2017), 465–475.
+     evolution management. In 1st USENIX Symposium on Networked Sys-           [26] Yu Gan, Yanqi Zhang, Dailun Cheng, Ankitha Shetty, Priyal Rathi,
+     tems Design & Implementation (NSDI’04). USENIX Association, USA,               Nayan Katarki, Ariana Bruno, Justin Hu, Brian Ritchken, Brendon
+     23–23.                                                                         Jackson, et al. 2019. An open-source benchmark suite for microservices
+[12] Michael Chow, David Meisner, Jason Flinn, Daniel Peek, and Thomas F            and their hardware-software implications for cloud & edge systems.
+     Wenisch. 2014. The Mystery Machine: End-to-end Performance Anal-               In Proceedings of the Twenty-Fourth International Conference on Archi-
+     ysis of Large-scale Internet Services. In 11th USENIX Symposium on             tectural Support for Programming Languages and Operating Systems
+     Operating Systems Design and Implementation (OSDI’14). USENIX As-              (ASPLOS’19). Association for Computing Machinery, New York, NY,
+     sociation, USA, 217–231.                                                       USA, 3–18.
+[13] Jeremy Cloud. 2013. Decomposing Twitter: Adventures in Service-           [27] Yu Gan, Yanqi Zhang, Kelvin Hu, Dailun Cheng, Yuan He, Meghna
+     Oriented Architecture. https://www.infoq.com/presentations/twitter-            Pancholi, and Christina Delimitrou. 2019. Seer: Leveraging big data
+     soa/. Accessed: 2023-05-21.                                                    to navigate the complexity of performance debugging in cloud mi-
+[14] Vadim Denisov, Dirk Fahland, and Wil MP van der Aalst. 2019. Pre-              croservices. In Proceedings of the 24th International Conference on Ar-
+     dictive performance monitoring of material handling systems using              chitectural Support for Programming Languages and Operating Systems
+     the performance spectrum. In 2019 International Conference on Process          (ASPLOS’19). Association for Computing Machinery, New York, NY,
+     Mining (ICPM). IEEE, 137–144.                                                  USA, 19–33.
+                                                                               [28] Fănică Gavril. 1972. Algorithms for minimum coloring, maximum
+                                                                                    clique, minimum covering by cliques, and maximum independent set
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA         Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang, and Ymir Vigfusson
+
+
+     of a chordal graph. SIAM J. Comput. 1, 2 (1972), 180–187.                  [44] Ping Liu, Haowen Xu, Qianyu Ouyang, Rui Jiao, Zhekang Chen,
+[29] Adam Gluck. 2020. Introducing Domain-Oriented Microservice Ar-                  Shenglin Zhang, Jiahai Yang, Linlin Mo, Jice Zeng, Wenman Xue, et al.
+     chitecture. https://www.uber.com/blog/microservice-architecture/.               2020. Unsupervised detection of microservice trace anomalies through
+     Accessed: 2023-05-21.                                                           service-level deep Bayesian networks. In 2020 IEEE 31st International
+[30] Herodotos Herodotou and Shivnath Babu. 2011. Profiling, what-if anal-           Symposium on Software Reliability Engineering (ISSRE). IEEE, IEEE,
+     ysis, and cost-based optimization of mapreduce programs. Proceedings            USA, 48–58.
+     of the VLDB Endowment 4, 11 (2011), 1111–1122.                             [45] Shutian Luo, Huanle Xu, Chengzhi Lu, Kejiang Ye, Guoyao Xu, Liping
+[31] Lexiang Huang and Timothy Zhu. 2021. tprof: Performance profiling               Zhang, Yu Ding, Jian He, and Chengzhong Xu. 2021. Characterizing
+     via structural aggregation and automated analysis of distributed sys-           microservice dependency and performance: Alibaba trace analysis. In
+     tems traces. In Proceedings of the ACM Symposium on Cloud Computing.            Proceedings of the ACM Symposium on Cloud Computing. Association
+     Association for Computing Machinery, New York, NY, USA, 76–91.                  for Computing Machinery, New York, NY, USA, 412–426.
+[32] Jaeger 2023. Jaeger: Open Source, End-to-End Distributed Tracing.          [46] Shutian Luo, Huanle Xu, Kejiang Ye, Guoyao Xu, Liping Zhang,
+     https://www.jaegertracing.io/. Accessed: 2023-05-21.                            Guodong Yang, and Chengzhong Xu. 2022. The power of predic-
+[33] Yurong Jiang, Lenin Ravindranath Sivalingam, Suman Nath, and                    tion: microservice auto scaling via workload learning. In Proceedings
+     Ramesh Govindan. 2016. WebPerf: Evaluating what-if scenarios for                of the 13th Symposium on Cloud Computing. Association for Computing
+     cloud-hosted web applications. In Proceedings of the 2016 ACM SIG-              Machinery, New York, NY, USA, 355–369.
+     COMM Conference. Association for Computing Machinery, New York,            [47] Jonathan Mace, Peter Bodik, Rodrigo Fonseca, and Madanlal Musu-
+     NY, USA, 258–271.                                                               vathi. 2015. Retro: Targeted Resource Management in Multi-Tenant
+[34] Diviyan Kalainathan, Olivier Goudet, Isabelle Guyon, David Lopez-Paz,           Distributed Systems. In Proceedings of the 12th USENIX Symposium
+     and MichÃ¨le Sebag. 2022. Structural Agnostic Modeling: Adversarial             on Networked Systems Design and Implementation (NSDI ’15). usenix,
+     Learning of Causal Graphs. Journal of Machine Learning Research 23,             USA.
+     219 (2022), 1–62. http://jmlr.org/papers/v23/19-529.html                   [48] Jonathan Mace, Ryan Roelke, and Rodrigo Fonseca. 2015. Pivot Tracing:
+[35] Jonathan Kaldor, Jonathan Mace, Michał Bejda, Edison Gao, Wiktor                Dynamic Causal Monitoring for Distributed Systems. In 25th ACM
+     Kuropatwa, Joe O’Neill, Kian Win Ong, Bill Schaller, Pingjia Shan,              Symposium on Operating Systems Principles (SOSP’15). Association for
+     Brendan Viscomi, et al. 2017. Canopy: An end-to-end performance                 Computing Machinery, New York, NY, USA.
+     tracing and analysis system. In Proceedings of the 26th symposium on       [49] Ashraf Mahgoub, Edgardo Barsallo Yi, Karthick Shankar, Sameh El-
+     operating systems principles. Association for Computing Machinery,              nikety, Somali Chaterji, and Saurabh Bagchi. 2022. ORION and the
+     New York, NY, USA, 34–50.                                                       Three Rights: Sizing, Bundling, and Prewarming for Serverless DAGs.
+[36] Kyle Kingsbury. 2013. The trouble with timestamps. https://aphyr.               In 16th USENIX Symposium on Operating Systems Design and Imple-
+     com/posts/299-the-trouble-with-timestamps. Accessed: 2023-05-30.                mentation (OSDI 22). USENIX Association, Carlsbad, CA, 303–320.
+[37] Darja Krushevskaja and Mark Sandler. 2013. Understanding latency                https://www.usenix.org/conference/osdi22/presentation/mahgoub
+     variations of black box services. In Proceedings of the 22nd Interna-      [50] Ashraf Mahgoub, Edgardo Barsallo Yi, Karthick Shankar, Eshaan
+     tional Conference on the World Wide Web (WWW’13). Association for               Minocha, Sameh Elnikety, Saurabh Bagchi, and Somali Chaterji. 2022.
+     Computing Machinery, New York, NY, USA, 703–714.                                Wisefuse: Workload characterization and dag transformation for
+[38] Pedro Las-Casas, Giorgi Papakerashvili, Vaastav Anand, and Jonathan             serverless workflows. Proceedings of the ACM on Measurement and
+     Mace. 2019. Sifter: Scalable Sampling for Distributed Traces, with-             Analysis of Computing Systems 6, 2 (2022), 1–28.
+     out Feature Engineering. In Proceedings of the ACM Symposium on            [51] Ali Najafi and Michael Wei. 2022. Graham: Synchronizing Clocks
+     Cloud Computing (Santa Cruz, CA, USA) (SoCC ’19). Association                   by Leveraging Local Clock Properties. In 19th USENIX Symposium
+     for Computing Machinery, New York, NY, USA, 312–324. https:                     on Networked Systems Design and Implementation (NSDI 22). USENIX
+     //doi.org/10.1145/3357223.3362736                                               Association, USA, 453–466.
+[39] Pedro Las-Casas, Giorgi Papakerashvili, Vaastav Anand, and Jonathan        [52] Oleg Obleukhov. 2020. Building a more accurate time service at
+     Mace. 2019. Sifter: Scalable Sampling for Distributed Traces, without           Facebook scale. https://engineering.fb.com/2020/03/18/production-
+     Feature Engineering. In Proceedings of the ACM Symposium on Cloud               engineering/ntp-service/. Accessed: 2023-05-30.
+     Computing (SOCC’19). 312–324.                                              [53] OpenTelemetry 2023. OpenTelemetry: An Observability Framework
+[40] Cate Lawrence. 2021. Deployment Frequency – A Key Metric in                     for Cloud-Native Software. http://opentelemetry.io/. Accessed: 2023-
+     DevOps. https://humanitec.com/blog/deployment-frequency-key-                    05-21.
+     metric-in-devops. Accessed: 2023-05-30.                                    [54] OpenTracing 2023. OpenTracing: Vendor-Neutral APIs and Instru-
+[41] Yuliang Li, Gautam Kumar, Hema Hariharan, Hassan Wassel, Peter                  mentation for Distributed Tracing. http://opentracing.io/. Accessed:
+     Hochschild, Dave Platt, Simon Sabato, Minlan Yu, Nandita Dukkipati,             2023-05-21.
+     Prashant Chandra, et al. 2020. Sundial: Fault-tolerant clock synchro-      [55] Krzysztof Ostrowski, Gideon Mann, and Mark Sandler. 2011. Diagnos-
+     nization for datacenters. In Proceedings of the 14th USENIX Conference          ing latency in multi-tier black-box services. In 4th International Work-
+     on Operating Systems Design and Implementation. USENIX Association,             shop on Large-Scale Distributed Systems and Middleware (LADIS’11).
+     USA, 1171–1186.                                                                 USA.
+[42] Chieh-Jan Mike Liang, Zilin Fang, Yuqing Xie, Fan Yang, Zhao Lucis         [56] Maulik Pandey. 2019. Building Netflix’s Distributed Tracing Infras-
+     Li, Li Lyna Zhang, Mao Yang, and Lidong Zhou. 2023. On Modular                  tructure. Retrieved December 2022 from https://netflixtechblog.com/
+     Learning of Distributed Systems for Predicting {End-to-End} Latency.            building-netflixs-distributed-tracing-infrastructure-bb856c319304.
+     In 20th USENIX Symposium on Networked Systems Design and Imple-            [57] Austin Parker, Daniel Spoonhower, Jonathan Mace, Ben Sigelman, and
+     mentation (NSDI 23). usenix, USA, 1081–1095.                                    Rebecca Isaacs. 2020. Distributed Tracing in Practice: Instrumenting,
+[43] Lightstep. 2020. OpenTelemetry: Best Practices on Sampling. Re-                 Analyzing, and Debugging Microservices. O’Reilly Media, USA.
+     trieved December 2020 from https://opentelemetry.lightstep.com/best-       [58] Judea Pearl. 2009. Causal inference in statistics: An overview. Statistics
+     practices/sampling/.                                                            surveys 3 (2009), 96–146.
+LatenSeer: Causal Modeling of End-to-End Latency Distributions                             SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA
+
+
+[59] Judea Pearl. 2019. The seven tools of causal inference, with reflections        shows a lack of transparent and comprehensive data. Journal of clinical
+     on machine learning. Commun. ACM 62, 3 (2019), 54–60.                           epidemiology 96 (2018), 1–11.
+[60] Judea Pearl and Dana Mackenzie. 2018. The Book of Why: the new             [75] Mukarram Tariq, Amgad Zeitoun, Vytautas Valancius, Nick Feamster,
+     science of cause and effect. Basic Books, USA.                                  and Mostafa Ammar. 2008. Answering what-if deployment and con-
+[61] Haoran Qiu, Subho S. Banerjee, Saurabh Jha, Zbigniew T. Kalbar-                 figuration questions with wise. In Proceedings of the ACM SIGCOMM
+     czyk, and Ravishankar K. Iyer. 2020. FIRM: An Intelligent Fine-                 2008 conference on Data communication. Association for Computing
+     grained Resource Management Framework for SLO-Oriented Mi-                      Machinery, New York, NY, USA, 99–110.
+     croservices. In 14th USENIX Symposium on Operating Systems Design          [76] Parth Thakkar, Rohan Saxena, and Venkata N Padmanabhan. 2021.
+     and Implementation (OSDI 20). USENIX Association, USA, 805–825.                 AutoSens: inferring latency sensitivity of user activity through natural
+     https://www.usenix.org/conference/osdi20/presentation/qiu                       experiments. In Proceedings of the 21st ACM Internet Measurement
+[62] Joy Rahman and Palden Lama. 2019. Predicting the end-to-end tail                Conference (IMC’21). Association for Computing Machinery, New York,
+     latency of containerized microservices in the cloud. In 2019 IEEE In-           NY, USA, 15–21.
+     ternational Conference on Cloud Engineering (IC2E). IEEE, IEEE, USA,       [77] Sudhir Tonse. 2015. Scalable Microservices at Netflix. Challenges and
+     200–210.                                                                        Tools of the Trade. https://www.infoq.com/presentations/netflix-ipc/.
+[63] Lenin Ravindranath, Jitendra Padhye, Sharad Agarwal, Ratul Mahajan,             Accessed: 2023-05-21.
+     Ian Obermiller, and Shahin Shayandeh. 2012. Appinsight: Mobile app         [78] Mert Toslali, Emre Ates, Alex Ellis, Zhaoqi Zhang, Darby Huye, Lan
+     performance monitoring in the wild. In Presented as part of the 10th            Liu, Samantha Puterman, Ayse K. Coskun, and Raja R. Sambasivan.
+     {USENIX} symposium on operating systems design and implementation               2021. Automating instrumentation choices for performance problems
+     ({OSDI} 12). USENIX Association, USA, 107–120.                                  in distributed applications with VAIF. In SoCC ’21: Proceedings of the
+[64] Lenin Ravindranath, Jitendra Padhye, Ratul Mahajan, and Hari Balakr-            Twelfth Symposium on Cloud Computing.
+     ishnan. 2013. Timecard: Controlling user-perceived delays in server-       [79] Kaushik Veeraraghavan, Justin Meza, David Chou, Wonho Kim, Sonia
+     based mobile applications. In Proceedings of the Twenty-Fourth ACM              Margulis, Scott Michelson, Rajesh Nishtala, Daniel Obenshain, Dmitri
+     Symposium on Operating Systems Principles. Association for Computing            Perelman, and Yee Jiun Song. 2016. Kraken: Leveraging live traffic tests
+     Machinery, New York, NY, USA, 85–100.                                           to identify and resolve resource utilization bottlenecks in large scale
+[65] Patrick Reynolds, Charles Edwin Killian, Janet L Wiener, Jeffrey C              web services. In 12th USENIX Symposium on Operating Systems Design
+     Mogul, Mehul A Shah, and Amin Vahdat. 2006. Pip: Detecting the                  and Implementation (OSDI 16). USENIX Association, USA, 635–651.
+     Unexpected in Distributed Systems.. In USENIX Symposium on the             [80] Kaushik Veeraraghavan, Justin Meza, Scott Michelson, Sankaralingam
+     Networked Systems Design and Implemntation (NSDI’06), Vol. 6. USENIX            Panneerselvam, Alex Gyori, David Chou, Sonia Margulis, Daniel Oben-
+     association, USA, 9–9.                                                          shain, Shruti Padmanabha, Ashish Shah, et al. 2018. Maelstrom: Mit-
+[66] Andreas Rogge-Solti, Wil MP van der Aalst, and Mathias Weske. 2014.             igating datacenter-level disasters by draining interdependent traffic
+     Discovering stochastic petri nets with arbitrary delay distributions            safely and efficiently. In 13th {USENIX} Symposium on Operating Sys-
+     from event logs. In Business Process Management Workshops: BPM 2013             tems Design and Implementation ({OSDI} 18). USENIX association,
+     International Workshops, Beijing, China, August 26, 2013, Revised Papers        USA, 373–389.
+     11. Springer, 15–27.                                                       [81] Shivaram Venkataraman, Zongheng Yang, Michael Franklin, Benjamin
+[67] Cynthia Rudin. 2019. Stop explaining black box machine learning                 Recht, and Ion Stoica. 2016. Ernest: Efficient performance prediction
+     models for high stakes decisions and use interpretable models instead.          for large-scale advanced analytics. In 13th {USENIX} symposium on
+     Nature machine intelligence 1, 5 (2019), 206–215.                               networked systems design and implementation ({NSDI} 16). USENIX
+[68] Ruslan Meshenberg, Josh Evan. 2015. Netflix at AWS re:Invent                    Association, USA, 363–378.
+     2015.     https://netflixtechblog.com/netflix-at-aws-re-invent-2015-       [82] Alec Warner and Štěpán Davidovič. 2018. The Site Reliability Engi-
+     2bc50551dead. Accessed: 2023-05-30.                                             neering Workbook Chapter: Canarying Releases. (2018).
+[69] Raja R. Sambasivan, Alice X. Zheng, Michael De Rosa, Elie Krevat,          [83] Yang Wu, Ang Chen, and Linh Thi Xuan Phan. 2019. Zeno: diagnosing
+     Spencer Whitman, Michael Stroucken, William Wang, Lianghong Xu,                 performance problems with temporal provenance. In 16th USENIX
+     and Gregory R. Ganger. 2011. Diagnosing performance changes by                  Symposium on Networked Systems Design and Implementation (NSDI’19).
+     comparing request flows. In NSDI’11: Proceedings of the 8th USENIX              USENIX Association, USA, 395–420.
+     Conference on Networked Systems Design and Implementation.                 [84] C-Q Yang and Barton P Miller. 1988. Critical path analysis for the
+[70] Justin Sheehy. 2015. There is No Now. Commun. ACM 58, 5 (apr 2015),             execution of parallel and distributed programs. In The 8th International
+     36–41. https://doi.org/10.1145/2733108                                          Conference on Distributed. IEEE Computer Society, IEEE, USA, 366–
+[71] Yuri Shkoro. 2019.        Conquering Microservices Complexity at                367.
+     Uber with Distributed Tracing (Presentation).           Received June      [85] Tao Yu, Yue Zhang, and Kwei-Jay Lin. 2007. Efficient algorithms for web
+     2021 from https://www.infoq.com/presentations/uber-microservices-               services selection with end-to-end qos constraints. ACM Transactions
+     distributed-tracing/.                                                           on the Web (TWEB) 1, 1 (2007), 6–es.
+[72] Yuri Shkuro. 2019. Mastering Distributed Tracing. Packt Publishing,        [86] Lei Zhang, Vaastav Anand, Zhiqiang Xie, Ymir Vigfusson, and Jonathan
+     USA.                                                                            Mace. 2023. The Benefit of Hindsight: Tracing Edge-Cases in Dis-
+[73] Benjamin H. Sigelman, Luiz André Barroso, Mike Burrows, Pat                     tributed Systems. In NSDI’23: Proceedings of the 20th USENIX Conference
+     Stephenson, Manoj Plakal, Donald Beaver, Saul Jaspan, and Chan-                 on Networked Systems Design and Implementation. USENIX association,
+     dan Shanbhag. 2010. Dapper, a Large-Scale Distributed Systems Tracing           USA, 321–339.
+     Infrastructure. Technical Report. Google, Inc. https://research.google.    [87] Yilei Zhang, Zibin Zheng, and Michael R Lyu. 2011. WSPred: A time-
+     com/archive/papers/dapper-2010-1.pdf                                            aware personalized QoS prediction framework for Web services. In
+[74] Benjamin Speich, Belinda von Niederhäusern, Nadine Schur, Lars G                2011 IEEE 22nd international symposium on software reliability engi-
+     Hemkens, Thomas Fürst, Neera Bhatnagar, Reem Alturki, Arnav Agar-               neering. IEEE, 210–219.
+     wal, Benjamin Kasenda, Christiane Pauli-Magnus, et al. 2018. Sys-
+     tematic review on costs and resource use of randomized clinical trials
+SoCC ’23, October 30–November 1, 2023, Santa Cruz, CA, USA        Yazhuo Zhang, Rebecca Isaacs, Yao Yue, Juncheng Yang, Lei Zhang, and Ymir Vigfusson
+
+
+[88] Zhizhou Zhang, Murali Krishna Ramanathan, Prithvi Raj, Abhishek
+     Parwal, Timothy Sherwood, and Milind Chabbi. 2022. CRISP: Criti-
+     cal Path Analysis of Large-Scale Microservice Architectures. In 2022
+     USENIX Annual Technical Conference (USENIX ATC 22). USENIX asso-
+     ciation, USA, 655–672.
+[89] Hao Zhou, Ming Chen, Qian Lin, Yong Wang, Xiaobin She, Sifan Liu,
+     Rui Gu, Beng Chin Ooi, and Junfeng Yang. 2018. Overload control for
+     scaling wechat microservices. In Proceedings of the ACM Symposium on
+     Cloud Computing. Association for Computing Machinery, New York,
+     NY, USA, 149–161.
+[90] Zipkin 2023. Zipkin: A Distributed Tracing System. http://zipkin.io/.
+     Accessed: 2023-05-21.
+

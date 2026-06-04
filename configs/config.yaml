@@ -1,0 +1,279 @@
+# ══════════════════════════════════════════════════════════════════════
+# AgenticSRE Configuration
+# ──────────────────────────────────────────────────────────────────────
+# 字符串里的 ${VAR_NAME} 会被 .env / 系统环境变量替换。
+# 修改本文件后需重启容器: `./deploy_docker.sh` 或 `docker compose restart`
+# ══════════════════════════════════════════════════════════════════════
+
+# ─── 大模型 (LLM) ─────────────────────────────────────────────────────
+# 所有 Agent 都走这一份 LLM 配置。系统调用方式 = OpenAI 兼容协议:
+#     POST <base_url>/v1/chat/completions   (Bearer <api_key>)
+# 任何兼容此协议的服务都可以接 (DeepSeek / OpenAI / 通义千问 DashScope /
+# 自建 vLLM / Ollama / OpenRouter ...)
+#
+# 字段说明:
+#   api_key      (必填) Bearer Token；强烈建议留 ${LLM_API_KEY} 占位
+#                       在 .env 里填实际值，避免敏感信息进 git
+#   base_url     (必填) API 根地址。代码用 OpenAI SDK，**会原样拼接**
+#                       `/chat/completions`，所以**大多数 provider 都需要
+#                       在 base_url 末尾带上 `/v1`** (OpenAI / DashScope /
+#                       OpenRouter / vLLM / Ollama 等)。
+#                       例外: DeepSeek 网关同时接受带与不带 /v1。
+#   model        (必填) 模型 ID，由 provider 决定
+#   temperature  (可选) 采样温度 0~2；SRE 推理建议 0.0~0.2 保稳定
+#   max_tokens   (可选) 单次回复最大 token；含 reasoning model 时建议 ≥32K
+#   timeout      (可选) HTTP 超时秒；大模型慢时调高到 300~600
+llm:
+  api_key: "${LLM_API_KEY}"
+  base_url: "https://api.deepseek.com"      # DeepSeek 例外，可不带 /v1
+  model: "deepseek-v4-pro"
+  temperature: 0.1
+  max_tokens: 65536
+  timeout: 300
+
+# ─── LLM Provider 预设 (按需取消注释替换上面整段 llm:) ──────────────
+# 注意: base_url 末尾的 /v1 不能漏 (DeepSeek 除外)
+#
+# # ▼ OpenAI 官方
+# llm:
+#   api_key: "${OPENAI_API_KEY}"
+#   base_url: "https://api.openai.com/v1"
+#   model: "gpt-4o"
+#   temperature: 0.1
+#   max_tokens: 16384
+#   timeout: 180
+#
+# # ▼ 阿里通义千问 (DashScope 兼容模式)
+# llm:
+#   api_key: "${DASHSCOPE_API_KEY}"
+#   base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+#   model: "qwen3-max"
+#   temperature: 0.1
+#   max_tokens: 32768
+#   timeout: 300
+#
+# # ▼ Anthropic Claude (通过 OpenAI 兼容网关，如 LiteLLM / OpenRouter)
+# llm:
+#   api_key: "${OPENROUTER_API_KEY}"
+#   base_url: "https://openrouter.ai/api/v1"
+#   model: "anthropic/claude-opus-4-7"
+#   temperature: 0.1
+#   max_tokens: 32768
+#   timeout: 300
+#
+# # ▼ 本地自建 vLLM / Ollama (无 key, 直连)
+# llm:
+#   api_key: "EMPTY"                                 # 占位，禁空字符串
+#   base_url: "http://33.33.33.127:8000/v1"          # vLLM 默认 OpenAI 兼容路径
+#   model: "Qwen3-32B"                               # 启动 vLLM 时的 --served-model-name
+#   temperature: 0.1
+#   max_tokens: 32768
+#   timeout: 600
+
+
+runtime:
+  mode: "daemon"            # daemon | pipeline | rca | status
+  log_level: "INFO"
+  log_dir: "./logs"
+  max_workers: 3
+  enable_self_healing: false
+
+kubernetes:
+  namespace: "default"
+  kubeconfig: ""            # empty = in-cluster or ~/.kube/config
+  use_ssh: false            # true when running remotely, false on cluster node
+  use_dry_run: true
+  forbid_unsafe_commands:
+    - "delete namespace"
+    - "delete node"
+    - "drain --force"
+  ssh_jump_host: "openstack@222.200.180.102"
+  ssh_target: "ubuntu@10.10.3.110"
+  target_host: "ubuntu@10.10.3.110"
+
+observability:
+  prometheus_url: "http://localhost:9090"
+  elasticsearch_url: "http://localhost:9200"
+  jaeger_url: "http://localhost:16686"
+  grafana_url: "http://localhost:3000"
+
+database:
+  dsn: ""                   # optional: postgresql://...
+
+mcp:
+  external_servers: []
+  # - name: "k8s-mcp"
+  #   url: "http://localhost:8765/sse"
+
+remediation:
+  enabled: false
+  confidence_threshold: 0.85
+  max_rollback_depth: 5
+  require_approval: true
+
+memory:
+  enabled: true
+  backend: "chromadb"       # chromadb | json
+  db_path: "./data/memory"
+  embedding_model: "text-embedding-3-small"
+  rules_collection: "sre_rules"
+  faults_collection: "sre_faults"
+  traces_collection: "sre_traces"
+  max_similar_results: 5
+  auto_learn: true
+  judge_threshold: 0.65
+  judge_llm_weight: 0.4
+
+daemon:
+  poll_interval_seconds: 30
+  dedup_ttl_seconds: 300
+  max_concurrent_pipelines: 3
+  default_namespace: ""
+  status_file: "./data/daemon_status.json"
+  signal_history_size: 100
+
+pipeline:
+  max_evidence_iterations: 3
+  hypothesis_confidence_threshold: 0.85
+  enable_correlation: true
+  enable_graph_rca: true
+  enable_recovery: false
+  enable_collaboration_optimization: true
+  enable_fast_evidence_selection: true
+  evidence_agent_timeout_s: 45
+  evidence_summary_max_tokens: 1024
+  enable_llm_inference_agent: true
+  enable_structured_evidence: true
+  skip_alert_compression_for_manual_rca: true
+  skip_planning_in_fast_evidence: true
+
+alert:
+  compression_enabled: true
+  time_window: 300          # seconds for alert grouping
+  similarity_threshold: 0.8
+  max_group_size: 50
+
+detection:
+  sources_enabled:
+    prometheus: true
+    k8s_event: true
+    pod_health: true
+    node_health: true
+    metric_anomaly: true
+  default_detect_methods: ["threshold", "zscore"]
+  default_lookback_m: 30
+  default_z_threshold: 3.0
+  default_ewma_span: 10
+  metric_checks:
+    - name: "node_cpu_usage"
+      query: 'avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance) * 100'
+      unit: "%"
+      label_key: "instance"
+      level: "node"
+      warn: 85
+      crit: 95
+      detect_methods: ["threshold", "zscore", "ewma"]
+    - name: "node_memory_usage"
+      query: '(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100'
+      unit: "%"
+      label_key: "instance"
+      level: "node"
+      warn: 85
+      crit: 95
+      detect_methods: ["threshold", "zscore"]
+    - name: "node_disk_usage"
+      query: '(1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100'
+      unit: "%"
+      label_key: "instance"
+      level: "node"
+      warn: 85
+      crit: 95
+    - name: "container_cpu"
+      query: 'sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (pod, namespace) / sum(kube_pod_container_resource_limits{resource="cpu"}) by (pod, namespace) * 100'
+      unit: "%"
+      label_key: "pod"
+      ns_key: "namespace"
+      level: "container"
+      warn: 80
+      crit: 95
+      detect_methods: ["threshold", "zscore", "ewma"]
+    - name: "container_memory"
+      query: 'sum(container_memory_working_set_bytes{container!=""}) by (pod, namespace) / sum(kube_pod_container_resource_limits{resource="memory"}) by (pod, namespace) * 100'
+      unit: "%"
+      label_key: "pod"
+      ns_key: "namespace"
+      level: "container"
+      warn: 80
+      crit: 95
+  categories_enabled:
+    infrastructure: true
+    application: true
+    business: true
+    database: true
+    k8s_workload: true
+  business_services:
+    - "nginx-thrift"
+    - "nginx-web"
+    - "compose-post"
+    - "user-service"
+    - "social-graph"
+    - "home-timeline"
+    - "user-timeline"
+    - "post-storage"
+    - "media-service"
+    - "url-shorten"
+    - "text-service"
+  db_services:
+    - "redis"
+    - "memcached"
+    - "mongodb"
+    - "mongo"
+    - "mysql"
+    - "postgres"
+    - "etcd"
+  thresholds: {}
+  critical_event_reasons:
+    - "OOMKilling"
+    - "NodeNotReady"
+    - "EvictionThresholdMet"
+  critical_pod_reasons:
+    - "CrashLoopBackOff"
+    - "OOMKilled"
+
+observability_agent:
+  trace_all_calls: true
+  collect_token_usage: true
+  collect_latency: true
+  behavior_validation: true
+  anomaly_threshold: 3.0    # z-score threshold for agent behavior anomaly
+
+web:
+  host: "0.0.0.0"
+  port: 8080
+  enable_cors: true
+
+paradigm:
+  default: "plan_and_execute"     # chain | react | reflection | plan_and_execute | debate | voting
+  max_react_steps: 8              # max Thought→Action→Observation iterations for ReAct
+  max_reflection_rounds: 2        # max critique→re-investigate rounds for Reflection
+  debate_perspectives:            # perspectives for Debate paradigm
+    - "infrastructure"
+    - "application"
+    - "holistic"
+  voting_temperatures:            # LLM temperatures for Voting paradigm
+    - 0.1
+    - 0.5
+    - 0.8
+
+# ─── Domain Adaptation (跨系统泛化) ───
+domain:
+  active_profile: "kubernetes"    # kubernetes | generic_linux
+  profiles_dir: ""                # empty = configs/domains/
+  auto_detect: false              # auto-detect from environment (kubectl / systemctl)
+
+# ─── Evolution Tracking (持续演化) ───
+evolution:
+  enabled: true
+  snapshot_dir: ""                # empty = ./data/evolution/
+  max_snapshots: 1000
+  auto_record: true               # record evolution snapshot after each paradigm run

@@ -1,0 +1,1199 @@
+                                                         How Memory Management Impacts LLM Agents:
+                                                        An Empirical Study of Experience-Following Behavior
+
+                                                              Zidi Xiong1 * , Yuping Lin3∗ , Wenya Xie4∗ , Pengfei He3 ,
+                                                         Zirui Liu4 , Jiliang Tang3 , Himabindu Lakkaraju1 , Zhen Xiang2
+                                                                   1
+                                                                     Harvard University 2 University of Georgia
+                                                         3
+                                                           Michigan State University 4 University of Minnesota-Twin Cities
+
+
+
+                                                               Abstract
+                                             Memory is a critical component in large lan-
+
+
+
+
+arXiv:2505.16067v2 [cs.AI] 10 Oct 2025
+                                             guage model (LLM)-based agents, enabling
+                                             them to store and retrieve past executions to
+                                             improve task performance over time. In this
+                                             paper, we conduct an empirical study on how
+                                             memory management choices impact the LLM
+                                             agents’ behavior, especially their long-term
+                                             performance. Specifically, we focus on two
+                                             fundamental memory management operations
+                                             that are widely used by many agent frame-                  Figure 1: Illustration of the memory management work-
+                                             works—memory addition and deletion—to sys-                 flow after each agent execution.
+                                             tematically study their impact on the agent be-
+                                                                                                        (LLM) agents often equip an episodic memory
+                                             havior. Through our quantitative analysis, we
+                                             find that LLM agents display an experience-                module (Wang et al., 2024a). This dynamic mecha-
+                                             following property: high similarity between a              nism retains past task queries (i.e. the agent input)
+                                             task input and the input in a retrieved mem-               and execution (i.e. the agent output), which can
+                                             ory record often results in highly similar agent           be retrieved as demonstrations to guide similar fu-
+                                             outputs. Our analysis further reveals two signif-          ture tasks. Through effective memory management,
+                                             icant challenges associated with this property:            including adding, updating, and deleting past ex-
+                                             error propagation, where inaccuracies in past
+                                                                                                        periences, the performance of LLM agents can be
+                                             experiences compound and degrade future per-
+                                             formance, and misaligned experience replay,
+                                                                                                        improved over time (Zhang et al., 2024).
+                                             where some seemingly correct executions can                   In practice, memory designs vary widely across
+                                             provide limited or even misleading value as ex-            agents due to their diverse objectives and function-
+                                             periences. Through controlled experiments, we              alities (Shi et al., 2024; Mao et al., 2024; Wang
+                                             demonstrate the importance of regulating ex-               et al., 2023; Li et al., 2023; Park et al., 2023; Xiang
+                                             perience quality within the memory bank and
+                                                                                                        et al., 2024). To address this heterogeneity, recent
+                                             show that future task evaluations can serve as
+                                             free quality labels for stored memory. Our find-           studies have proposed a range of memory man-
+                                             ings offer insights into the behavioral dynamics           agement strategies (Yin et al., 2024; Zeng et al.,
+                                             of LLM agent memory systems and provide                    2024; Zhao et al., 2024; Zhong et al., 2024; Xu
+                                             practical guidance for designing memory com-               et al., 2025). However, these approaches are often
+                                             ponents that support robust, long-term agent               tailored to specific tasks and offer limited under-
+                                             performance. We also release our code to facil-            standing of the underlying principles that govern
+                                             itate further study. 1
+                                                                                                        memory behavior across different agentic systems.
+                                         1   Introduction                                                  In this work, we investigate a fundamental ques-
+                                                                                                        tion in memory management: How do the evolving
+                                         To enable effective solving of complex tasks and               dynamics of the memory bank, driven by continu-
+                                         self-evolving over time, large language model                  ous memory operations, influence long-term agent
+                                             * Equal contributions.     Correspondence to: Zidi         execution? In particular, we focus on the core
+                                         Xiong zidixiong@g.harvard.edu and Zhen Xi-                     mechanisms underlying these dynamics—memory
+                                         angzhen.xiang.lance@gmail.com
+                                             1
+                                               The dataset and experimental code are available in       addition and memory deletion—as they constitute
+                                         https://github.com/yuplin2333/agent_memory_manage.git          the foundation of memory management (see Fig-
+
+                                                                                                    1
+ure 1). Moreover, unlike prior studies on in-context             Our contributions are summarized below:
+learning with static, external knowledge bases (Luo          • We conduct systematic and quantitative analy-
+et al., 2024), our setting with these two operations           sis of the agent memory dynamics through two
+captures the distinctive nature of agentic memory              most essential memory operations—addition and
+systems: a dynamic retrieval pool (memory bank)                deletion—of the memory records on the long-
+that evolves over time and contains inherently noisy           term performance of LLM agents. Our findings
+outputs (trajectories) that are often generated by the         provide key principles for robust memory man-
+agent itself.                                                  agement design.
+   Through extensive experiments, we identify an
+                                                             • We reveal an experience-following property
+important phenomenon that we term the experience-
+                                                               for LLM agents with memory and highlight
+following property: a high ‘input similarity’ be-
+                                                               two important challenges for memory manage-
+tween the current task query and the one from
+                                                               ment—error propagation and misaligned experi-
+the retrieved record often yields a high ‘output
+                                                               ence replay—arising with this property.
+similarity’ between their corresponding (output)
+executions. While this property enables effective            • We demonstrate how incorporating environmen-
+reuse of successful experiences, we uncover two                tal feedback from trajectory evaluators can ef-
+significant challenges arising from the dynamic and            fectively improve memory management by mit-
+noisy nature of agentic memory banks. First, we                igating both error propagation and misaligned
+observe the problem of error propagation: if a re-             experience replay.
+trieved memory record contains noisy or incorrect            • We study how memory evolution affects long-
+outputs, the agent is likely to replicate and even             term agent performance under task distribution
+amplify these errors during the current task. If the           shifts and memory constraints, finding that well-
+resulting execution is then added back into mem-               chosen evaluators enable agents to adapt to these
+ory, the error is likely to be further propagated to           scenarios and sustain performance with simple
+future tasks. Second, we recognize the issue of mis-           addition and deletion.
+aligned experience replay, which limits the benefits
+of experience following—certain memory records,              2     Background and Related Works
+when retrieved as demonstrations, consistently lead
+to poor execution due to their misalignment with             2.1    Memory Module of LLM Agents
+the current task, indicating their inadequacy as ef-         LLM agents often include short-term memory and
+fective demonstrations. Retaining these records              long-term memory (Zhang et al., 2024). Short-
+increases the likelihood of suboptimal or incorrect          term memory usually refers to inside-task working
+executions.                                                  memory (Sumers et al., 2023), while long-term
+   To systematically analyze these phenomena, we             memory (Sumers et al., 2023) can be divided into
+conduct controlled experiments across four distinct          three types: semantic memory, procedural memory,
+agents operating on diverse tasks. Crucially, we re-         and episodic memory. Semantic memory (Kumar,
+veal the critical yet underexplored role of trajectory       2020) contains the agent’s world knowledge and un-
+evaluators in both memory addition and deletion              derstanding of the environment; procedural mem-
+processes, providing novel insights related to ef-           ory (Beaunieux et al., 2006) involves rules or pro-
+fective memory bank optimization that have been              cedures, which may reside implicitly in the LLM’s
+significantly overlooked in existing literature.             weights or be explicitly defined as guidelines for
+   We further examine challenging conditions rep-            the agent; and episodic memory (Nuxoll and Laird,
+resenting real-world scenarios, including (1) Task           2007; Lampinen et al., 2025) records task-specific
+Distribution Shift: the task distribution changes            experiences. In this paper, we specifically focus
+substantially over time, requiring the agent to adapt        on episodic memory, which is commonly used by
+to shifting patterns and contexts. (2) Memory                LLM agents with memory and has recently been
+Resources Constraint: the memory capacity is                 shown to mitigate the lack of latent learning capa-
+severely limited, requiring the agent to retain only         bility in LLMs (Lampinen et al., 2025).
+the most valuable and helpful experience. The
+results underscore the importance of thoughtful              2.2    Memory Management and Limitations
+memory management for maintaining stable and                 LLM agents often employ an episodic memory
+effective long-term agent performance.                       module to store past experiences for future retrieval,
+
+                                                         2
+which is crucial for effective planning and task ex-           In contrast, our findings highlight potential chal-
+ecution (Shi et al., 2024; Mao et al., 2024; Xu                lenges posed by these operations and offer insights
+et al., 2025; Zhou et al., 2025; Zhong et al., 2024;           to guide the design of future memory systems.
+Yin et al., 2024). The memory module typically
+includes operations such as memory reading and                 3     Addition of Memory
+memory management (Zhang et al., 2024). Specif-                Memory addition refers to the process of decid-
+ically, given a new task query q and a memory                  ing whether a finished task execution should be
+base currently containing N query-execution pairs              stored as a new record in the memory bank. Here,
+D = {(q1 , e1 ), . . . , (qN , eN )}, the agent’s execu-       we consider the most common approach that adds
+tion cycle involves the following memory opera-                memory based on the feedback of the trajectory
+tions:                                                         evaluator (Wang et al., 2025; Shi et al., 2024). We
+Memory Reading: The agent retrieves a sub-                     investigate three types of memory addition with
+set ξK ⊂ D consisting of the K query-execution                 different trajectory evaluators—an add-all baseline,
+pairs most relevant to the query q. The relevance              selective addition based on coarse automatic evalu-
+is often measured by the input similarity between              ation, and selective addition based on strict human
+the task query q and the query from the retrieved              evaluation—along with a fixed-memory baseline
+past experience. For example, the relevance can                without memory addition.
+be computed as the cosine similarity between the
+                                                               3.1    Setup
+feature representations for both queries from a text
+encoder (Kusupati et al., 2022). The retrieved pairs           Setup for Agents We investigate memory man-
+ξK are then used as in-context learning demonstra-             agement in generic LLM agent settings by con-
+tions to guide the LLM in generating an execution              sidering an illustrative and controllable synthetic
+trajectory e for the task query q.                             agent and three representative agents designed for
+                                                               different tasks: For the synthetic agent, we design
+Memory Management and Limitations: Mem-                        a task in which the agent predicts the output of a
+ory management typically involves the addition                 simple mapping – a linear function in the ground
+and deletion of memory records. Specifically, when             truth – by performing regression approximation
+obtaining the query-execution trajectory pair (q, e),          over the provided demonstrations, which we call
+addition decides whether this pair should be added             RegAgent. Formally, the agent receives an input
+to memory, while deletion (Zhong et al., 2024;                 vector x together with several past guesses over
+Wang et al., 2024b) is often triggered to remove               nearby inputs under the linear transformation w to
+outdated or redundant pairs from memory.                       infer an output for w⊤ x. This setup allows us to
+   Although various strategies have been proposed              investigate an ideal setting where the model fully
+for memory management, such as structural trans-               relies on the provided demonstrations to generate
+formation (Anokhin et al., 2024; Zeng et al., 2024;            the output, while enabling control over the noise
+Xu et al., 2025), merging (Zhong et al., 2024; Liu             level of the stored memory and direct measurement
+et al., 2023; Hu et al., 2024), summarization (Wang            of the resulting error.
+et al., 2025; Zhong et al., 2024; Pan et al., 2025),
+                                                                  For real agent, we include EHRAgent (Shi et al.,
+and reflection (Shinn et al., 2024; Zhao et al., 2024;
+                                                               2024), AgentDriver (Mao et al., 2024), and CIC-
+Liang et al., 2024), these approaches are often de-
+                                                               IoT Agent (Neto et al., 2023). In addition to their
+signed for specific agent types (e.g., chatbot agents)
+                                                               distinct tasks, these agents also vary significantly in
+and lack a unified design that generalizes across
+                                                               input-output formats and memory retrieval mecha-
+different agentic systems.
+                                                               nisms, which enhances the generalizability of our
+   Recent works also study the optimization of
+                                                               findings. For all four agents, we use GPT-4o-mini
+the memory bank, such as using an expecta-
+                                                               as the backbone language model for most of the
+tion–maximization approach for optimization (Yin
+                                                               experiments. See Appendix A.1 for details of these
+et al., 2024) or formulating memory management
+                                                               agents.
+as a Markov Decision Process (Zhou et al., 2025).
+However, these works do not provide an under-                  Setup for Memory Addition We begin by de-
+standing of how memory bank dynamics affect                    scribing several memory addition using different
+long-term performance under the inherently noisy               trajectory evaluator. For a query-execution pair
+nature of basic addition and deletion operations.              (q, e) and an evaluator π, the addition decision is
+
+                                                           3
+given by π(q, e): if π(q, e) = 1, the experience is          Table 1: Performance of the three memory addition
+stored; if π(q, e) = 0, it is discarded. Our aim is to       strategies: add-all, coarse evaluation with three differ-
+                                                             ent automatic evaluators, and selective addition based
+analyze how the noise introduced by additions from
+                                                             on human evaluation (strict), compared with the fixed-
+different evaluators influences the agent’s behav-           memory baseline (shaded). The results highlight the
+ior and long-term performance. Starting from an              necessity of selection for effective memory addition.
+identical initial memory, we examine the following
+                                                                         RegAgent        EHRAgents       AgentDriver      CIC-IoT Agent
+four categories of memory additions:                         Judge
+                                                                     SR. ↑ Mem Size ↓ ACC ↑ Mem Size ↓ SR. ↑ Mem Size ↓ ACC. ↑ Mem Size ↓
+                                                              Fixed 67.53     100     16.75   100      40.11    180      71.50     50
+   1) Fixed-memory baseline: In this baseline                Add all 55.48   4100     13.05   2411     32.32   2125      59.90    1050
+                                                                                               Coarse
+setting, we use a subset of the training data                  C1 63.18      3511     26.19   1447     36.92   1161      74.00    1030
+                                                               C2 65.78      3347     32.21   1467     40.01   1119      68.80     936
+with correct agent execution as the fixed memory               C3 67.35      3139     34.66   1094     47.37   1285      79.50     952
+                                                                                                Strict
+bank (Mao et al., 2024; Li et al., 2023; Zhao et al.,         Strict 70.95   2938     38.50   1012     51.00   1178      85.40     904
+2024; Zheng et al., 2024), and the agent relies only
+on this fixed memory without adding new entries,
+i.e., πfixed (q, e) = 0.
+   2) Add-all approach: A straightforward addi-
+tion is to store every encountered task and its exe-
+cution: πall (q, e) = 1.
+   3) Selective addition based on automatic eval-
+uation (coarse): We have πautomatic (q, e) =
+Automatic(q, e) and evaluate three automatic eval-           Figure 2: Performance trend for EHRAgent and Agent-
+uators (Wang et al., 2025; Yin et al., 2024;                 Driver. 4o-mini, 4.1-mini, and 4.1-mini FT denote dif-
+Liang et al., 2024), denoted as Coarse 1 (C1),               ferent coarse evaluators from the GPT series. Both the
+                                                             strict evaluator and some coarse evaluators exhibit con-
+Coarse 2 (C2), and Coarse 3 (C3). For RegAgent,
+                                                             sistent self-improvement over time.
+we define the evaluator based on the absolute error
+between the predicted and ground-truth outputs,              four agents. Although all methods start with the
+where a smaller error threshold indicates a more ac-         same initial memory, their long-term performances
+curate evaluator. Specifically, we set the thresholds        diverge notably. The fixed-memory baseline main-
+to 1.6, 1.4, and 1.2 for C1, C2, and C3, respectively.       tains strong results with RegAgent, AgentDriver,
+For the other three agents, C1 and C2 correspond             and CIC-IoT Agent—sometimes even surpassing
+to GPT-4o-mini and GPT-4.1-mini used as evalua-              runs guided by coarse evaluators—indicating that
+tors, respectively, while C3 employs GPT-4.1-mini            noisy or low-quality additions can harm mem-
+fine-tuned on 300 correct judge data collected from          ory utility. In contrast, using a strict evaluator
+executions on a separate training set. Detailed              that selectively expands memory with high-quality
+designs of these automatic evaluators are provided           records consistently yields superior performance,
+in Appendix A.4.                                             showing that both memory quality and capacity are
+   4) Selective addition based on human evalu-               key to effective long-term learning.
+ation (strict):In this stricter approach, a human               Furthermore, performance relies on the judge’s
+(oracle) serves as the evaluator (Shi et al., 2024),         capability for coarse evaluators. For the three
+determining whether the execution should be stored           model judged agents, fine-tuning the evaluator
+in the memory: πhuman (q, e) = Human(q, e). Al-              on only 300 trajectories (C3) already achieves
+though human input could be gathered after each              strong long-term improvements, outperforming
+execution for practical agents, it is not feasible for       other coarse evaluators and unfiltered additions.
+our current evaluation. Therefore, we simulate this             As shown in Figure 2 and Figure 8 in Ap-
+process by comparing the generated output with               pendix B.1, the add-all and some coarse addition
+the ground truth. More details on each agent’s spe-          approach exhibits flat or declining success rates,
+cific designs for memory addition can be found in            suggesting accumulation of flawed records. The
+Appendix A.                                                  fixed-memory baseline performs better but remains
+                                                             static due to its frozen memory. In contrast, strict
+3.2   Execution quality and memory size jointly              selective addition and C3 coarse evaluator continue
+      determine long-term agent performance.                 to improve over time, a trend consistent across dif-
+Table 1 summarizes the performance of memory                 ferent LLM backbones (Appendix B.2) with strict
+addition strategies guided by five evaluators across         addition.
+
+                                                         4
+Figure 3: Left: Output similarity versus input similarity       Figure 4: Comparison of running performance between
+for RegAgent over different evaluators. Right: Output           using the agent output as demonstrations and the error-
+similarity versus input similarity for AgentDriver over         free (EF) variant using ground-truth. Coarse here uses
+different evaluators.                                           C1 evaluator.
+
+   These results suggest that careful construction              perfect correlation (Pearson r ≈ 1) between input
+of the evaluator is particularly important, as di-              and output similarity, indicating strong demonstra-
+rectly applying a vanilla LLM as a trajectory evalu-            tion following when input similarity is high. In con-
+ator (Wang et al., 2025; Pan et al., 2024) may lead             trast, under the fixed-memory setting, both input
+to a more severe negative impact than manually                  and output similarities remain consistently lower
+crafting a small but high-quality dataset.                      than those achieved with memory addition, sug-
+                                                                gesting that the agent still relies on reasoning rather
+3.3   Experience-Following Property                             than pure imitation, and thus achieves surprisingly
+For each memory addition strategy, we measure                   high performance compared with those using a
+both the input similarities and output similarities             coarse evaluator with noisy memory. A similar pat-
+between each query and the memory records re-                   tern is also observed in AgentDriver. Therefore,
+trieved during its execution. The computation of                a careful selection strategy with a stronger eval-
+both types of similarities for each query can be                uator for memory addition can facilitate the self-
+found in Appendix A. For each of the input sim-                 improvement of the agent through the replication of
+ilarities and the output similarities, we compute               correct executions of similar tasks. Conversely, in-
+the cumulative average over the entire stream of                discriminate memory addition will easily introduce
+test query executions to demonstrate the long-term              incorrect executions for the agent to learn from,
+trend. As shown in Figure 3 for RegAgent and                    causing a self-degradation of its performance.
+AgentDriver, the fixed-memory baseline produces
+both low input and output similarities, whereas the             3.4   Error Propagation in Agent Memory
+addition-based methods exhibit higher output simi-              While experience-following enables LLM agents
+larity as the input similarity grows. Similar patterns          to learn from high-quality examples with a strong
+are observed for the other two agents (Figure 9                 evaluator, the inclusion of erroneous memory
+in Appendix B.1) and alternative LLM backbones                  records or seemingly well-performed trajectories
+such as state-of-the art GPT-4o and DeepSeek-V3                 with incorrect intermediate attempts remains in-
+(Figure 12 in Appendix B.2). The exhibition of                  evitable in many cases, even under human inspec-
+such a strong correlation between the input and                 tion of the agent’s execution.
+output similarities is referred to as the experience-              When erroneous and noisy memory records are
+following property of memory-based LLM agents.                  retrieved as demonstrations, these errors can in-
+   Intuitively, this property reflects that LLM agents          fluence the current task execution. If the current
+tend to imitate retrieved experience more closely               execution is then stored in the memory, the error
+when their current queries are similar to past exam-            may propagate to future tasks by affecting their
+ples. As the memory expands to include a broader                execution. This error propagation poses signifi-
+range of experiences, the agent is more likely to re-           cant challenges to memory management, causing a
+trieve highly similar records for new queries. For              deviation between the agent’s performance and the
+instance, in RegAgent, the agent can make pre-                  optimal level achievable with perfect memory.
+dictions either by directly mimicking the closest                  In Figure 4, we visualize error propagation on
+demonstration or by internal reasoning to guess the             RegAgent and AgentDriver. For each addition strat-
+mapping rule based on demonstrations. When the                  egy in Section 3.1, we compare it with a variant
+memory size increases and demonstrations become                 that uses the same retrieved examples for each task
+more similar to the query, the agent shows a near-              but replaces the LLM’s execution with the ground-
+
+                                                            5
+truth output, ensuring error-free2 retrieval.                           be deleted if ϕper (qi , ei , t, t′ ) = 1 where
+   For both agents, we observe an immediate gap
+in performance compared to their error-free variant.                    ϕper (qi , ei , t, t′ ) = 1[ frt (qi , ei ) − frt′ (qi , ei ) ≤ α ] .
+Moreover, as the execution continues, both add-
+all and coarse selective addition exacerbate such a                     This approach keeps the memory size M bounded
+performance gap. However, for AgentDrievr with                          by M ≤ α(t − t′ )K, where K is the number of
+strict selective addition, despite lagging initially,                   retrieved memory per execution.
+it gradually approaches the ground-truth baseline                          2) History-Based Deletion: Following the pre-
+and even surprisingly surpasses its performance                         vious discussion on experience-following and error
+after roughly 2000 executions. These results again                      propagation, we hypothesize a correlation between
+highlight the importance of both the quantity and                       the quality of experiences stored in memory and
+quality of memory, underscoring the necessity of                        the downstream execution quality of future tasks
+carefully selecting and training trajectory evalua-                     when these experiences are retrieved. Thus, we
+tors for stable long-term agent execution.                              propose a simple history-based deletion strategy
+                                                                        guided by the utility of stored memory records over
+                                                                        time. Specifically, suppose Φ is a utility evaluator,
+4     Deletion of Memory
+                                                                        which could be the same one used for selective
+Memory deletion is often necessary for real sys-                        addition. For any timestamp t, a record will be
+tems, as the memory cannot grow indefinitely due                        removed if a) it has been retrieved for at least n
+to the practical constraint of storage. In this section,                times, and b) the average utility across all its past
+we evaluate three memory deletion approaches: the                       retrievals is below a prescribed threshold β:
+commonly adopted periodic deletion, the proposed
+history-based deletion guided by future execution                                             (
+                                                                                               δ(qi , ei , t), if frt (qi , ei ) > n,
+utility, and a hybrid approach that combines both.                      ϕhist (qi , ei , t) =
+                                                                                               0,              otherwise.
+4.1    Setup for Memory Deletion Experiments
+                                                                        where
+We follow Section 3.1 for the four agent setups we                                                                                          
+                                                                                                             frt (qi ,ei )
+considered. For the deletion, let (qi , ei ) be a query-                                                        X
+                                                                        δ(qi , ei , t) = 1 frt (q1i ,ei )                   Φ(qm , em ) ≤ β  .
+execution pair where 1 ≤ i ≤ N is the index. This
+                                                                                                               m=1
+pair will be removed from the memory bank if it
+satisfies a specific criterion ϕ. We focus on three                     Here, Φ(qm , em ) denotes the utility obtained from
+memory deletion strategies that can be deployed                         the m-th retrieval of the specific memory record
+together with selective memory addition (either                         (qi , ei ). Note that we require a memory record to be
+coarse (automatic) or strict (human) evaluation):                       retrieved at least n times before being considered
+    1) Periodical-based Deletion: Prior research                        for removal to reduce the estimation bias for the
+proposes to use a forgetting rate inspired by human                     average utility.
+cognition to assign deletion probabilities based on                        3) Combined Deletion: Periodical- and history-
+how frequently and how recently a memory record                         based methods can be applied together to jointly
+is retrieved (Zhong et al., 2024; Hou et al., 2024;                     enhance the agent’s performance and reduce the
+Wang et al., 2024b). In this work, we adopt a sim-                      memory size:
+plified (thus more widely applicable) strategy using
+a fixed threshold to determine whether a memory                         ϕcomb (qi , ei , t, t′ ) = ϕper (qi , ei , t, t′ ) ∨ ϕhist (qi , ei , t).
+record should be deleted based on its past retrieval
+frequency during a given period. Specifically, Let                      4.2    Strategic Memory Deletion Improves the
+frt (qi , ei ) denote the total retrievals of (qi , ei ) at the                Agent Performance
+current timestamp t, and frt′ (qi , ei ) be the retrievals              Table 2 summarizes the effects of three deletion
+at an earlier timestamp t′ . Define α as the target                     strategies on both agent performance and memory
+retrieval count within [t′ , t]. A memory record will                   size.
+    2
+                                                                           We first observe that periodical-based deletion
+      For AgentDriver, while these trajectories can still be sub-
+optimal, the ground-truth trajectory resembles relatively “cor-         achieves substantial memory reduction with small
+rect” task executions.                                                  performance degradation in general, indicating that
+
+                                                                    6
+Table 2: Performance of periodical-based deletion,
+history-based deletion, and the combined approach,
+when deployed with the two selective addition strate-
+gies (strict and coarse with C1 evaluator) and using the
+same evaluator for history-based and combined deletion.
+The history-based approach in real agents often yields
+the best performance when paired with a strict evaluator
+among deletion approaches, while the combined method
+                                                                                                Figure 6: Left: KDE curve over the absolute error of
+reduces the memory size the most.
+                                                                                                deleted and retained memory (with retrieved more than
+ Strategy
+                RegAgents           EHRAgents             AgentDriver     CIC-IoT Agent         5 times) with C1 evaluator using history-based deletion.
+            SR. ↑ Mem Size ↓   ACC. ↑ Mem Size ↓ SR. ↑ Mem Size ↓       ACC. ↑ Mem Size ↓
+                                    Coarse evaluator (C1)                                       Right: KDE curve over the absolute error with strict
+ No del     63.18    3511       25.91      1447        36.92    1161    74.00     1030
+ Period     60.88    1012       26.65       338        36.38     426    78.10     355           evaluator.
+ History    62.10    3205       33.55      1004        34.00    1019    73.70     952
+Combined    59.32     951       31.47       279        35.62     372    68.80     352
+
+ No del     70.95    2938       38.67
+                                      Strict evaluator
+                                           1012        51.00    1178    85.40      904
+                                                                                                and combined deletion can influence the agent’s
+ Period
+ History
+            67.65
+            69.80
+                      949
+                     2286
+                                38.59
+                                42.06
+                                            302
+                                            784
+                                                       50.94
+                                                       51.81
+                                                                 467
+                                                                 846
+                                                                        80.80
+                                                                        89.60
+                                                                                   310
+                                                                                   788
+                                                                                                long-term behavior in different ways. As shown
+Combined    66.58     890       42.34       248        49.97     323    85.50      188
+                                                                                                in Figure 5 and Figure 14 (Appendix B.4), the im-
+                                                                                                pact of history-based deletion varies notably across
+                                                                                                evaluators based on LLMs without fine-tuning. For
+                                                                                                instance, when using GPT-4o-mini as the history-
+                                                                                                based evaluator, the deletion strategy yields a clear
+                                                                                                performance gain on EhrAgent but leads to de-
+                                                                                                graded performance on AgentDriver. In contrast,
+                                                                                                fine-tuned evaluators tend to produce more sta-
+Figure 5: Performance comparison after applying
+history-based deletion with different evaluators.
+                                                                                                ble results, achieving performance comparable to
+                                                                                                their addition-only counterparts while maintaining
+addition-only memory designs often accumulate                                                   smaller memory sizes.
+redundant entries.                                                                                 In summary, our findings show that with a re-
+   History-based deletion and combined deletion                                                 liable utility evaluator, history-based deletion can
+show more variable results depending on the relia-                                              improve agent performance. Additionally, the com-
+bility of the utility evaluator used during addition                                            bined deletion approach offers a strong balance
+and deletion. Specifically, when a strict evaluator is                                          between maintaining performance and reducing
+employed, history-based deletion leads to notable                                               memory size, making it a practical and efficient
+performance improvements with the non-synthetic                                                 memory management strategy for long-term LLM
+agent we considered. In addition, for our syn-                                                  agent deployment.
+thetic RegAgent, which exhibits strong experience-
+following behavior and relies on a large memory                                                 4.3   Misaligned Experience Replay
+capacity, we observe that history-based deletion                                                To explain the performance gains achieved by
+causes only a small performance drop compared                                                   history-based deletion, we hypothesize that certain
+with other strategies, even after removing several                                              memory records provide limited or even harmful
+hundred frequent executions.                                                                    guidance during task execution. These records,
+   To further understand these improvements, we                                                 although initially passing the evaluator’s quality
+extend the methodology used in Section 3.4 to con-                                              filter, may still be misaligned with the objectives
+struct an error-free memory baseline during agent                                               of the current task distribution. Such misalign-
+execution with AgentDriver and RegAgent. As pre-                                                ment can arise from inconsistencies between their
+sented in Appendix B.3, in AgentDriver, history-                                                stored trajectories and the current execution con-
+based deletion with a strict evaluator can even out-                                            text, or from errors introduced by the evaluator’s
+perform this error-free counterpart with a larger                                               limitations. Conditioning on such demonstrations
+magnitude compared with no deletion. This re-                                                   can therefore degrade the quality of task execu-
+sult suggests that selectively retaining experiences                                            tion. We refer to this phenomenon as misaligned
+with high utility scores on downstream tasks can                                                experience replay, emphasizing the misalignment
+improve long-term performance.                                                                  between the current task and its retrieved demon-
+   However, when the evaluator used for both addi-                                              strations from the memory bank. We attribute the
+tion and deletion is coarse or noisy, history-based                                             effectiveness of history-based deletion to its ability
+
+                                                                                            7
+to remove these misaligned memory records.
+   Since inconsistencies between context and task
+distributions are often case-specific and difficult
+to capture directly, we instead use the error in-
+duced by the evaluator’s limitations for clearer
+illustration, as both factors jointly contribute to
+misaligned experience replay. Taking RegAgent
+as an example, the experience quality in terms of            Figure 7: Performance comparison under task distribu-
+the error in the memory record can be directly ob-           tion shift for EHRAgent and AgentDriver. The vertical
+                                                             line indicates the point at which the task distribution
+served through the discrepancy between its pre-
+                                                             shifts. The horizontal dashed line shows the perfor-
+dicted and ground-truth value. As shown in Fig-              mance of the combined deletion variant without distri-
+ure 6, we plot the kernel density estimation (KDE)           bution shift.
+curves for both deleted and retained records based
+on two different evaluators, respectively, revealing         We also include results from a variant of combined
+a clear quality gap: retained demonstrations exhibit         deletion (with a strict evaluator) executed under a
+lower error scores than deleted ones. Even under             setting without task distribution shift, as shown in
+strict addition—where only data with error ≤ 1               Section 4. We observe varying performance dynam-
+were initially stored—conditioning on noisier ex-            ics across task distributions. However, in general,
+periences (e.g., entries with error > 0.5) can still         the performance gap relative to the no-shift vari-
+propagate errors to subsequent tasks more easily,            ant remains small. Notably, in AgentDriver, strict
+leading to degraded predictions and thus removed             addition alone achieves performance that even sur-
+by history-based deletion. Consistent trends across          passes the no-shift variant. In contrast, on EHRA-
+other agents (Appendix B.5) further demonstrate              gent, history-based deletion underperforms com-
+that history-based deletion effectively identifies and       pared to combined deletion. This suggests that
+removes noisy or misaligned memory records with              in practical scenarios involving distribution shift,
+various evaluators.                                          periodic deletion—despite its simplicity—can con-
+   These findings suggest that experience quality,           tribute to stabilizing performance.
+especially the intrinsic quality of experience itself,
+is tightly linked to downstream execution quality.           5.2   Memory Management with Resource
+By effectively removing those demonstrations with                  Constraints
+low future execution quality through an evaluator,           We also investigate a scenario where the memory
+we can mitigate misaligned experience replay.                capacity is fixed, for example, to its initial size
+                                                             of 100 records for EHRAgent and 180 records for
+5     Memory Management under                                AgentDriver. Under this constraint, we modify
+      Challenging Scenarios                                  the combined deletion policy so that after each
+                                                             task execution, it first performs periodical-based
+5.1    Memory Management with Task                           deletion and then removes only the record with the
+       distribution shift                                    least average utility (rather than all records below
+Task distribution shift occurs when the predomi-             the utility threshold) if the memory still exceeds
+nant task type and the expected execution change             the limit after additions.
+over time. To simulate a task distribution shift, we
+construct a modified dataset from the original test          Results As shown in Figure 17 in Appendix B.6,
+sets of EHRAgent and AgentDriver by aggregating              the memory management policies achieve high per-
+their input vectors and reordering them to alter the         formance under strict capacity constraints com-
+underlying task distribution. More details for setup         pared with the fixed-memory variant. By selec-
+can be found in Appendix A.5.                                tively retaining only the most relevant and high-
+                                                             quality records, the agent utilizes limited storage
+Results In Figure 7, we compare performance                  efficiently. These results indicate that effective
+trends across several memory configurations on               memory management choices can still improve the
+EHRAgent and AgentDriver: fixed memory, strict               long-term agent performance in resource-limited
+addition, history-based deletion with a strict evalu-        settings. We also study the relationship between
+ator, and combined deletion with a strict evaluator.         the size of the constrained memory and the per-
+
+                                                         8
+formance on AgentDriver, as shown in Figure 18                 Which processes are involved in cognitive procedu-
+in Appendix B.6, which demonstrates a gradually                ral learning? Memory. 2006 Jul;14(5):521-39. doi:
+                                                               10.1080/09658210500477766. PMID: 16754239.
+converging performance when using a strict utility
+evaluator. This also suggests that naive, unbounded          Holger Caesar, Varun Bankiti, Alex H Lang, Sourabh
+memory growth is unnecessary.                                  Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan,
+                                                               Yu Pan, Giancarlo Baldan, and Oscar Beijbom. 2020.
+6   Conclusion                                                 nuscenes: A multimodal dataset for autonomous driv-
+                                                               ing. In Proceedings of the IEEE/CVF conference
+This paper studies memory management in LLM                    on computer vision and pattern recognition, pages
+                                                               11621–11631.
+agents through addition and deletion. We identify
+the experience-following phenomenon and reveal               Yuki Hou, Haruki Tamoto, and Homei Miyashita. 2024.
+two key challenges—error propagation and mis-                  " my agent understands me better": Integrating dy-
+                                                               namic human-like memory recall and consolidation
+aligned experience replay. Experiments demon-
+                                                               in llm-based agents. In Extended Abstracts of the
+strate that evaluator reliability is critical and that         CHI Conference on Human Factors in Computing
+incorporating evaluator signals is essential for ef-           Systems, pages 1–7.
+fective memory management.
+                                                             Mengkang Hu, Tianxing Chen, Qiguang Chen, Yao Mu,
+                                                              Wenqi Shao, and Ping Luo. 2024. Hiagent: Hier-
+Limitations                                                   archical working memory management for solving
+                                                              long-horizon agent tasks with large language model.
+One limitation of this work lies in the scope of              arXiv preprint arXiv:2408.09559.
+memory management considered. To build a
+generalizable understanding of memory dynamics               Alistair E. W. Johnson, Tom J. Pollard, Lu Shen, Li-
+                                                               Wei H. Lehman, Mengling Feng, Mohammad Ghas-
+over time, this study focuses on two fundamental               semi, Benjamin Moody, Peter Szolovits, Leo An-
+operations—memory addition and memory dele-                    thony Celi, and Roger G. Mark. 2016. MIMIC-III,
+tion—while omitting more complex and less gen-                 a freely accessible critical care database. Scientific
+eralizable mechanisms such as structural transfor-             Data, 3:160035.
+mation (Zeng et al., 2024), merging (Liu et al.,             Abhilasha Ashok Kumar. 2020. Semantic memory: A
+2023), summarization (Pan et al., 2025), and re-               review of methods, models, and current challenges.
+flection (Shinn et al., 2024). Consequently, when              Psychonomic Bulletin & Review, 28:40 – 80.
+extending our findings to systems that integrate             Aditya Kusupati, Gantavya Bhatt, Aniket Rege,
+these advanced updating mechanisms or operate                  Matthew Wallingford, Aditya Sinha, Vivek Ramanu-
+with different agent architectures, additional fine-           jan, William Howard-Snyder, Kaifeng Chen, Sham
+                                                               Kakade, Prateek Jain, and 1 others. 2022. Ma-
+grained analyses will be helpful.
+                                                               tryoshka representation learning. Advances in Neural
+   Another limitation concerns the lack of theoret-            Information Processing Systems, 35:30233–30249.
+ical guarantees. Our findings are primarily based
+                                                             Andrew Kyle Lampinen, Martin Engelcke, Yuxuan Li,
+on extensive empirical analyses, which, although
+                                                               Arslan Chaudhry, and James L. McClelland. 2025.
+comprehensive, do not provide formal theoretical               Latent learning: episodic memory complements para-
+proofs. Given the inherent complexity of agentic               metric learning by enabling flexible reuse of experi-
+systems, deriving such guarantees is often infeasi-            ences.
+ble. Nonetheless, we believe that the proposed               Yang Li, Yangyang Yu, Haohang Li, Zhi Chen, and
+framework offers a solid foundation for future                 Khaldoun Khashanah. 2023. Tradinggpt: Multi-
+theoretical investigation, particularly through con-           agent system with layered memory and distinct char-
+trolled experimentation in our synthetic RegAgent              acters for enhanced financial trading performance.
+                                                               arXiv preprint arXiv:2309.03736.
+environment.
+                                                             Xuechen Liang, Yangfan He, Yinghui Xia, Xinyuan
+                                                               Song, Jianhui Wang, Meiling Tao, Li Sun, Xin-
+References                                                     hang Yuan, Jiayi Su, Keqin Li, and 1 oth-
+                                                               ers. 2024. Self-evolving agents with reflective
+Petr Anokhin, Nikita Semenov, Artyom Sorokin, Dmitry           and memory-augmented abilities. arXiv preprint
+  Evseev, Mikhail Burtsev, and Evgeny Burnaev. 2024.           arXiv:2409.00872.
+  Arigraph: Learning knowledge graph world models
+  with episodic memory for llm agents. arXiv preprint        Lei Liu, Xiaoyan Yang, Yue Shen, Binbin Hu, Zhiqiang
+  arXiv:2407.04363.                                            Zhang, Jinjie Gu, and Guannan Zhang. 2023. Think-
+                                                               in-memory: Recalling and post-thinking enable
+H Beaunieux, V Hubert, T Witkowski, AL Pitel, S Rossi,         llms with long-term memory.        arXiv preprint
+  JM Danion, B Desgranges, and F Eustache. 2006.               arXiv:2311.08719.
+
+
+                                                         9
+Man Luo, Xin Xu, Yue Liu, Panupong Pasupat, and                Zhiruo Wang, Daniel Fried, and Graham Neubig. 2024b.
+ Mehran Kazemi. 2024. In-context learning with re-               Trove: Inducing verifiable and efficient toolboxes
+ trieved demonstrations for language models: A sur-              for solving programmatic tasks. arXiv preprint
+ vey. arXiv preprint arXiv:2401.11624.                           arXiv:2401.12869.
+Jiageng Mao, Junjie Ye, Yuxi Qian, Marco Pavone, and           Zora Zhiruo Wang, Jiayuan Mao, Daniel Fried, and
+   Yue Wang. 2024. A language agent for autonomous               Graham Neubig. 2025. Agent workflow memory. In
+   driving. In First Conference on Language Modeling.            Forty-second International Conference on Machine
+                                                                 Learning.
+Euclides Carlos Pinto Neto, Sajjad Dadkhah, Raphael
+  Ferreira, Alireza Zohourian, Rongxing Lu, and Ali A.         Zhen Xiang, Linzhi Zheng, Yanjie Li, Junyuan Hong,
+  Ghorbani. 2023. Ciciot2023: A real-time dataset and            Qinbin Li, Han Xie, Jiawei Zhang, Zidi Xiong,
+  benchmark for large-scale attacks in iot environment.          Chulin Xie, Carl Yang, and 1 others. 2024. Guarda-
+  Sensors, 23(13).                                               gent: Safeguard llm agents by a guard agent
+                                                                 via knowledge-enabled reasoning. arXiv preprint
+Andrew Nuxoll and John E. Laird. 2007. Extending cog-            arXiv:2406.09187.
+  nitive architecture with episodic memory. In AAAI
+  Conference on Artificial Intelligence.                       Wujiang Xu, Kai Mei, Hang Gao, Juntao Tan, Zu-
+                                                                jie Liang, and Yongfeng Zhang. 2025. A-mem:
+Jiayi Pan, Yichi Zhang, Nicholas Tomlin, Yifei Zhou,
+                                                                Agentic memory for llm agents. arXiv preprint
+   Sergey Levine, and Alane Suhr. 2024. Autonomous
+                                                                arXiv:2502.12110.
+   evaluation and refinement of digital agents. arXiv
+   preprint arXiv:2404.06474.                                  Zhangyue Yin, Qiushi Sun, Qipeng Guo, Zhiyuan Zeng,
+Zhuoshi Pan, Qianhui Wu, Huiqiang Jiang, Xufang                  Qinyuan Cheng, Xipeng Qiu, and Xuan-Jing Huang.
+  Luo, Hao Cheng, Dongsheng Li, Yuqing Yang, Chin-               2024. Explicit memory learning with expectation
+  Yew Lin, H Vicky Zhao, Lili Qiu, and 1 others.                 maximization. In Proceedings of the 2024 Confer-
+  2025. On memory construction and retrieval for                 ence on Empirical Methods in Natural Language
+  personalized conversational agents. arXiv preprint             Processing, pages 16618–16635.
+  arXiv:2502.05589.                                            Ruihong Zeng, Jinyuan Fang, Siwei Liu, and Zaiqiao
+Joon Sung Park, Joseph O’Brien, Carrie Jun Cai, Mered-           Meng. 2024. On the structural memory of llm agents.
+  ith Ringel Morris, Percy Liang, and Michael S Bern-            arXiv preprint arXiv:2412.15266.
+  stein. 2023. Generative agents: Interactive simulacra
+                                                               Zeyu Zhang, Xiaohe Bo, Chen Ma, Rui Li, Xu Chen,
+  of human behavior. In Proceedings of the 36th an-
+                                                                 Quanyu Dai, Jieming Zhu, Zhenhua Dong, and Ji-
+  nual acm symposium on user interface software and
+                                                                 Rong Wen. 2024. A survey on the memory mecha-
+  technology, pages 1–22.
+                                                                 nism of large language model based agents. arXiv
+Wenqi Shi, Ran Xu, Yuchen Zhuang, Yue Yu, Jieyu                  preprint arXiv:2404.13501.
+ Zhang, Hang Wu, Yuanda Zhu, Joyce Ho, Carl Yang,
+ and May D Wang. 2024. Ehragent: Code empow-                   Andrew Zhao, Daniel Huang, Quentin Xu, Matthieu
+ ers large language models for complex tabular rea-              Lin, Yong-Jin Liu, and Gao Huang. 2024. Expel:
+ soning on electronic health records. arXiv preprint             Llm agents are experiential learners. In Proceedings
+ arXiv:2401.07128.                                               of the AAAI Conference on Artificial Intelligence,
+                                                                 volume 38, pages 19632–19642.
+Noah Shinn, Federico Cassano, Ashwin Gopinath,
+  Karthik Narasimhan, and Shunyu Yao. 2024. Re-                Longtao Zheng, Rundong Wang, Xinrun Wang, and
+  flexion: Language agents with verbal reinforcement             Bo An. 2024. Synapse: Trajectory-as-exemplar
+  learning. Advances in Neural Information Process-              prompting with memory for computer control. In
+  ing Systems, 36.                                               The Twelfth International Conference on Learning
+                                                                 Representations.
+Theodore R Sumers, Shunyu Yao, Karthik Narasimhan,
+  and Thomas L Griffiths. 2023. Cognitive ar-                  Wanjun Zhong, Lianghong Guo, Qiqi Gao, He Ye, and
+  chitectures for language agents. arXiv preprint               Yanlin Wang. 2024. Memorybank: Enhancing large
+  arXiv:2309.02427.                                              language models with long-term memory. In Pro-
+                                                                 ceedings of the AAAI Conference on Artificial Intelli-
+Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Man-                  gence, volume 38, pages 19724–19731.
+  dlekar, Chaowei Xiao, Yuke Zhu, Linxi Fan, and
+  Anima Anandkumar. 2023. Voyager: An open-ended               Huichi Zhou, Yihang Chen, Siyuan Guo, Xue Yan,
+  embodied agent with large language models. arXiv               Kin Hei Lee, Zihan Wang, Ka Yiu Lee, Guchun
+  preprint arXiv:2305.16291.                                     Zhang, Kun Shao, Linyi Yang, and 1 others. 2025.
+                                                                 Agentfly: Fine-tuning llm agents without fine-tuning
+Lei Wang, Chen Ma, Xueyang Feng, Zeyu Zhang, Hao                 llms. arXiv preprint arXiv:2508.16153.
+  Yang, Jingsen Zhang, Zhiyuan Chen, Jiakai Tang,
+  Xu Chen, Yankai Lin, and 1 others. 2024a. A survey
+  on large language model based autonomous agents.
+  Frontiers of Computer Science, 18(6):186345.
+
+
+                                                          10
+A     Detailed experimental setups.                            of accuracy (ACC).
+                                                                  For our implementation, we use OpenAI text-
+A.1    Agent details and functionality                         embedding-3-large as the text encoder. For
+RegAgents RegAgent serves as a synthetic and                   the coarse evaluator, we use the built-in LLM-
+controlled environment to study the effects of                 generated termination signal, which reflects if LLM
+memory management on long-term agent perfor-                   considers the task to be completed. For the strict
+mance. We first generate an implicit weight vector             evaluator, we use exact match to determine whether
+w ∈ R6 , and the task is to predict the correct out-           the generated answer is correct. For input similar-
+put y = w⊤ x by retrieving the six most relevant               ity, we take the highest cosine similarity between
+demonstrations from memory. Specifically, we gen-              the text embedding of all retrieved experiences
+erate 100 input vectors x sampled from three Gaus-             and the task. For output similarity, we use the
+sian distributions N (µ, 1) with µ ∈ −0.5, 0, 0.5,             pycode_similar package3 to detect the code plagia-
+each of six dimensions, and compute y = w⊤ x + ϵ,              rism score between the execution from the retrieved
+where ϵ is bounded noise within [−1, 1]. These                 memory with the highest input similarity and the
+pairs form the initial memory bank. During actual              current model execution. For periodic deletion, we
+execution, we collect 4000 input–output pairs from             use a period of 200 and α = 0. For history-based
+the same three distributions. A prediction ŷ is con-          deletion, we set the minimal deleting frequency to
+sidered successful if |ŷ − y| ≤ 1, and we use the             5 and the threshold β to 0.3 for the coarse evaluator
+success rate as the primary performance metric.                using GPT-4o-mini and GPT-4.1-mini, and 0.7 for
+   For retrieval, input similarity is measured by co-          the strict and GPT-4.1-mini fine-tuned evaluator.
+sine similarity between input vectors, while out-              The combined deletion reuses all hyperparameters
+put similarity is defined as output_similarity =               above.
+exp(−γ|x1 − x2 |2 ), where γ = 1.0.
+                                                               AgentDriver Following AgentDriver (Mao et al.,
+   This task is highly controllable and well-suited
+                                                               2024), we adopt an LLM-based autonomous driv-
+for our study, as it (1) relies solely on the retrieved
+                                                               ing agent that integrates common sense and expe-
+demonstrations, (2) allows the agent to either rea-
+                                                               riential knowledge into memory records. We use
+son or directly mimic the demonstrations to pro-
+                                                               the nuScenes dataset (Caesar et al., 2020) and ran-
+duce outputs, and (3) enables clear definitions of
+                                                               domly sample 2,000 test cases from its test split.
+error and addition criteria.
+                                                               The initial memory contains 180 experiences ran-
+   For evaluation, the strict evaluator applies a              domly drawn from the nuScenes training set.
+threshold of 1.0 on the absolute error between pre-
+                                                                  For the retrieval strategy, the original retrieval
+diction and ground truth. Coarse evaluators use
+                                                               pipeline proposed by (Mao et al., 2024) consists of
+thresholds of 1.6 (C1), 1.4 (C2), and 1.2 (C3), re-
+                                                               a two-step process: first, selecting the top-3 experi-
+spectively. Periodic deletion is performed with
+                                                               ences based on vector similarity, and then prompt-
+500 steps with α = 0. History-based deletion is ap-
+                                                               ing an LLM to choose the most relevant one. To
+plied with a minimum deletion frequency of 5 and a
+                                                               improve reproducibility, we simplify this process to
+threshold β = 0.5 across all setups. The combined
+                                                               a single-step retrieval, selecting only the top-1 ex-
+deletion strategy reuses all hyperparameters above.
+                                                               perience based on vector similarity. For the coarse
+We also list the task prompt in Appendix A.2
+                                                               evaluator, we employ an LLM to assess the quality
+EHRAgents Following EHRAgent (Shi et al.,                      of retrieved experiences. The LLM outputs either
+2024), our agent is a code-generation system that              “yes” or “no” to indicate whether a given experience
+enables clinicians to interact with electronic health          is a “good” experience or a “bad” one. The prompt
+records (EHRs) through natural language queries.               used for this LLM-based evaluation is provided in
+We adopt the MIMIC-III dataset (Johnson et al.,                Appendix A.4. For the strict evaluator, we measure
+2016) for evaluation. After filtering out duplicated           the UniAD 3-second average L2 distance between
+and unanswerable entries, we obtain 2,392 tasks in             the predicted trajectory and the ground truth. Expe-
+total. During each test query, the agent retrieves             riences with an L2 error lower than 2.5 are added to
+four past experiences from an initial memory bank              the memory bank. For input similarity, we adhere
+containing 100 records, based on maximum cosine                to the computation method from the original paper.
+similarity computed using a general text embed-                   3
+                                                                      https://github.com/fyrestone/pycode_similar.
+ding model. We report task performance in terms                git
+
+
+                                                          11
+                               Table 3: Details of Agents and Their Functionality
+
+                                                                                      Retrieve
+  Agent Name     Task                    Input           Output                                            #Experiences
+                                                                                      Feature
+    RegAgent     Regression prediction   Input vector    Output number                Input vector              6
+                                         Task                                         Text
+   EHRAgents     EHR tasks                               Code                                                   4
+                                         text query                                   embedding
+                 Autonomous              Vehicle                                      Ego state, goal,
+   AgentDriver                                           Predicted trajectory                                   1
+                 Driving                 state data                                   history trajectory
+                 IoT Traffic Detection   IoT packet      Reasoning and prediction
+ CIC-IoT Agent                                                                        IoT features              3
+                 (8 categories)          data            attack type
+
+
+
+Specifically, we compute the exponential negative             Agent on the CIC-IoT dataset, randomly sampling
+L2 distance between the query vector and stored               1,000 test cases from its training split. During each
+experiences, using the same coefficients as in (Mao           execution, the agent retrieves three past experiences
+et al., 2024). For output similarity, we compute              using a feature-based similarity approach. The ini-
+the radial basis function (RBF) kernel between the            tial memory bank is initialized with 100 synthetic
+predicted trajectory and the ground-truth trajectory.         records generated by GPT-4o-mini from a disjoint
+The similarity score is calculated with the same              training subset. We report task performance in
+formula in RegAgent:                                          terms of accuracy (ACC).
+                                                                 For the text encoder, we use OpenAI text-
+                                                              embedding-3-large. For the coarse evaluator, simi-
+   output_similarity = exp −γ∥v1 − v2 ∥2 .
+                                        
+                                                              lar to AgentDriver, we employ an LLM to assess
+                                                              the quality of the experiences. The prompt for the
+   In our experiments, we set γ = 1.0. For peri-              CIC-IoT Agent’s LLM evaluator is provided in Ap-
+odic deletion, we apply a deletion period of 500              pendix A.4. For the strict evaluator, we use string
+steps with a threshold of α = 0. For history-based            matching to check if the ground-truth is contained
+deletion, we set a threshold of 5.0 for the UniAD             in the generated answer. For input similarity, we
+3-second average L2 distance. An experience is                use a feature-based approach. Specifically, we com-
+deleted if it has been retrieved at least 3 times and         pute the relative change across all features and take
+the mean UniAD 3-second average L2 distance                   the average. For continuous features, the relative
+across all retrievals exceeds this threshold. Coarse          change between two inputs, input1 and input2 ,
+deletion leverages the predicted success rate from            for feature fi is computed as:
+the coarse evaluator and deletes a record if the accu-
+mulated success rate is less than 0.5. The combined                               |input1 (fi ) − input2 (fi )|
+deletion mechanism incorporates all the aforemen-               Scont (fi ) =
+                                                                                max(|input1 (fi )|, |input2 (fi )|)
+tioned hyperparameters.
+CIC-IoT Following the setup in the CIC-IoT                    For discrete features, we define the relative change
+benchmark (Neto et al., 2023), we implement a                 as follows:
+network traffic detection agent designed to predict                          (
+traffic types from IoT packet features. The orig-                             0,     if input1 (fi ) = input2 (fi )
+                                                               Sdisc (fi ) =
+inal CIC-IoT dataset contains 34 attack classes.                              1,     otherwise
+Since our implementation relies solely on single-
+flow features, we exclude categories that cannot be           For output similarity, we calculate the embedding
+distinguished based on such features. For exam-               similarity. For periodic deletion, we set a cycle of
+ple, we retain DDoS- HTTP_Flood while removing                500 steps, and α = 1. For history-based deletion,
+DoS- HTTP_Flood due to their high similarity un-              we set the experience quality threshold β = 0.7.
+der single-flow representations. After filtering, we          If an experience is retrieved 3 or more times and
+retain 8 representative classes that remain distin-           the average score of all test samples when using
+guishable using single-flow features, and construct           this experience falls below 0.7, the experience is
+each test query by formatting these features into a           removed. The combined deletion strategy reuses
+predefined prompt template. We evaluate CIC-IoT               all the hyperparameters mentioned above.
+
+                                                         12
+A.2   RegAgent design                                       User Prompt
+
+                                                            Flow duration [description: Duration of the
+Below is the user prompt used for the RegAgent              packet’s flow]: {flow_duration}
+task.                                                       Header Length [description:          Header
+                                                            Length]: {Header_Length} bytes
+                                                            Protocol Type [description: IP, UDP,
+   User Prompt
+                                                            TCP, IGMP, ICMP, Unknown (Integers)]:
+   You are given a 6-dimensional input vector               {Protocol_Type}
+   x. Predict y = wT x with an unknown w.                   Duration [description: Time-to-Live (ttl)]:
+   You will see K demonstrations of (input,                 {Duration}
+   guess) pairs that use the same w but may                 Rate [description: Rate of packet transmis-
+   contain noise in all demonstrations.                     sion in a flow]: {Rate}
+   You need to strictly follow the output                   Srate [description: Rate of outbound
+   content and format of the demonstrations,                packets transmission in a flow]: {Srate}
+   which is Guess:                                          Drate [description: Rate of inbound packets
+   boxed{{<number>}} without any other                      transmission in a flow]: {Drate}
+   text.                                                    Number of FIN flags [description: FIN flag
+   Demonstrations (K=k): {demonstrations}                   value]: {fin_flag_number}
+   Now solve for the new input.                             Number of SYN flags [description: SYN
+   Input: {x} Guess:                                        flag value]: {syn_flag_number}
+                                                            Number of RST flags [description: RST
+                                                            flag value]: {rst_flag_number}
+                                                            Number of PSH flags [description: PSH
+                                                            flag value]: {psh_flag_number}
+A.3   CIC-IoT Agent design
+                                                            Number of ACK flags [description: ACK
+                                                            flag value]: {ack_flag_number}
+Below is the user prompt used in CIC-IoT Agent to           Number of ECE flags [description: ECE
+incorporate IoT packet data and all possible traffic        flag value]: {ece_flag_number}
+types.                                                      Number of CWR flags [description: CWR
+                                                            flag value]: {cwr_flag_number}
+                                                            Number of ACK packets [description:
+   User Prompt                                              Number of packets with ACK flag set in the
+   Based on the following features, determine               same flow]: {ack_count}
+   the most likely traffic type from the list be-           Number of SYN packets [description:
+   low:                                                     Number of packets with SYN flag set in the
+   * Pay special attention to cross-field consis-           same flow]: {syn_count}
+   tency checks.                                            Number of FIN packets [description:
+   * Do not be misled by a single feature if it             Number of packets with FIN flag set in the
+   conflicts with others.                                   same flow]: {fin_count}
+   * Note: Your reasoning should be based on                Number of URG packets [description:
+   all features, not on any single field. You               Number of packets with URG flag set in
+   are allowed to select only one traffic type as           the same flow]: {urg_count}
+   your answer. If you choose more than one,                Number of RST packets [description:
+   your answer will be marked as incorrect.                 Number of packets with RST flag set in the
+   Required output format:                                  same flow]: {rst_count}
+   ANALYSIS: {your reasoning here, includ-                  HTTP traffic flag [description: Indicates
+   ing key features and justification}                      if the application layer protocol is HTTP]:
+   ANSWER: {traffic_type}                                   {HTTP}
+
+   (Continued on next page...)                              (Continued on next page...)
+
+
+
+                                                       13
+User Prompt                                            User Prompt
+
+(Continuation from previous page...)                   (Continuation from previous page...)
+HTTPS traffic flag [description: Indicates             Maximum value [description: Maximum
+if the application layer protocol is HTTPS]:           packet length in the flow]: {Max}
+{HTTPS}                                                Average value [description: Average packet
+DNS traffic flag [description: Indicates               length in the flow]: {AVG}
+if the application layer protocol is DNS]:             Standard deviation [description: Standard
+{DNS}                                                  deviation of packet length in the flow]:
+Telnet traffic flag [description: Indicates            {Std}
+if the application layer protocol is Telnet]:          Total size of the flow [description: Packet’s
+{Telnet}                                               length]: {Tot_size} bytes
+SMTP traffic flag [description: Indicates              Inter-arrival time (milliseconds) [descrip-
+if the application layer protocol is SMTP]:            tion: The time difference with the previous
+{SMTP}                                                 packet]: {IAT}
+SSH traffic flag [description: Indicates if the        Number of packets or flows [description:
+application layer protocol is SSH]: {SSH}              The number of packets in the flow]:
+IRC traffic flag [description: Indicates if the        {Number}
+application layer protocol is IRC]: {IRC}              Magnitude of the flow [description: Av-
+TCP traffic flag [description: Indicates if            erage of the lengths of incoming packets
+the transport layer protocol is TCP]: {TCP}            in the flow + average of the lengths of
+UDP traffic flag [description: Indicates               outgoing packets in the flow]: {Magnitude}
+if the transport layer protocol is UDP]:               Radius of the flow [description: Variance
+{UDP}                                                  of the lengths of incoming packets in the
+DHCP traffic flag [description: Indicates              flow + variance of the lengths of outgoing
+if the application layer protocol is DHCP]:            packets in the flow]: {Radius}
+{DHCP}                                                 Covariance of the flow [description:
+ARP traffic flag [description: Indicates if            Covariance of the lengths of incoming and
+the link layer protocol is ARP]: {ARP}                 outgoing packets]: {Covariance}
+ICMP traffic flag [description: Indicates              Variance of the flow [description: Variance
+if the network layer protocol is ICMP]:                of the lengths of incoming packets in the
+{ICMP}                                                 flow / variance of the lengths of outgoing
+IPv4 traffic flag [description: Indicates if           packets in the flow]: {Variance}
+the network layer protocol is IP]: {IPv}               Weight of the flow [description: Number
+LLC traffic flag [description: Indicates if            of incoming packets / number of outgoing
+the link layer protocol is LLC]: {LLC}                 packets]: {Weight}
+Total sum of feature values [description:              ### Traffic Types:
+Summation of packets’ lengths in the flow]:            [’DDoS-ICMP_Flood’,                  ’DDoS-
+{Tot_sum}                                              UDP_Flood’, ’DDoS-TCP_Flood’, ’DDoS-
+Minimum value [description: Minimum                    SYN_Flood’, ’DDoS-PSHACK_Flood’,
+packet length in the flow]: {Min}                      ’DDoS-RSTFINFlood’,                  ’DDoS-
+(Continued on next page...)                            HTTP_Flood’, ’BenignTraffic’]
+
+
+
+
+                                                  14
+A.4   Coarse evaluator prompts                          System Prompt
+
+                                                        (Continuation from previous page...)
+                                                        (3) FilterDB(DATABASE, CONDITIONS),
+Below is the system prompt used for our coarse          which filters the DATABASE according to
+evaluator (LLM judge) in EHRAgent:                      the CONDITIONS. The CONDITIONS is
+                                                        a string composed of multiple conditions,
+                                                        each of which consists of the column_name,
+                                                        the relation and the value (e.g., COST<10).
+   System Prompt                                        The CONDITIONS is one single string
+  You are an expert judge for Electronic                (e.g., "admissions, SUBJECT_ID=24971").
+  Health Records (EHR) database queries and             (4) GetValue(DATABASE, ARGUMENT),
+  analysis. Your task is to evaluate whether            which returns the values of the column in
+  the provided code solution and execution re-          the DATABASE. When there is no addi-
+  sult are reasonable and correct for the given         tional operations on the values, the ARGU-
+  medical database question.                            MENT is the column_name in demand. If
+  You should assess the solution based on: 1)           the values need to be returned with certain
+  **Code Quality**: Does the code use appro-            operations, the ARGUMENT is composed
+  priate database functions and follow logical          of the column_name and the operation (like
+  steps? Be lenient about minor inefficiencies          COST, sum). Please do not contain " or ’
+  or alternative valid approaches. 2) **Re-             in the argument. (5) SQLInterpreter(SQL),
+  sult Reasonableness**: Does the execution             which interprets the query SQL and re-
+  result appear plausible and well-formatted            turns the result. (6) Calendar(DURATION),
+  for the medical context? 3) **Complete-               which returns the date after the duration of
+  ness**: Does the solution address the core            time.
+  question asked? Accept solutions that may             **Available        Tables:**      admissions,
+  miss minor constraints but solve the main             chartevents,       cost,    d_icd_diagnoses,
+  problem.                                              d_icd_procedures, d_items, d_labitems,
+  **Evaluation Guidelines:** - Focus on                 diagnoses_icd, icustays, inputevents_cv,
+  whether the solution would produce a rea-             labevents,      microbiologyevents,       out-
+  sonable answer in practice - Accept alter-            putevents, patients, prescriptions, proce-
+  native valid approaches even if not optimal           dures_icd, transfers
+  - Be lenient about missing minor date fil-            **Knowledge of the Tables:** (1) Tables
+  ters if the core logic is sound - Consider the        are linked by identifiers which usually have
+  medical context - some variation in results           the suffix ’ID’. For example, SUBJECT_ID
+  is normal - Only reject solutions that are            refers to a unique patient, HADM_ID refers
+  fundamentally flawed or completely irrele-            to a unique admission to the hospital, and
+  vant                                                  ICUSTAY_ID refers to a unique admission
+  **Available Tool Functions:** (1) Cal-                to an intensive care unit. (2) Charted events
+  culate(FORMULA), which calculates                     such as notes, laboratory tests, and fluid
+  the FORMULA and returns the result.                   balance are stored in a series of ’events’
+  (2) LoadDB(DBNAME) which loads                        tables. For example the outputevents table
+  the database DBNAME and returns the                   contains all measurements related to output
+  database. The DBNAME can be one of                    for a given patient, while the labevents table
+  the following: admissions, chartevents,               contains laboratory test results for a patient.
+  cost, d_icd_diagnoses, d_icd_procedures,              (Continued on next page...)
+  d_items,      d_labitems,      diagnoses_icd,
+  icustays, inputevents_cv, labevents, mi-
+  crobiologyevents, outputevents,patients,
+  prescriptions, procedures_icd, transfers.
+  (Continued on next page...)
+
+
+                                                   15
+System Prompt                                             System Prompt
+
+(Continuation from previous page...)                      (Continuation from previous page...)
+(3) Tables prefixed with ’d_’ are dictionary              (9)     icustays:       ROW_ID,       SUB-
+tables and provide definitions for identifiers.           JECT_ID, HADM_ID, ICUSTAY_ID,
+For example, every row of chartevents is                  FIRST_CAREUNIT, LAST_CAREUNIT,
+associated with a single ITEMID which                     FIRST_WARDID,             LAST_WARDID,
+represents the concept measured, but it                   INTIME, OUTTIME (10) inputevents_cv:
+does not contain the actual name of the                   ROW_ID, SUBJECT_ID, HADM_ID,
+measurement. By joining chartevents                       ICUSTAY_ID, CHARTTIME, ITEMID,
+and d_items on ITEMID, it is possible to                  AMOUNT (11) labevents: ROW_ID,
+identify the concept represented by a given               SUBJECT_ID, HADM_ID, ITEMID,
+ITEMID.                                                   CHARTTIME, VALUENUM, VAL-
+(4) For the databases, four of them are                   UEUOM
+used to define and track patient stays:                   (12) microbiologyevents:        RROW_ID,
+admissions, patients, icustays, and transfers.            SUBJECT_ID, HADM_ID, CHARTTIME,
+Another four tables are dictionaries for                  SPEC_TYPE_DESC, ORG_NAME (13)
+cross-referencing codes against their                     outputevents: ROW_ID, SUBJECT_ID,
+respective definitions: d_icd_diagnoses,                  HADM_ID, ICUSTAY_ID, CHART-
+d_icd_procedures, d_items, and d_labitems.                TIME, ITEMID, VALUE (14) patients:
+The remaining tables, including chartevents,              ROW_ID, SUBJECT_ID, GENDER,
+cost, inputevents_cv, labevents, microbi-                 DOB, DOD (15) prescriptions: ROW_ID,
+ologyevents, outputevents, prescriptions,                 SUBJECT_ID, HADM_ID, STARTDATE,
+procedures_icd, contain data associated                   ENDDATE, DRUG, DOSE_VAL_RX,
+with patient care, such as physiological                  DOSE_UNIT_RX, ROUTE (16) pro-
+measurements, caregiver observations,                     cedures_icd: ROW_ID, SUBJECT_ID,
+and billing information. For different                    HADM_ID, ICD9_CODE, CHARTTIME
+tables, they contain the following in-                    (17) transfers: ROW_ID, SUBJECT_ID,
+formation: (1) admissions: ROW_ID,                        HADM_ID, ICUSTAY_ID, EVENT-
+SUBJECT_ID, HADM_ID, ADMITTIME,                           TYPE, CAREUNIT, WARDID, INTIME,
+DISCHTIME,            ADMISSION_TYPE,                     OUTTIME
+ADMISSION_LOCATION,                      DIS-             **Correct        Examples:**       {EHRA-
+CHARGE_LOCATION, INSURANCE,                               gent_4Shots_Knowledge}
+LANGUAGE, MARITAL_STATUS, ETH-                            Now, please judge whether the provided so-
+NICITY, AGE (2) chartevents: ROW_ID,                      lution is reasonable and correct. Please as-
+SUBJECT_ID, HADM_ID, ICUSTAY_ID,                          sume that the solution is bug-free and does
+ITEMID, CHARTTIME, VALUENUM,                              not contain any syntax errors.
+VALUEUOM (3) cost: ROW_ID, SUB-                           ### Execution to be judged: Ques-
+JECT_ID, HADM_ID, EVENT_TYPE,                             tion:{question} Knowledge:{knowledge}
+EVENT_ID, CHARGETIME, COST (4)                            Solution:{code}
+d_icd_diagnoses: ROW_ID, ICD9_CODE,                       ### Execution Result: {execution_result}
+SHORT_TITLE, LONG_TITLE (5)                               ### Your Task: Evaluate whether this solu-
+d_icd_procedures: ROW_ID, ICD9_CODE,                      tion is reasonable and correct. Consider the
+SHORT_TITLE, LONG_TITLE (6)                               medical context, database logic, and result
+d_items: ROW_ID, ITEMID, LABEL,                           plausibility.
+LINKSTO (7) d_labitems: ROW_ID,                           **Output Format:** - First line of your an-
+ITEMID, LABEL (8) dianoses_icd:                           swer: ’yes’ or ’no’ ONLY. - Following lines:
+ROW_ID, SUBJECT_ID, HADM_ID,                              briefly provide your reasoning and analysis.
+ICD9_CODE, CHARTTIME (Continued                           Your evaluation:
+on next page...)
+                                                         Below is the system and user prompt used for
+                                                       our coarse evaluator (LLM judge) in AgentDriver:
+
+                                                  16
+System Prompt                                             User Prompt
+
+You are a highly knowledgeable and rigor-                 {pred_traj}
+ous judge for autonomous driving. You are
+judging a *short-horizon* trajectory (e.g., 6             Please decide if the predicted trajec-
+steps). We only require the following:                    tory is successful under the above criteria,
+1) The predicted trajectory should *gener-                then provide your reasoning (you may use
+ally* move towards or align with the goal.                chain-of-thought).
+2) It should stay within a drivable area (i.e.,           Remember:
+allowed region).                                          - First line of your answer: ’yes’ or ’no’
+3) It should avoid collisions with other                  ONLY.
+objects.                                                  - Following lines: your reasons or chain-of-
+                                                          thought.
+Your output format:
+- First line: strictly output ’yes’ or ’no’.             Below is the user prompt used for our coarse
+- Following lines: provide your reasoning              evaluator (LLM judge) in CIC-IoT Agent:
+(Chain-of-Thought is allowed).
+Be mindful that small lateral or partial for-             User Prompt
+ward movements can be acceptable as long
+                                                          You are a strict evaluator for IoT traffic
+as the overall direction is consistent with
+                                                          classification answers. You should infer
+the planning target and safety requirements.
+                                                          the most likely label from the provided
+Our coordinate system is such that the x-
+                                                          flow-level features, then judge whether the
+axis is lateral, and the y-axis is forward.
+                                                          model’s answer is CORRECT or INCOR-
+Therefore, moving forward means an in-
+                                                          RECT.
+crease in y values.
+                                                          ### Judging Criteria The Model Answer
+Be mindful that minor lateral adjustments
+                                                          is CORRECT if its predicted label exactly
+or minimal forward movements are accept-
+                                                          matches your inferred gold label, else IN-
+able.
+                                                          CORRECT.
+If the y coordinate is increasing from
+                                                          ### Judging Steps 1) Carefully analyze key
+step to step (and there’s no collision or
+                                                          fields and reason your inferred gold label.
+out-of-lane), that may be considered a
+                                                          2) Compare the Model Answer’s label to
+success. Below are the relevant information
+                                                          your gold label.
+for this autonomous driving task:
+                                                          ### Problem: Based on the following fea-
+                                                          tures, determine the most likely traffic type
+1) Current state of the ego vehicle:
+                                                          from the list below:
+{ego_prompts}
+                                                          ### Features: problem
+                                                          ### Model Answer: {generated_answer}
+2) Perception of the environment:
+                                                          - Respond with your judgement and ex-
+{perception_prompts}
+                                                          plaination as following format.
+                                                          - First line: Respond with ’CORRECT’ or
+3) Commonsense: {commonsense_mem}
+                                                          ’INCORRECT’ only.
+                                                          - Following lines: Provide your reasoning
+4) Planning target:
+                                                          or chain-of-thought.
+{planning_target}
+                                                          Your judgement:
+5) Predicted trajectory:
+                                                       A.5   Additional setup for task distribution
+                                                             shift
+                                                       For task distribution shift, we obtain the embed-
+                                                       ding vectors for all test queries using OpenAI
+                                                       text-embedding-3-large encoder for EHRAgent,
+                                                       and the original input vector computation method
+
+                                                  17
+from AgentDriver. We then apply a Gaussian Mix-
+ture Model (GMM) to cluster the embeddings into
+three groups – each group will likely have a dis-
+tinguished task distribution. Finally, we reorder
+the test queries based on their assigned cluster la-
+bels to process the three task groups sequentially.
+This procedure forces a pronounced shift in the task
+distribution.
+
+B     Additional results
+
+B.1    Additional results on addition
+       experiments
+We present additional results for the memory addi-
+tion experiments in this section.
+
+
+
+
+                                                               Figure 9: Cumulative average output similarity vs. in-
+                                                               put similarity of different addition strategies over the
+                                                               execution on AgentDriver and CIC-IoT.
+
+
+                                                               experiments. In addition, their input similarity ver-
+                                                               sus output similarity using add strict strategies and
+                                                               show in Figure 12.
+
+
+
+
+Figure 8: Accuracy trends of different addition strate-
+gies over long-term running on EhrAgent and CIC-IoT.
+
+
+B.2 Experiments on different LLM backbones                     Figure 10: Accuracy trends of GPT-4o over long-term
+                                                               running on AgentDriver
+In this experiment, we conduct experiments with
+different LLM Agent backbones. Specifically, we
+conduct evaluation on GPT-4o and Deepseek-V3
+                                                               B.3   Error-free variant of history-based
+with fixed-memory baseline, strict addition, strict
+                                                                     deletion
+addition with history-based deletion, and strict ad-
+dition with combined deletion in Figure 11 and                 In Figure 13, we follow the procedure in Sec-
+Figure 10, respectively. Across these two mod-                 tion 3.4 to plot the history-based deletion and its
+els, we observed consistent trend within the main              error-free variant. Surprisingly, for AgentDriver,
+
+                                                          18
+Figure 11: Accuracy trends of Deepseek-V3 over long-
+term running on AgentDriver
+
+
+
+
+                                                            Figure 13: Comparison between history-based deletion
+                                                            and its error-free variants. Coarse here represents C1
+                                                            evaluator.
+Figure 12: Cumulative average output similarity
+vs. input similarity over GPT-4o-mini, GPT-4o, and          Table 4: Correctness rate (%) of deleted records and
+Deepseek-V3 using add strict in AgentDriver                 retained records for EhrAgent and CIC-IoT Agent with
+                                                            coarse evaluation.
+
+we observe that around task index 1000, the com-              Agent     Category   4o-mini   4.1-mini   4.1-mini-FT
+bined deletion with strict addition surpasses the            EhrAgent
+                                                                        Retained    44.1       49.1        54.8
+                                                                        Deleted     36.3       32.1        48.2
+performance of its error-free variant. This sug-
+gests that history-based deletion can retain mem-                       Retained    78.9       72.2        86.6
+                                                             CIC-IoT
+                                                                        Deleted     56.7       55.1        61.0
+ory entries with outputs suitable for later reuse,
+corroborating the necessity of adopting this type of
+deletion.                                                   GPT-4o-mini as the evaluator, the retained memory
+B.4   History-based deletion on different                   in AgentDriver exhibits lower average quality than
+      evaluators                                            the deleted records. We further report the correct-
+                                                            ness rates with respect to ground truth for EhrAgent
+In Figure 14, we present performance changes after          and CIC-IoT Agent, as shown in Table 4.
+history-based deletion on RegAgent and CIC-IoT
+Agent with different evaluators.                            B.6   Results under memory resource
+                                                                  constraints.
+B.5 Comparison between deleted records and
+                                                            We provide the results of the agent running under
+    retained records
+                                                            memory resource constraints in Figure 17. We
+In this section, we analyze the intrinsic quality           also provide additional results on memory resource
+differences between retained and deleted memory             constraints with different memory limitation sizes
+records. Figure 15 presents results for the Coarse 1        in Figure 18.
+and Coarse 2 evaluators under history-based dele-
+tion, while Figure 16 shows results across all eval-
+uators for AgentDriver. Interestingly, when using
+
+                                                       19
+Figure 14: Performance comparison after applying
+history-based deletion with different evaluators.
+
+
+
+
+                                                                Figure 16: Comparison between deleted records and re-
+Figure 15: Comparison between deleted and retained              tained records for AgentDriver. Lower error represents
+records for RegAgent under history-based deletion. The          better execution quality.
+top figure shows results with Coarse 1.2, and the bottom
+figure shows results with Coarse 1.4. Lower absolute
+error represents better execution quality.
+
+
+                                                           20
+Figure 17: Comparison of unlimited memory size versus
+a limited memory size for strict and coarse selective
+addition with combined deletion. Coarse here denotes
+the C1 evaluator.
+
+
+
+
+Figure 18: Different limited sizes versus the perfor-
+mance of AgentDriver. The horizontal dashed lines
+are their corresponding unlimited variant performance.
+Coarse here denotes the C1 evaluator.
+
+
+
+
+                                                         21
+

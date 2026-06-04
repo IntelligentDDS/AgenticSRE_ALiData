@@ -1,0 +1,17 @@
+graph TB
+    subgraph Agent["LLM-based Agent"]
+        direction TB
+        P["🔍 感知模块<br/>Perception"]
+        B["🧠 推理引擎<br/>LLM Brain"]
+        A["⚡ 行动模块<br/>Action"]
+        M["💾 记忆模块<br/>Memory"]
+    end
+    
+    E["🌐 外部环境<br/>APIs / Tools / DBs"]
+    
+    E -->|观测| P
+    P -->|结构化输入| B
+    B -->|决策| A
+    A -->|执行| E
+    B <-->|读写| M
+    E -->|反馈| P

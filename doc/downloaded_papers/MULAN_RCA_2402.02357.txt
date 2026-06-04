@@ -1,0 +1,701 @@
+                                        Multi-modal Causal Structure Learning and Root Cause Analysis
+                                                                    Lecheng Zheng1,2,∗ , Zhengzhang Chen1,† , Jingrui He2 , Haifeng Chen1
+                                                                          1 NEC Laboratories America, 2 University of Illinois at Urbana-Champaign
+
+                                                                                  {lecheng4,jingrui}@illinois.edu,{zchen,haifeng}@nec-labs.com
+
+                                        ABSTRACT                                                                  Table 1: Abnormal patterns in multi-modal data for different
+                                                                                                                  system failures. ‘-’ indicates no detected unusual patterns.
+                                        Effective root cause analysis (RCA) is vital for swiftly restoring ser-
+                                        vices, minimizing losses, and ensuring the smooth operation and
+                                        management of complex systems. Previous data-driven RCA meth-                 System Fault Type          System Metric           System Log
+                                        ods, particularly those employing causal discovery techniques, have         Database Query Failure             -                Error/Warning
+                                        primarily focused on constructing dependency or causal graphs for               Login Failure                  -                Error/Warning
+
+
+
+
+arXiv:2402.02357v1 [cs.LG] 4 Feb 2024
+                                        backtracking the root causes. However, these methods often fall                 DDoS Attack           High CPU Utilization            -
+                                        short as they rely solely on data from a single modality, thereby              Disk Space Full        High Disk Utilization     Error/Warning
+                                        resulting in suboptimal solutions.
+                                           In this work, we propose MULAN, a unified multi-modal causal
+                                        structure learning method for root cause localization. We lever-          and the associated KPIs so that the operators can trace back to the
+                                        age a log-tailored language model to facilitate log representation        underlying causes by utilizing these established causal graphs. For
+                                        learning, converting log sequences into time-series data. To ex-          instance, in [21], historical multivariate metric data was leveraged
+                                        plore intricate relationships across different modalities, we pro-        to construct causal graphs through conditional interdependence
+                                        pose a contrastive learning-based approach to extract modality-           tests, followed by the application of causal intervention techniques
+                                        invariant and modality-specific representations within a shared           to pinpoint the root causes within a microservice system. Further-
+                                        latent space. Additionally, we introduce a novel key performance          more, Wang et al. [46, 47] introduced a hierarchical graph neural
+                                        indicator-aware attention mechanism for assessing modality re-            networks based approach to construct interdependent causal net-
+                                        liability and co-learning a final causal graph. Finally, we employ        works, facilitating the localization of root causes.
+                                        random walk with restart to simulate system fault propagation                However, these methods rely solely on data from a single modal-
+                                        and identify potential root causes. Extensive experiments on three        ity, thus failing to capture the intricacies of various abnormal pat-
+                                        real-world datasets validate the effectiveness of our proposed frame-     terns associated with system failures, ultimately resulting in sub-
+                                        work.                                                                     optimal solutions. Table 1 illustrates an example of anomalous
+                                                                                                                  information found in multi-modal data related to different types
+                                        KEYWORDS                                                                  of system failures. Some system failures, such as Database Query
+                                        Root Causal Analysis, Causal Structure Learning, Multi-modal              Failures or Login Failures, may easily elude detection if we do not
+                                        Learning, Large Language Model, Contrastive Learning, Log Anal-           harness system logs to pinpoint their root causes. Conversely, sys-
+                                        ysis, System Diagnosis, Microservice Systems                              tem metrics and logs collectively contribute to the localization of
+                                                                                                                  system faults like “Disk Space Full”. Leveraging multi-modal data
+                                        1    INTRODUCTION                                                         empowers us to gain a deeper and more thorough insight into
+                                                                                                                  system failures, emphasizing the critical importance of adopting a
+                                        Root Cause Analysis (RCA) plays a critical role in identifying the
+                                                                                                                  more holistic approach to root cause analysis.
+                                        origins of system failures. A fault within any real-world complex
+                                                                                                                     In recent years, multi-modal learning has emerged as a promising
+                                        system can severely impact user experience and lead to substantial
+                                                                                                                  way in modeling diverse modalities across various domains, such as
+                                        financial losses. To ensure the reliability and robustness of complex
+                                                                                                                  natural language processing [16, 25], information retrieval [15, 31],
+                                        systems, key performance indicators (KPIs) like latency, metrics
+                                                                                                                  and computer vision [28, 36, 57]. Despite its prevalence, multi-
+                                        data such as CPU/memory usage, and log data including pod-level
+                                                                                                                  modal learning for RCA is still largely unexplored. Recent multi-
+                                        Kubernetes entries are often collected and analyzed. However, the
+                                                                                                                  modal RCA approaches [18, 54] primarily aim to extract information
+                                        complexity of these systems combined with the vast amount of
+                                                                                                                  from individual modalities, often missing the potential interplay
+                                        monitoring data can make manual root cause analysis both costly
+                                                                                                                  between them. This oversight is particularly significant, given that
+                                        and error-prone. Thus, a swift and effective root cause analysis,
+                                                                                                                  studies on non-RCA multi-modal algorithms [52, 53, 60, 63] empha-
+                                        enabling rapid service recovery and minimizing losses, is vital for
+                                                                                                                  size the pivotal role of harnessing relationships between modalities
+                                        the consistent operation and management of expansive, intricate
+                                                                                                                  to optimize generalization outcomes.
+                                        systems.
+                                                                                                                     Enlightened by multi-modal learning, this paper aims to propose
+                                           Previous data-driven RCA studies, particularly those employ-
+                                                                                                                  a multi-modal causal structure learning method for identifying root
+                                        ing causal discovery techniques, have primarily focused on the
+                                                                                                                  causes in complex systems. Formally, given the system KPI data
+                                        construction of dependency/causal graphs. These graphs capture
+                                                                                                                  and the multi-modal microservice data including metrics and log
+                                        the causal relationships between various entities within a system
+                                                                                                                  data, our goal is to learn a multi-modal causal graph to identify the
+                                        ∗ Work done during an internship at NEC Laboratories America.             top 𝑘 system entities that are most relevant to system KPI. There
+                                        †Corresponding author.                                                    are three major challenges in this task:
+Conference’17, July 2017, Washington, DC, USA                                                                                      Lecheng Zheng et al.
+
+
+• C1: Learning effective representation of system logs for                The subsequent sections of this paper are organized as follows:
+  causal graph learning. Traditional methods for learning causal          After presenting the background and preliminary information in
+  graphs encounter difficulties when directly applied to system           Section 2, we introduce our proposed multi-modal root cause anal-
+  log data. Simply extracting statistical features overlooks the rich     ysis framework in Section 3. Section 4 details the evaluation of our
+  semantic information within the log messages. An intriguing             framework on real-world datasets, and the paper concludes with
+  approach is to employ language models to derive semantic in-            Section 5.
+  sights. However, unstructured system logs significantly differ
+  from standard textual data. They lack formal grammar rules              2   PRELIMINARIES
+  and extensively employ special tokens. This divergence poses a          Key Performance Indicator (KPI). A KPI represents time series
+  considerable challenge when attempting to extract contextual            data that evaluates the efficiency and efficacy of a system architec-
+  information from log data using existing language models.               ture. For instance, latency and service response time are two com-
+• C2: Learning causal structure from multi-modal data. Rely-              mon KPIs used in microservice systems. A large value of latency or
+  ing solely on the extraction of common information may inad-            response time usually indicates a low-quality system performance
+  vertently overlook critical insights unique to a single modality,       or even a system failure.
+  potentially resulting in the failure to identify certain root causes.   Entity Metrics. Entity metrics typically refer to the set of mea-
+  To enhance the applicability and robustness of the multi-modal          surable attributes that give insight into the behavior and health
+  RCA approach, the challenge is how to capture both modality-            of individual services (or entities) in a system. The system entity
+  invariant information and modality-specific information and de-         could be a physical machine, container, virtual machine, pod, etc.
+  termine the corresponding effects associated with system failure.       For example, some common entity metrics in a microservice system
+• C3: Assessing modality reliability. Data collected for root             include CPU utilization, Memory utilization, disk IO utilization, etc.
+  cause analysis often includes noisy metrics or overwhelming             These entity metrics are essentially time series data. An abnormal
+  redundant log messages. This can obscure crucial patterns, mak-         system entity is usually a potential root cause of a system failure.
+  ing it a challenging task to identify significant events within the     Causal Structure Learning for Time Series Data. Existing causal
+  noise. However, existing methods typically treat both modalities        structure learning methods for time series data can be classified into
+  equally important, thus suffering from the low-quality modality         four categories [2] including constrained-based methods [20, 32, 43],
+  scenario. Consequently, it becomes imperative to re-weight the          score-based methods [21, 26, 45–47], noise-based method [9, 24, 34],
+  importance of each modality in noisy scenarios.                         and other uncategorized methods [10, 19]. Our work belongs to
+   To tackle these challenges, in this paper, we propose MULAN,           the score-based category, which leverages the Vector Autoregres-
+a MULti-Modal CAusal Structure LearNing method for root cause             sion (VAR) Model [40] to model multi-modal causal relationships
+localization. MULAN consists of four major modules: 1) Represen-          between different system entities.
+tation Extraction via Log-Tailored Language Model; 2) Contrastive            One branch of score-based methods [21, 33, 45, 47] aim to utilize
+Multi-modal Causal Structure Learning; 3) Causal Graph Fusion             𝑝-th order VAR Model to capture the relationship between different
+with KPI-Aware Attention; and 4) Network Propagation based Root           system entities as they change over time. Given the 𝑇 -length time-
+Cause Localization. Specifically, the initial step of MULAN is ded-       series data 𝑿 = {𝒙 0, ..., 𝒙𝑇 }, these methods utilize the 𝑝-th order
+icated to extracting effective log representations, converting log        data before the 𝑡-th timestamp to predict the value at the timestamp
+sequences into time-series data to facilitate causal graph genera-        𝑡 via the VAR model as follows:
+tion from system logs. To explore the relationships among different                        𝒙𝑡 = 𝑨1 𝒙𝑡 −1 + · · · + 𝑨𝑝 𝒙𝑡 −𝑝 + 𝜖𝑡
+modalities, we introduce a contractive learning-based method that
+extracts both modality-invariant and modality-specific representa-        where 𝒙𝑡 ∈ R𝑛−1 , 𝑛 − 1 is the number of entities, 𝑝 denotes the time-
+tions through node-level contrastive regularization and edge-level        lagged order, 𝑨𝑝 ∈ R𝑛−1×𝑛−1 is the weight matrix at the 𝑝-th time-
+regularization. In the third module, a novel KPI-aware attention          lagged order, and 𝜖𝑡 ∈ R𝑛−1 is the error variables. The underlying
+mechanism is designed to evaluate the reliability of each modal-          intuition is to predict the future value at the 𝑡-th timestamp by
+ity and fuse the final causal graph, ensuring the robustness of the       utilizing the last 𝑝-length historical values.
+root cause analysis model, especially in the presence of low-quality         Inspired by the message-passing mechanism of the graph neural
+modalities. Finally, we employ random walk with restart to simulate       network [23, 44, 50], [47] combined the VAR model with the graph
+the propagation of a system fault and identify the root causes. Ex-       neural network to capture the non-linear relationship between
+tensive experimental results with real-world datasets demonstrate         different system entities by:
+the effectiveness of our proposed framework.                                                               ∑︁
+   Our main contributions are summarized below:                                                   𝑿˜ = 𝑓 (    𝑨𝑿ˆ 𝑝 ; 𝜃 ) + 𝜖                (1)
+                                                                                                          𝑝
+     • A novel unified framework for the multi-modality root cause
+       analysis method for identifying the root cause.                    where 𝑿˜ ∈ R (𝑛−1) ×𝑚 denotes the future data, 𝑚 = 𝑇 −𝑝 +1 denotes
+     • A novel KPI-aware attention to alleviate the issue of low-         the length of the effective timestamp, 𝑨 ∈ R (𝑛−1) × (𝑛−1) is the
+       quality modality and ensure the robustness of the proposed         learnable weight matrix shared across different 𝑝, 𝑿ˆ 𝑝 ∈ R (𝑛−1) ×𝑚
+       method.                                                            is the 𝑝-lagged historical data and 𝜽 is the parameters of the graph
+     • Experimental results on real-world data sets demonstrating         neural networks 𝑓 . Notice that different from the traditional graph
+       the effectiveness and efficiency of the proposed framework.        neural network where the adjacency matrix is given, in Equation. 1,
+Multi-modal Root Cause Analysis                                                                                      Conference’17, July 2017, Washington, DC, USA
+
+
+𝑨 is also a learnable adjacency matrix aiming to capture the non-                     Phase 1: We utilize an existing log parsing tool (e.g., Drain) to
+linear relationship between system entities. Therefore, [47] aimed                    transform unstructured system logs into structured log messages,
+to minimize the following loss:                                                       represented as log templates.
+                                                                                      Phase 2: The entire system logs are partitioned into multiple time
+                                       𝑨𝑿ˆ 𝑝 ; 𝜃 )|| 2 )
+                                    ∑︁
+                    min(|| 𝑿˜ − 𝑓 (                             (2)                   windows with fixed sizes. For each time window, we assemble a log
+                                          𝑝                                           sequence 𝑿𝑖,𝑗𝐿 , 𝑗 ∈ [0,𝑇 ] for the 𝑖-th entity. These sequences consist
+
+   Note that these methods [33, 45, 47] are designed for one single                   of unique log templates that occur within that specific time range.
+modality and simply extending it to include multiple modalities                       Rather than treating individual words in log templates as tokens, we
+would result in the sub-optimal performance, which is validated in                    treat each event template as a token, and the log templates within
+the experiment (i.e., Subsection 4.4.1 and Subsection 4.4.2).                         a sequence are organized based on their first appearance times-
+Problem Statement. Let X 𝑀 = {𝑿 0𝑀 , ..., 𝑿𝑎𝑀 } denotes 𝑎 multi-                      tamp in ascending order. This strategy significantly reduces the
+                                                                                      token count and minimizes the maximum sequence length, which
+variate time series metric data. The 𝑖-th metric data is 𝑿 𝑀     𝒊 =
+  𝑀 , ..., 𝒙 𝑀 ] ∈ R (𝑛−1) ×𝑇 , the unstructured system logs 𝑿 𝐿 , and
+                                                                                      speeds up the training process. Moreover, it enables the encoding
+[𝒙𝑖,0       𝑖,𝑇                                                                       of semantic information into representations and models the re-
+system key performance indicator y ∈ R𝑇 , the goal is to construct a                  lationships among log templates within a log sequence. We also
+causal graph G = {𝑽, 𝑨}∗ to identify the top 𝑘 system entities that                   consider the frequency of each unique log template, assuming that
+are most relevant to y, where 𝑽 is the set of vertices, 𝑨 ∈ R𝑛×𝑛 is the               more frequently occurring log event templates carry more impor-
+adjacency matrix, 𝑛 is the number of entities plus the system KPI,                    tant information. This assumption proves useful in dealing with
+and 𝑇 is the length of time series. For simplicity, we concatenate                    certain failure cases, such as DDoS attacks. In the event of a DDoS
+the 𝑖-th system metric and KPI together 𝑿𝑖𝑀 = [𝑿𝑖𝑀 ; y] ∈ R𝑛×𝑇 †                      attack, the frequency of certain log templates may suddenly and
+to illustrate our model.                                                              dramatically increase, indicating unusual behavior. To address this,
+                                                                                      we include the frequency right after each log template, providing
+3     METHODOLOGY                                                                     extra information for monitoring unusual patterns in potential fail-
+We present MULAN, a multi-modality causal structural learning                         ure cases. Additionally, we leverage log-based anomaly detection
+method for root cause analysis. As illustrated in Figure 1, MULAN                     algorithms (e.g., OC4Seq [51] or Deeplog [13]) to measure the anom-
+includes four key modules: (1) representation extraction via log-                     aly score denoted as 𝑦𝑙𝑜𝑔 . This score is used as label information
+tailored language model; (2) contrastive multi-modal causal struc-                    to assist language models in learning better representations. The
+ture learning; (3) causal graph fusion with KPI-aware attention;                      objective function is formulated as follows:
+and (4) network propagation based root cause localization.
+                                                                                                                                              )|| 2            (3)
+                                                                                                                       𝑙𝑜𝑔         𝐿      𝐿
+                                                                                                        L𝑙𝑜𝑔 = E𝑖,𝑗 ||𝑦𝑖     − 𝑓 (𝑿𝑖,𝑗 , 𝒄𝑖,𝑗
+3.1     Representation Extraction via Log-tailored
+        Language Model                                                                where 𝒄𝑖,𝑗
+                                                                                             𝐿 denotes a list of the frequency of the unique log templates
+
+The first step of MULAN is to transform raw system logs into                          within a log sequence 𝑿𝑖,𝑗   𝐿 , and 𝑓 (·) is the proposed language model
+time series data, making it easier to generate causal graphs from                     that predicts the anomaly score.
+these logs. The main challenge is how to effectively learn high-                      Phase 3: We train a regression-based language model by optimizing
+quality representations from these unstructured system logs (i.e.,                    L𝑙𝑜𝑔 (Eq. 3). The core of our proposed language model consists
+challenge C1 in Section 1). A straightforward method involves                         of a bidirectional transformer, followed by a one-layer multilayer
+fine-tuning a pre-trained large language model with system logs to                    perceptron for predicting the anomaly scores. We then employ this
+generate representations for log sequences. However, it’s essential                   model to generate the representation of the special token [CLS],
+to understand that system logs are quite different from traditional                   which serves as the representation of the log sequence 𝒙𝑖,𝑗       𝐿 ∈ R𝑑
+textual data. They lack formal grammar rules, make extensive use                      for the 𝑖-th entity at the 𝑗-th time window. Note that the feature
+of special tokens, and lack a structured format, which makes it                       dimension, typically 𝑑 = 768 in traditional large language models,
+challenging to extract the necessary contextual information. As a                     can be further reduced using feature reduction techniques like
+result, merely fine-tuning pre-trained language models on system                      PCA [1]. This reduction can potentially bring the dimension down
+logs often leads to suboptimal representations. On the other hand,                    to a much lower value (e.g., 𝑑 = 1 in this paper), facilitating the
+it’s vital to extract semantic information from log event content to                  causal structure learning process. Therefore, for the 𝑖-th system
+obtain high-quality representations[55]. Unfortunately, most exist-                   entity, we obtain 𝑿ˆ 𝑖𝑳 = {𝒙𝑖,0   𝐿 , ..., 𝒙 𝐿 } ∈ R𝑇 . The structured log
+ing approaches [13, 51] fail to capture such important information,                                                               𝑖,𝑇
+                                                                                      representations for the 𝑛 − 1 other system entities are denoted as
+thus suffering from the performance degradation.
+                                                                                      𝑿ˆ 𝑳 = [𝑿ˆ 0𝑳 ; ...; 𝑿ˆ 𝑛−1
+                                                                                                              𝑳 ] ∈ R (𝑛−1) ×𝑇 . Similarly, we concatenate the
+    To address the challenge C1, we introduce a log-tailored lan-
+                                                                                      system log and KPI together 𝑿ˆ 𝐿 = [𝑿ˆ 𝐿 ; y] ∈ R𝑛×𝑇 .
+guage model (as illustrated in Figure 2). This model unfolds in three
+key phases:
+                                                                                      3.2    Contrastive Multi-modal Causal Structure
+∗ Note that the causal graph G consists of two types of nodes, including the system
+                                                                                             Learning
+entities and the system KPI.                                                          As previously mentioned, existing methods [29, 35, 47, 54] often
+† For ease of explanation, we use one system metric to introduce our model.           struggle to handle multi-modal data or fail to effectively correlate
+Conference’17, July 2017, Washington, DC, USA                                                                                      Lecheng Zheng et al.
+
+
+
+
+Figure 1: The overview of the proposed framework MULAN. It consists of four main modules: representation extraction via
+log-tailored language model, contrastive multi-modal causal structure learning, causal graph fusion with KPI-aware attention,
+and network propagation-based root cause localization.
+
+
+
+
+Figure 2: The overview of log representation extraction. It first uses a log parser to extract the log templates. The inputs of the
+language model are log sequences, where unique log templates are followed by their frequencies within a fixed time window.
+The label information (i.e., scores) are obtained through anomaly detection methods to guide the log sequence representation
+learning. [CLS] is a special token used for downstream tasks.
+
+
+different modalities, resulting in suboptimal solutions. Furthermore,      Here, we employ GraphSage [17] as the backbone for both 𝐸𝑐𝑣
+exclusively extracting modality-invariant information may lead to       and 𝐸𝑠𝑣 to extract modality-invariant representation and modality-
+a loss of valuable insights within individual modalities. To address    specific representation, respectively. And 𝑀𝐿𝑃 𝑣 (·) is a Multi-Layer
+this challenge (i.e., challenge C2 in Section 1), we propose a con-     Perception (MLP) used to map the representation 𝑅𝑐𝐿 and 𝑅𝑐𝑀 to
+trastive learning based method for extracting both the modality-        another latent space to get the entity representations. It’s important
+invariant representation and the modality-specific representation       to note that, in contrast to traditional graph neural networks, where
+via encoder-decoder pairs.                                              the adjacency matrix is predefined, in Eq. 4, 𝑨𝑣 is also a learnable
+Contrastive Learning-based Encoders. Given the system met-              adjacency matrix designed to capture the non-linear relationships
+ric data 𝑿ˆ 𝑀 = 𝑿 𝑀 ∈ R𝑛×𝑇 and the system log representation            among system entities.
+𝑿ˆ 𝑳 ∈ R𝑛×𝑇 , we first extract both modality-invariant and modality-       To ensure mutual information agreement between the modality-
+specific representation by:                                             invariant representations extracted from both metric and log data,
+                                                                        we propose maximizing the mutual information between these two
+                         𝑹𝑐𝑣 = 𝐸𝑐𝑣 ( 𝑿ˆ 𝑣 , 𝑨𝑣 )                        representations using contrastive learning regularization[58, 59,
+                         𝑹𝑠𝑣 = 𝐸𝑠𝑣 ( 𝑿ˆ 𝑣 , 𝑨𝑣 )                        61]:
+                                                                  (4)
+                                                                                                      1 ∑︁ sim(𝐻𝑖 , 𝐻𝑖 )
+                                                                                                         𝑛           𝑀    𝐿
+                         𝑹𝑐 = 𝛼 𝑹𝑐𝐿 + (1 − 𝛼)𝑹𝑐𝑀
+                                                                                          L𝑛𝑜𝑑𝑒 = −                                         (5)
+                                                                                                      𝑛 𝑖=1 𝑘 sim(𝐻 , 𝐻 𝐿 )
+                                                                                                             Í         𝑀
+                         𝑯 𝑣 = 𝑀𝐿𝑃 𝑣 (𝑹𝑐𝑣 )                                                                            𝑖    𝑘
+
+where 𝑣 ∈ {𝑀, 𝐿} represents the two modalities, 𝑹𝑐𝑣 ∈ R𝑛×𝑚×𝑑1 de-                            𝐻𝑖𝑀 (𝐻𝑘𝐿 )𝑇
+                                                                        where sim(𝐻𝑖𝑀 , 𝐻𝑘𝐿 ) =            is the cosine similarity measure-
+notes the modality-invariant representation extracted from the 𝑣-th                          |𝐻𝑖𝑀 | |𝐻𝑘𝑀 |
+modality, 𝑹𝑠𝑣 ∈ R𝑛×𝑚×𝑑1 represents the modality-specific represen-      ment between two entity representations 𝐻𝑖𝐿 and 𝐻𝑘𝑀 .
+tation from the 𝑣-th modality, and 𝑚 is the length of the effective        To ensure that there is no information overlapping between
+timestamps. 𝑹𝑐 is the combined modality-invariant representation,       the modality-invariant and modality-specific representations, we
+𝑯 𝑣 ∈ R𝑛×𝑑2 can be viewed as the entity representations, while 𝑑 1      leverage the orthogonal constraint [48], defined as:
+and 𝑑 2 denote the hidden feature dimensions. And 𝛼 ∈ [0, 1] is a                                           𝑛
+constant parameter balancing two modality-invariant representa-                                                       𝑣 𝑇 𝑣 2
+                                                                                                    ∑︁     ∑︁
+                                                                                        L𝑜𝑟𝑡ℎ =                   ||(𝑹𝑠,𝑖 ) 𝑹𝑐,𝑖 || 𝐹               (6)
+tions.                                                                                            𝑣 ∈ {𝑀,𝐿} 𝑖=1
+Multi-modal Root Cause Analysis                                                                                      Conference’17, July 2017, Washington, DC, USA
+
+
+   However, minimizing L𝑛𝑜𝑑𝑒 and L𝑜𝑟𝑡ℎ alone cannot guarantee                          where 𝜎 (·) is the softmax function. We validate this assumption in
+that the modality-invariant representations contain only informa-                      Section 4.4.2. Notably, we can leverage the modality importance
+tion relevant to learning causal graphs. To further ensure the quality                 score 𝑎 𝑣 to replace the hyper-parameter 𝛼 in Eq. 4 and get the final
+of modality-invariant representations, we propose predicting the                       fused adjacency matrix for the causal graph G as follows:
+adjacency matrix of the causal graph based on the representation
+                                                                                                               𝑹𝑐 = 𝑎𝐿 𝑹𝑐𝐿 + 𝑎𝑀 𝑹𝑐𝑀
+of edges as follows:                                                                                                                                         (11)
+                                                                                                                𝑨 = 𝑎𝐿 𝑨𝐿 + 𝑎𝑀 𝑨𝑀
+                                     ||𝐺 (𝒆𝑖𝑣𝑗 ) − 𝐴𝑖𝑣𝑗 || 2
+                            ∑︁ ∑︁
+                L𝑒𝑑𝑔𝑒 =                                            (7)
+                            𝑣 ∈ {𝑀,𝐿} 𝑖,𝑗                                              Optimization. Therefore, the final objective function is written as:
+
+where 𝒆𝑖𝑣𝑗 = [𝐻𝑖𝑣 , 𝐻 𝑗𝑣 ] denotes the concatenation of the representa-                 L = 𝜆1 L𝑣𝑎𝑟 +𝜆2 L𝑜𝑟𝑡ℎ +𝜆3 L𝑛𝑜𝑑𝑒 +𝜆4 L𝑒𝑑𝑔𝑒 +𝜆5 ||𝑨|| 1 +ℎ(𝑨) (12)
+tions of two entities, and 𝐺 (·) is a one-layer MLP followed by the                    where || · || 1 is the sparsity constraint imposed on the adjacency
+sigmoid activation function used to predict the existence of an edge                   matrix. The trace exponential function ℎ(𝑨) = (𝑡𝑟 (𝑒 𝑨∗𝑨 ) − 𝑛) = 0
+in 𝐴𝑣 . Note that the causal graph (e.g., G 𝑣 = {𝑽, 𝑨𝑣 }) includes both                holds if and only if 𝑨 is acyclic [33], where ∗ denotes Hadamard
+the system entities and the system KPI. Encoding the topological                       product of two matrices. 𝜆1 , 𝜆2 , 𝜆3 , 𝜆4 , and 𝜆5 are the positive
+structure of the causal graph in Eq. 7 allows us to better capture                     constant hyper-parameters. The parameter analysis can be found
+the relationship between the root causes and the system KPI.                           in Subsection 4.4.3.
+VAR-based Decoders. After extracting both modality-invariant
+and modality-specific representations, we aim to predict the future                    3.4    Network Propagation based Root Cause
+value 𝑿˜ 𝑣 with the previous 𝑝-th lagged data 𝑿ˆ 𝑣 via VAR model:                             Localization
+                                   || 𝑿˜ 𝑣 − 𝐷 𝑣 (𝑹𝑐 + 𝑹𝑠𝑣 )|| 2                       The final fused causal graph G = {𝑽, 𝑨}, 𝑨 ∈ R𝑛×𝑛 consists of two
+                             ∑︁
+               L𝑣𝑎𝑟 =
+                                                                     (8)
+                         𝑣 ∈ {𝑀,𝐿}                                                     types of nodes: system entities and system KPI. Malfunctioning
+                                                                                       effects can propagate from the root cause to its neighboring entities,
+Similarly, we choose GraphSage as the backbone for the decoder
+                                                                                       meaning that the first-order neighbors of system KPIs may not
+𝐷 𝑣 (·).
+                                                                                       necessarily be the root causes. To pinpoint the root cause, we first
+                                                                                       derive the transition probability matrix based on the causal graph
+3.3    Causal Graph Fusion with KPI-Aware                                              G and then employ a random walk with restart method [11, 12, 42]
+       Attention                                                                       to mimic the propagation patterns of malfunctions. Specifically, the
+From the metric decoder and log decoder, we can obtain the causal                      transition probability matrix 𝑷 is formulated as follows:
+graph G 𝑀 and the causal graph G 𝐿 , respectively. Combining these                                                      (1 − 𝛽)𝑨 𝑗,𝑖
+two causal graphs through simple addition is not suitable, as it                                                 𝑷 𝒊𝒋 = Í𝑛                                   (13)
+                                                                                                                              𝑨
+may lead to dense and cyclical graphs. Furthermore, in scenarios                                                           𝑘=1 𝑘,𝑖
+with low-quality modalities (as discussed in challenge C3 in Sec-                      where 𝛽 ∈ [0, 1] represents the probability of transitioning from
+tion 1), treating both modalities as equally important would yield                     one node to another. The probability transition equation for the
+undesirable results. Following the assumption that KPI is highly                       random walk with restart is given by:
+associated with the root cause [45, 47], we propose a KPI-aware                                               𝒑𝑡 +1 = (1 − 𝑐)𝒑𝑡 + 𝑐𝒑 0                       (14)
+attention-based causal graph fusion. This module measures the
+cross-correlation [3] between the raw feature of each entity for                       where 𝒑𝑡 denotes the jumping probability at the 𝑡-th step, 𝒑 0 is the
+each modality and the KPI to alleviate the potential negative impact                   initial starting probability, and 𝑐 ∈ [0, 1] is the restart probability.
+of low-quality modalities by:                                                          Once the jumping probability 𝒑𝑡 converges, the probability scores
+                                      ∫ +∞                                             of the nodes are used to rank the system entities. The top 𝑘 entities
+   𝒔 𝑣 = max (𝑿 𝑣 ⊙ y)(𝑝) = max             𝑿 𝑣 (𝑡 + 𝑝) · y(𝑡)𝑑𝑡 (9)                   are then selected as the most likely root causes for the system
+        𝑝 ∈ [0,𝜏 ]                    𝑝 ∈ [0,𝜏 ] 𝑡 =0                                  failure.
+where 𝑝 represents the time lag and 𝜏 is the maximum time lag.
+Intuitively, 𝒔 𝑣 quantifies the maximum similarity between each                        4     EXPERIMENTS
+entity and the KPI while considering a time lag of up to 𝜏. A higher                   In this section, we evaluate the effectiveness of our proposed MU-
+value of 𝒔 𝑣 indicates a stronger causal relationship between the                      LAN through a comparative analysis with state-of-the-art root
+system entity and the KPI.                                                             cause analysis methods. Additionally, we conduct a comprehensive
+   Given that the temporal patterns of the top 𝑘 entities within a                     case study and an ablation study to further validate the assumptions
+high-quality modality are expected to closely resemble the temporal                    outlined in the Methodology section.
+pattern of the KPI, and that smaller values of 𝒔 𝑣 typically indicate
+low-quality modalities, we employ 𝒔 𝑣 to measure the importance                        4.1    Experiment Setup
+of each modality as follows:                                                           4.1.1 Datasets. We evaluate the performance of our method, MU-
+                       ∑︁                            𝑒
+                                                         Í
+                                                         𝑖 ∈𝑖𝑑𝑥 𝑣 𝒔𝑖
+                                                                   𝑣                   LAN, using three real-world datasets for root cause analysis: (1).
+               𝑣
+             𝑎 = 𝜎(              𝒔𝑖𝑣 ) =                                               Product Review [47]: This microservice system, dedicated to on-
+                                                                                (10)
+                                               Í                  Í
+                                               𝑖 ∈𝑖𝑑𝑥 𝐿 𝒔𝑖        𝑖 ∈𝑖𝑑𝑥 𝑀 𝒔𝑖
+                                                         𝐿                  𝑀
+                      𝑖 ∈𝑖𝑑𝑥 𝑣             𝑒                 +𝑒                        line product reviews, encompasses 234 pods and is deployed across
+          𝑖𝑑𝑥 𝑣 = Topk(𝒔 [−1, :]; 𝑘)
+                            𝑣                                                          6 cloud servers. It recorded four system faults between May 2021
+Conference’17, July 2017, Washington, DC, USA                                                                                 Lecheng Zheng et al.
+
+
+and December 2021. (2). Online Boutique [54]: This dataset rep-            only) and the multi-modality case. To enable multi-modality model-
+resents a microservice system designed for e-commerce, and it              ing, we initially convert the system logs into time-series data using
+includes five system faults. (3). Train Ticket [54]: This dataset is       the Regression-based language model introduced in Section 3.1.
+a microservice system for railway ticketing service with 5 system          This time-series data is then treated as an additional system met-
+faults. All three datasets contain two modalities: system metrics          ric for evaluation. We calculate an average ranking score based
+and system logs.                                                           on the evaluation of different system metrics as the final result
+                                                                           for all single-modality methods and MULAN. Our observations
+4.2     Implementation Details                                             are as follows: (1) In contrast to single-modality scenarios, most
+All experiments are conducted on a server running Ubuntu 18.04.5           baseline methods demonstrate improved performance when lever-
+with an Intel(R) Xeon(R) Silver 4110 CPU @2.10GHz and a 4-way              aging multi-modality data across three distinct datasets and various
+11GB GTX2080 GPU.                                                          metrics. (2) MULAN consistently outperforms all baseline methods
+                                                                           across the three datasets. Notably, MULAN exhibits a remarkable
+4.3     Evaluation Metric                                                  improvement in MRR on the Product Review dataset, surpassing
+                                                                           the second competitor (i.e., REASON) by 12.5%. Furthermore, on the
+To measure the model performance, we choose three widely-used
+                                                                           Online Boutique dataset, MULAN outperforms Nezha, achieving im-
+metrics [30, 45, 47]:
+                                                                           provements of over 13.2% and 8% with respect to MRR and MAP@5,
+(1). Precision@K (PR@K): It measures the probability that the
+                                                                           respectively. This superiority can be attributed to MULAN’s adept-
+top 𝐾 predicted root causes are real, defined as:
+                                                                           ness in exploring correlations among different modalities and its
+                          1 ∑︁ 𝑖<𝑘 𝑅𝑎 (𝑖) ∈ 𝑉𝑎
+                                  Í
+                𝑃𝑅@𝐾 =                                    (15)             robust KPI-aware attention mechanism, while all baseline methods,
+                         |A|        min(𝐾, |𝑣𝑎 |)                          including REASON and Nezha, fall short in this regard.
+                                  𝑎∈A
+where A is the set of system faults, 𝑎 is one fault in A, 𝑉𝑎 is the real
+root causes of 𝑎, 𝑅𝑎 is the predicted root causes of 𝑎, and i is the       4.4.2 Case Study. In this case study, we aim to demonstrate the
+𝑖-th predicted cause of 𝑅𝑎 .                                               robustness of our proposed method in the context of low-quality
+(2). Mean Average Precision@K (MAP@K): It assesses the top                 modality scenarios. It’s important to distinguish this setup from
+𝐾 predicted causes from the overall perspective, defined as:               the experimental configuration detailed in Section 4.4.1, where
+                                                                           multiple system metrics were utilized. In this case study, we keep
+                               1 ∑︁ ∑︁
+                𝑀𝐴𝑃@𝐾 =                         𝑃𝑅@𝑗                (16)   the representation of the system log constant and only select a
+                             𝐾 |A|                                         single system metric to investigate its impact on the performance
+                                        𝑎∈A 𝑖 ≤ 𝑗 ≤𝐾
+where a higher value indicates a better performance.                       of all models. The procedure unfolds as follows: Initially, we assess
+(3). Mean Reciprocal Rank (MRR): It evaluates the ranking ca-              the performance of each single-modality baseline method using
+pability of models, defined as:                                            distinct system metrics (e.g., CPU usage, memory usage, transmit
+                                                                           rate, etc). Subsequently, we identify the system metric with the
+                                 1 ∑︁     1
+                     𝑃𝑅@𝐾 =                              (17)              highest median ranking score as the high-quality metric, denoted
+                                |A|   𝑟𝑎𝑛𝑘𝑅𝑎                               as 𝑀 + , and the system metric with the lowest median ranking score
+                                        𝑎∈A
+where 𝑟𝑎𝑛𝑘𝑅𝑎 is the rank number of the first correctly predicted           as the low-quality metric, denoted as 𝑀 − . We evaluate all methods’
+root cause for system fault 𝑎.                                             performance on the Product Review Dataset and present the results
+                                                                           in Figures 3 (a) and (b). Notably, the performance of the log-only
+4.3.1 Baselines. We compare MULAN with six causal discovery                setting can be found in Table 2. Additionally, to underscore the
+models: (1). PC [4]: This classic constraint-based causal discovery        robustness of MULAN, we also examine the weights assigned to
+algorithm is designed to identify the causal graph’s skeleton using        the two modalities, as illustrated in Figure 3 (c).
+an independence test. (2) Dynotears [33]: It constructs dynamic               We have four key observations: (1). REASON and C-LSTM demon-
+Bayesian networks through vector autoregression models. (3). C-            strate impressive results on the Product Review dataset when utiliz-
+LSTM [41]: This model utilizes LSTM to model temporal depen-               ing a high-quality metric. However, their performance undergoes
+dencies and capture nonlinear Granger causality. (4). GOLEM [32]:          a significant decline when the high-quality metric is substituted
+GOLEM relaxes the hard Directed Acyclic Graph (DAG) constraint             with the low-quality system metric, as shown in Figure 3 (a). (2).
+of NOTEARS [62] with a scoring function. (5). REASON [46, 47]:             Comparing Figures 3 (a) and 3 (b) reveals that the performance
+An interdependent network model that focuses on learning both              of most baseline methods improves when incorporating system
+intra-level and inter-level causal relationships. (6). Nezha [54]: A       logs, regardless of whether the chosen system metric is of high
+multi-modal method designed to identify root causes by detecting           or low quality. This underscores the value of integrating multiple
+abnormal patterns.                                                         modalities for enhanced performance. (3). In Figure 3 (b), the per-
+                                                                           formance of most baseline methods experiences a notable decrease
+4.4     Performance Evaluation                                             when replacing the high-quality metric with the low-quality one.
+4.4.1 Experimental Results. Tables 2, 3, and 4 present a compre-           Remarkably, our proposed method (MULAN) consistently main-
+hensive performance evaluation of all methods. For methods ex-             tains robust and promising performance in such scenarios. (4) In
+clusively designed for a single modality (e.g., PC, C-LSTM, REA-           Figure 3 (c), when the high-quality system metric (𝑀 + or blue bar)
+SON, Dynotears, and GOLEM), we assess their performance in both            is replaced by the low-quality system metric (𝑀 − or green bar),
+single-modality scenarios (e.g., system metrics only or system logs        MULAN dynamically adjusts the weight assigned to the system
+Multi-modal Root Cause Analysis                                                                           Conference’17, July 2017, Washington, DC, USA
+
+
+                                        Table 2: Results on Product Review dataset w.r.t different metrics.
+
+                                   Modality        Model     PR@1    PR@5    PR@10   MRR     MAP@3    MAP@5    MAP@10
+                                                 Dynotears      0       0     0.50   0.070      0        0      0.075
+                                                    PC         0        0     0.25   0.053      0        0      0.050
+                                  Metric Only     C-LSTM      0.25    0.75    0.75   0.474     0.5     0.25     0.675
+                                                  GOLEM         0       0     0.25   0.043      0        0      0.025
+                                                 REASON       0.75    1.0      1.0   0.875    0.917    0.95     0.975
+                                                 Dynotears      0       0     0.25   0.058      0        0      0.075
+                                                    PC         0        0     0.25   0.069      0        0      0.075
+                                   Log Only       C-LSTM        0       0     0.25   0.059      0        0      0.075
+                                                  GOLEM         0       0     0.25   0.058      0        0      0.075
+                                                 REASON         0     0.50    0.75   0.216    0.167    0.25     0.400
+                                                 Dynotears      0       0     0.50   0.095      0        0      0.150
+                                                    PC         0        0     0.25   0.064      0        0      0.125
+                             Multi-Modality       C-LSTM      0.50    0.75    0.75   0.592    0.583    0.65     0.700
+                                                  GOLEM         0       0     0.25   0.065      0        0      0.050
+                                                 REASON       0.75    1.0      1.0   0.875    0.917    0.95     0.975
+                                                   Nezha       0       0.5    0.75   0.193    0.083    0.25     0.475
+                                                  MULAN       1.0     1.0      1.0    1.0      1.0     1.0       1.0
+
+                                       Table 3: Results on Online Boutique dataset w.r.t different metrics.
+
+                                    Modality       Model     PR@1    PR@3    PR@5    MRR     MAP@2    MAP@3    MAP@5
+                                                 Dynotears    0.20    0.40    0.40   0.344    0.20     0.267    0.320
+                                                    PC        0.20    0.40    0.80   0.390    0.30     0.333    0.400
+                                   Metric Only    C-LSTM        0     0.40    0.80    0.30    0.10     0.200    0.440
+                                                  GOLEM         0     0.40    0.80   0.291    0.20     0.267    0.360
+                                                 REASON       0.40    0.80     1.0   0.617    0.50     0.200    0.440
+                                                 Dynotears      0     0.20    0.60   0.207      0      0.067    0.240
+                                                    PC          0     0.40    0.60   0.257    0.10     0.200    0.320
+                                    Log Only      C-LSTM        0     0.40    0.60   0.267    0.10     0.200    0.360
+                                                  GOLEM         0     0.40    0.80   0.248      0      0.133    0.360
+                                                 REASON       0.20    0.80    0.80   0.458    0.30     0.467    0.600
+                                                 Dynotears    0.20    0.60    1.0    0.467    0.30     0.400    0.640
+                                                    PC        0.40    0.80     1.0   0.573    0.40     0.533    0.680
+                              Multi-Modality      C-LSTM      0.20    0.40     1.0   0.450    0.30     0.333    0.600
+                                                  GOLEM       0.20    0.60     1.0   0.467    0.30     0.400    0.640
+                                                 REASON       0.40     1.0     1.0   0.667    0.60     0.733    0.840
+                                                   Nezha      0.60     1.0     1.0   0.767    0.70     0.800    0.880
+                                                  MULAN       0.80    1.0     1.0    0.900    0.90     0.933    0.960
+
+                                         Table 4: Results on Train Ticket Dataset w.r.t. Different Metrics.
+
+                                   Modality       Model      PR@1    PR@5    PR@10   MRR     MAP@3    MAP@5    MAP@10
+                                                 Dynotears     0       0       0.2   0.046      0        0        0
+                                                    PC         0      0.2      0.8   0.170    0.133    0.16     0.243
+                                  Metric Only     C-LSTM       0      0.2      0.4   0.096      0        0      0.100
+                                                  GOLEM        0      0.2      0.4   0.098      0        0      0.100
+                                                 REASON       0.2     0.6      0.8   0.323     0.2     0.28     0.343
+                                                 Dynotears     0      0.4      0.8   0.160      0      0.16     0.271
+                                                    PC         0      0.4      0.8   0.219    0.133    0.24     0.343
+                                   Log Only       C-LSTM       0      0.4      0.8   0.160      0      0.16     0.271
+                                                  GOLEM        0      0.4      0.8   0.164      0      0.16     0.274
+                                                 REASON       0.2     0.4      1.0   0.315     0.2     0.28     0.343
+                                                 Dynotears     0      0.4      0.8   0.141      0      0.16     0.228
+                                                    PC         0       0       0.4   0.083      0        0      0.071
+                             Multi-Modality       C-LSTM      0.2     0.4      0.8   0.310     0.2     0.28     0.314
+                                                  GOLEM        0      0.4      0.8   0.160      0      0.16     0.271
+                                                 REASON       0.2     0.4      0.8   0.299     0.2     0.28     0.300
+                                                   Nezha      0.2     0.2      1.0   0.297     0.2      0.2     0.285
+                                                  MULAN       0.2     0.4      1.0   0.381    0.333    0.36     0.414
+Conference’17, July 2017, Washington, DC, USA                                                                                       Lecheng Zheng et al.
+
+
+
+
+                    (a) Metric Only                                 (b) Log + Metric                           (c) Modality Weight
+
+Figure 3: Case study on Product Review dataset. (a): MRR score of all methods evaluated with a single system metric only.
+(b): MRR score of all methods evaluated with one system metric and system log. (c): Modality weight measured by KPI-aware
+mechanism of MULAN with four system fault cases, where 𝑀 + , 𝐿(𝑀 + ), 𝑀 − , and 𝐿(𝑀 − ) are the weight of the high-quality metric,
+the weight of the system log with the high-quality metric, the weight of the low-quality metric and the weight of the system
+log with the low-quality metric, respectively.
+
+
+
+
+   (a) log(𝜆1 ) w.r.t. MRR        (b) log(𝜆2 ) w.r.t. MRR      (c) log(𝜆3 ) w.r.t. MRR     (d) log(𝜆4 ) w.r.t. MRR        (e) log(𝜆5 ) w.r.t. MRR
+
+  Figure 4: Parameter analysis on Product Review dataset w.r.t MRR. The red dashed line denotes the value used in Table 2.
+
+
+metric in all four cases. This adaptability ensures that MULAN does                 Table 5: Ablation study on three datasets w.r.t MRR.
+not overly rely on any specific metric modality. Findings 3 and 4
+underscore the effectiveness of the KPI-aware attention mechanism                  Model      Product Review         Online Boutique    Train Ticket
+and the inherent robustness of the proposed method.                               MULAN            1.0                     0.9             0.347
+                                                                                 MULAN-V          0.875                    0.8             0.343
+                                                                                 MULAN-O          0.833                    0.9             0.326
+4.4.3 Parameter Analysis. In this subsection, we conduct a thor-
+                                                                                 MULAN-N          0.813                    0.7             0.343
+ough analysis of the parameter sensitivity of MULAN framework
+                                                                                 MULAN-E          0.833                   0.667            0.225
+on the Product Review dataset. We specifically examine the impact
+of variations in five parameters: 𝜆1 , 𝜆2 , 𝜆3 , 𝜆4 , and 𝜆5 . Our study
+involves individually adjusting the value of each parameter while
+keeping the remaining four fixed. Figure 4 presents the experimen-
+tal results in terms of Mean Reciprocal Rank (MRR), where the                  4.4.4 Ablation Study. In this subsection, we conduct an ablation
+x-axis represents log(𝜆𝑖 ), 𝑖 ∈ [1, 2, 3, 4, 5], and the y-axis represents     study to thoroughly assess the effectiveness of each component
+MRR. Notably, a substantial value for 𝜆1 (e.g., 𝜆1 = 50) tends to              within the overarching objective function (Eq. 12). We consider four
+yield superior performance, highlighting the crucial role of the               distinct variants of MULAN: MULAN-V, which excludes the VAR
+VAR model in capturing temporal dependencies among diverse                     models responsible for modeling temporal dependencies among
+system entities. For 𝜆2 , MULAN achieves the best performance                  diverse system entities; MULAN-O, which disregards the orthogo-
+when 𝜆2 is set to 1, with a noticeable decline in performance as 𝜆2            nal constraint (L𝑜𝑟𝑡ℎ ); MULAN-N, which omits the extraction of
+increases. This suggests a delicate balance in the contribution of             modality-invariant information by excluding the node loss (L𝑛𝑜𝑑𝑒 )
+𝜆2 to the overall model effectiveness. Regarding 𝜆3 and 𝜆4 , optimal           from the objective function; and MULAN-E, which removes the
+performance is observed when both are set to 20, underscoring                  edge loss (L𝑒𝑑𝑔𝑒 ). A comparative analysis of MULAN against its
+their critical role in achieving superior results. Similarly, the best         variants consistently reveals performance degradation when any
+performance for MULAN aligns with a smaller value for 𝜆5 , e.g.,               component is removed from the proposed method. For example,
+𝜆5 = 0.1. Further decreasing 𝜆5 results in a decline in performance,           removing the edge loss induces a performance drop of 16.7% and
+highlighting the importance of sparse regularization in the loss               23.3% on the Product Review and Online Boutique datasets, re-
+function.                                                                      spectively. Similarly, excluding the node loss results in an 18.7%
+Multi-modal Root Cause Analysis                                                                                Conference’17, July 2017, Washington, DC, USA
+
+
+performance reduction on the Product Review dataset. These find-         REFERENCES
+ings underscore the pivotal role of each component in ensuring the        [1] Hervé Abdi and Lynne J Williams. 2010. Principal component analysis. Wiley
+overall effectiveness of the proposed method.                                 interdisciplinary reviews: computational statistics 2, 4 (2010), 433–459.
+                                                                          [2] Charles K. Assaad, Emilie Devijver, and Éric Gaussier. 2023. Survey and Eval-
+                                                                              uation of Causal Discovery Methods for Time Series (Extended Abstract). In
+5    RELATED WORK                                                             Proceedings of the Thirty-Second International Joint Conference on Artificial Intelli-
+                                                                              gence, IJCAI 2023, 19th-25th August 2023, Macao, SAR, China. ijcai.org, 6839–6844.
+Root Cause Analysis. Root cause analysis (RCA) is a systematic                https://doi.org/10.24963/ijcai.2023/766
+process aimed at uncovering the fundamental reasons for system            [3] Paul Bourke. 1996. Cross correlation. Cross Correlation”, Auto Correlation—2D
+                                                                              Pattern Identification (1996).
+failures using observed symptoms [37]. Numerous domain-specific           [4] Tom Burr. 2003. Causation, Prediction, and Search. Technometrics 45, 3 (2003),
+RCA approaches [5, 7, 8, 14, 26, 30, 37–39, 49] have been developed           272–273.
+to enhance the resilience of applications. Notably, in the context of     [5] Alfonso Capozzoli, Fiorella Lauro, and Imran Khan. 2015. Fault detection analysis
+                                                                              using data mining techniques for a cluster of smart office buildings. Expert Syst.
+the microservice systems, Li et al. [26] constructed a dependency             Appl. 42, 9 (2015), 4324–4338.
+graph based on system architecture knowledge and proposed a               [6] Zhengzhang Chen, Yuncong Chen, LuAn Tang, and Haifeng Chen. 2023. Multi-
+regression-based hypothesis testing to identify the root cause. An-           modality attack forensic analysis model for enterprise security systems. US
+                                                                              Patent App. 18/302,908.
+other study [21] integrated a hierarchical learning method with the       [7] Zhengzhang Chen, Yuncong Chen, LuAn Tang, and Haifeng Chen. 2023. Multi-
+PC algorithm, facilitating rapid identification of interventional tar-        modality root cause localization engine. US Patent App. 18/302,939.
+                                                                          [8] Wei Cheng, Kai Zhang, Haifeng Chen, Guofei Jiang, Zhengzhang Chen, and Wei
+gets. Additionally, [46, 47] introduced a hierarchical graph neural           Wang. 2016. Ranking causal anomalies via temporal and dynamical analysis on
+networks-based algorithm to capture both intra-level and inter-level          vanishing correlations. In Proceedings of the 22nd ACM SIGKDD International
+causal relationships for identifying the root causes in interdepen-           Conference on Knowledge Discovery and Data Mining. 805–814.
+                                                                          [9] Nevin Climenhaga, Lane DesAutels, and Grant Ramsey. 2021. Causal inference
+dent networks. Different from the existing works that primarily fo-           from noise. Noûs 55, 1 (2021), 152–170.
+cus on unimodal data (e.g., system metrics data), MULAN is a multi-      [10] Antonio Anastasio Bruto da Costa and Pallab Dasgupta. 2021. Learning Temporal
+modal learning approach that extracts both modality-invariant and             Causal Sequence Relationships from Real-Time Time-Series. J. Artif. Intell. Res.
+                                                                              70 (2021), 205–243.
+modality-specific information to enhance RCA performance.                [11] Boxiang Dong, Zhengzhang Chen, Lu-An Tang, Haifeng Chen, Hui Wang, Kai
+Multi-modal Learning. Multi-modal learning has been exten-                    Zhang, Ying Lin, and Zhichun Li. 2020. Anomalous event sequence detection.
+                                                                              IEEE Intelligent Systems 36, 3 (2020), 5–13.
+sively studied across various domains, such as natural language          [12] Boxiang Dong, Zhengzhang Chen, Hui Wang, Lu-An Tang, Kai Zhang, Ying
+processing [16, 25, 27], information retrieval [6, 15, 31], and com-          Lin, Zhichun Li, and Haifeng Chen. 2017. Efficient discovery of abnormal event
+puter vision [28, 36, 56, 57]. For example, within the domain of              sequences in enterprise security systems. In Proceedings of the 2017 ACM on
+                                                                              Conference on Information and Knowledge Management. 707–715.
+natural language processing, [16] explored the interplay among           [13] Min Du, Feifei Li, Guineng Zheng, and Vivek Srikumar. 2017. DeepLog: Anomaly
+text, visual, and acoustic modalities to enhance sentiment analysis.          Detection and Diagnosis from System Logs through Deep Learning. In Proceedings
+In computer vision, numerous methods [22, 31] have been proposed              of the 2017 ACM SIGSAC Conference on Computer and Communications Security,
+                                                                              CCS 2017, Dallas, TX, USA, October 30 - November 03, 2017, Bhavani Thuraising-
+to align text and image representations in the latent space. Nev-             ham, David Evans, Tal Malkin, and Dongyan Xu (Eds.). ACM, 1285–1298.
+ertheless, in the context of RCA, the exploration of multi-modal         [14] Panting Duan, Zhenzhen He, Yihai He, Fengdi Liu, Anqi Zhang, and Di Zhou.
+                                                                              2020. Root cause analysis approach based on reverse cascading decomposition
+RCA remains in a nascent stage. Research presented in [18, 54] has            in QFD and fuzzy weight ARM for quality accidents. Computers & Industrial
+attempted to extract information from multi-modal data for root               Engineering 147 (2020), 106643.
+cause analysis. Regrettably, these studies primarily focus on each       [15] Valentin Gabeur, Chen Sun, Karteek Alahari, and Cordelia Schmid. 2020. Multi-
+                                                                              modal Transformer for Video Retrieval. In Computer Vision - ECCV 2020 - 16th
+modality as a standalone entity, overlooking the intricate intercon-          European Conference, Glasgow, UK, August 23-28, 2020, Proceedings, Part IV (Lecture
+nections between them. In contrast, this paper systematically exam-           Notes in Computer Science, Vol. 12349), Andrea Vedaldi, Horst Bischof, Thomas
+ines the interplay between different modalities, specifically between         Brox, and Jan-Michael Frahm (Eds.). Springer, 214–229.
+                                                                         [16] Deepanway Ghosal, Md. Shad Akhtar, Dushyant Singh Chauhan, Soujanya Poria,
+time-series data and unstructured text data, and co-constructs a              Asif Ekbal, and Pushpak Bhattacharyya. 2018. Contextual Inter-modal Attention
+comprehensive causal graph for root cause localization.                       for Multi-modal Sentiment Analysis. In Proceedings of the 2018 Conference on
+                                                                              Empirical Methods in Natural Language Processing, Brussels, Belgium, October 31 -
+                                                                              November 4, 2018, Ellen Riloff, David Chiang, Julia Hockenmaier, and Jun’ichi
+6    CONCLUSION                                                               Tsujii (Eds.). Association for Computational Linguistics, 3454–3466.
+                                                                         [17] William L. Hamilton, Zhitao Ying, and Jure Leskovec. 2017. Inductive Represen-
+In this paper, we investigated the challenging problem of multi-              tation Learning on Large Graphs. In Advances in Neural Information Processing
+modal root cause localization in microservice systems. We proposed            Systems 30: Annual Conference on Neural Information Processing Systems 2017,
+MULAN, a unified framework for localizing root causes by co-                  December 4-9, 2017, Long Beach, CA, USA. 1024–1034.
+                                                                         [18] Chuanjia Hou, Tong Jia, Yifan Wu, Ying Li, and Jing Han. 2021. Diagnosing
+learning a causal graph from multi-modal data. MULAN leverages                Performance Issues in Microservices with Heterogeneous Data Source. In 2021
+a log-tailored language model to facilitate causal graph generation           IEEE Intl Conf on Parallel & Distributed Processing with Applications, Big Data &
+from system logs. To explore the relationships among different                Cloud Computing, Sustainable Computing & Communications, Social Computing
+                                                                              & Networking (ISPA/BDCloud/SocialCom/SustainCom), New York City, NY, USA,
+modalities, both modality-invariant and modality-specific represen-           September 30 - Oct. 3, 2021. IEEE, 493–500.
+tations were extracted through node-level contrastive regulariza-        [19] Biwei Huang, Kun Zhang, and Bernhard Schölkopf. 2015. Identification of time-
+                                                                              dependent causal model: A gaussian process treatment. In Twenty-Fourth inter-
+tion and edge-level regularization. Additionally, we introduced a             national joint conference on artificial intelligence.
+KPI-aware attention mechanism to assess modality reliability and         [20] Antti Hyttinen, Frederick Eberhardt, and Matti Järvisalo. 2014. Constraint-
+facilitate the co-learning of the final causal graph. We validated            based Causal Discovery: Conflict Resolution with Answer Set Programming.
+                                                                              In Proceedings of the Thirtieth Conference on Uncertainty in Artificial Intelligence,
+the effectiveness of MULAN through extensive experiments on                   UAI 2014, Quebec City, Quebec, Canada, July 23-27, 2014, Nevin L. Zhang and Jin
+three real-world datasets. A promising direction for future work is           Tian (Eds.). AUAI Press, 340–349.
+extending MULAN to handle streaming data in an online setting.           [21] Azam Ikram, Sarthak Chakraborty, Subrata Mitra, Shiv Kumar Saini, Saurabh
+                                                                              Bagchi, and Murat Kocaoglu. 2022. Root Cause Analysis of Failures in Microser-
+                                                                              vices through Causal Discovery. In NeurIPS.
+Conference’17, July 2017, Washington, DC, USA                                                                                                                  Lecheng Zheng et al.
+
+
+[22] Muhammad Uzair Khattak, Hanoona Abdul Rasheed, Muhammad Maaz,                           [41] Alex Tank, Ian Covert, Nicholas J. Foti, Ali Shojaie, and Emily B. Fox. 2022. Neural
+     Salman H. Khan, and Fahad Shahbaz Khan. 2023. MaPLe: Multi-modal Prompt                      Granger Causality. IEEE Trans. Pattern Anal. Mach. Intell. 44, 8 (2022), 4267–4279.
+     Learning. In IEEE/CVF Conference on Computer Vision and Pattern Recognition,            [42] Hanghang Tong, Christos Faloutsos, and Jia-Yu Pan. 2006. Fast Random Walk
+     CVPR 2023, Vancouver, BC, Canada, June 17-24, 2023. IEEE, 19113–19122.                       with Restart and Its Applications. In Proceedings of the 6th IEEE International
+[23] Thomas N. Kipf and Max Welling. 2017. Semi-Supervised Classification with                    Conference on Data Mining (ICDM 2006), 18-22 December 2006, Hong Kong, China.
+     Graph Convolutional Networks. In 5th International Conference on Learning                    IEEE Computer Society, 613–622.
+     Representations, ICLR 2017, Toulon, France, April 24-26, 2017, Conference Track         [43] Sofia Triantafillou and Ioannis Tsamardinos. 2015. Constraint-based causal
+     Proceedings. OpenReview.net.                                                                 discovery from multiple interventions over overlapping variable sets. The Journal
+[24] Markku Lanne, Mika Meitz, and Pentti Saikkonen. 2017. Identification and estima-             of Machine Learning Research 16, 1 (2015), 2147–2205.
+     tion of non-Gaussian structural vector autoregressions. Journal of Econometrics         [44] Petar Velickovic, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro
+     196, 2 (2017), 288–304.                                                                      Liò, and Yoshua Bengio. 2018. Graph Attention Networks. In 6th International
+[25] Haoran Li, Junnan Zhu, Cong Ma, Jiajun Zhang, and Chengqing Zong. 2017.                      Conference on Learning Representations, ICLR 2018, Vancouver, BC, Canada, April
+     Multi-modal Summarization for Asynchronous Collection of Text, Image, Audio                  30 - May 3, 2018, Conference Track Proceedings. OpenReview.net.
+     and Video. In Proceedings of the 2017 Conference on Empirical Methods in Nat-           [45] Dongjie Wang, Zhengzhang Chen, Yanjie Fu, Yanchi Liu, and Haifeng Chen.
+     ural Language Processing, EMNLP 2017, Copenhagen, Denmark, September 9-11,                   2023. Incremental Causal Graph Learning for Online Root Cause Analysis. In
+     2017, Martha Palmer, Rebecca Hwa, and Sebastian Riedel (Eds.). Association for               Proceedings of the 29th ACM SIGKDD Conference on Knowledge Discovery and
+     Computational Linguistics, 1092–1102.                                                        Data Mining. 2269–2278.
+[26] Mingjie Li, Zeyan Li, Kanglin Yin, Xiaohui Nie, Wenchi Zhang, Kaixin Sui, and           [46] Dongjie Wang, Zhengzhang Chen, Jingchao Ni, Liang Tong, Zheng Wang, Yanjie
+     Dan Pei. 2022. Causal Inference-Based Root Cause Analysis for Online Service                 Fu, and Haifeng Chen. 2023. Hierarchical graph neural networks for causal
+     Systems with Intervention Recognition. In KDD ’22: The 28th ACM SIGKDD                       discovery and root cause localization. arXiv preprint arXiv:2302.01987 (2023).
+     Conference on Knowledge Discovery and Data Mining, Washington, DC, USA,                 [47] Dongjie Wang, Zhengzhang Chen, Jingchao Ni, Liang Tong, Zheng Wang, Yanjie
+     August 14 - 18, 2022, Aidong Zhang and Huzefa Rangwala (Eds.). ACM, 3230–                    Fu, and Haifeng Chen. 2023. Interdependent Causal Networks for Root Cause
+     3240.                                                                                        Localization. In Proceedings of the 29th ACM SIGKDD Conference on Knowledge
+[27] Chen Ling, Xujiang Zhao, Jiaying Lu, Chengyuan Deng, Can Zheng, Junxiang                     Discovery and Data Mining, KDD 2023, Long Beach, CA, USA, August 6-10, 2023.
+     Wang, Tanmoy Chowdhury, Yun Li, Hejie Cui, Tianjiao Zhao, et al. 2023. Do-                   ACM, 5051–5060.
+     main specialization as the key to make large language models disruptive: A              [48] Daixin Wang, Peng Cui, Mingdong Ou, and Wenwu Zhu. 2015. Deep Multimodal
+     comprehensive survey. arXiv preprint arXiv:2305.18703 2305 (2023).                           Hashing with Orthogonal Regularization. In Proceedings of the Twenty-Fourth
+[28] Jiasen Lu, Christopher Clark, Rowan Zellers, Roozbeh Mottaghi, and Aniruddha                 International Joint Conference on Artificial Intelligence, IJCAI 2015, Buenos Aires,
+     Kembhavi. 2023. UNIFIED-IO: A Unified Model for Vision, Language, and Multi-                 Argentina, July 25-31, 2015, Qiang Yang and Michael J. Wooldridge (Eds.). AAAI
+     modal Tasks. In The Eleventh International Conference on Learning Representations,           Press, 2291–2297.
+     ICLR 2023, Kigali, Rwanda, May 1-5, 2023. OpenReview.net.                               [49] Lu Wang, Chaoyun Zhang, Ruomeng Ding, Yong Xu, Qihang Chen, Wentao Zou,
+[29] Siyang Lu, BingBing Rao, Xiang Wei, Byung-Chul Tak, Long Wang, and Liqiang                   Qingjun Chen, Meng Zhang, Xuedong Gao, Hao Fan, Saravan Rajmohan, Qingwei
+     Wang. 2017. Log-based Abnormal Task Detection and Root Cause Analysis for                    Lin, and Dongmei Zhang. 2023. Root Cause Analysis for Microservice Systems
+     Spark. In 2017 IEEE International Conference on Web Services, ICWS 2017, Honolulu,           via Hierarchical Reinforcement Learning from Human Feedback. In Proceedings
+     HI, USA, June 25-30, 2017. IEEE, 389–396.                                                    of the 29th ACM SIGKDD Conference on Knowledge Discovery and Data Mining,
+[30] Yuan Meng, Shenglin Zhang, Yongqian Sun, Ruru Zhang, Zhilong Hu, Yiyin                       KDD 2023, Long Beach, CA, USA, August 6-10, 2023. ACM, 5116–5125.
+     Zhang, Chenyang Jia, Zhaogang Wang, and Dan Pei. 2020. Localizing Failure               [50] Shen Wang, Zhengzhang Chen, Ding Li, Zhichun Li, Lu-An Tang, Jingchao Ni,
+     Root Causes in a Microservice through Causality Inference. In 28th IEEE/ACM                  Junghwan Rhee, Haifeng Chen, and Philip S Yu. 2019. Attentional heterogeneous
+     International Symposium on Quality of Service, IWQoS 2020, Hangzhou, China,                  graph neural network: Application to program reidentification. In Proceedings of
+     June 15-17, 2020. IEEE, 1–10.                                                                the 2019 SIAM International Conference on Data Mining. SIAM, 693–701.
+[31] Niluthpol Chowdhury Mithun, Juncheng Li, Florian Metze, and Amit K. Roy-                [51] Zhiwei Wang, Zhengzhang Chen, Jingchao Ni, Hui Liu, Haifeng Chen, and Jiliang
+     Chowdhury. 2018. Learning Joint Embedding with Multimodal Cues for Cross-                    Tang. 2021. Multi-Scale One-Class Recurrent Neural Networks for Discrete Event
+     Modal Video-Text Retrieval. In Proceedings of the 2018 ACM on International                  Sequence Anomaly Detection. In KDD ’21: The 27th ACM SIGKDD Conference
+     Conference on Multimedia Retrieval, ICMR 2018, Yokohama, Japan, June 11-14,                  on Knowledge Discovery and Data Mining, Virtual Event, Singapore, August 14-18,
+     2018, Kiyoharu Aizawa, Michael S. Lew, and Shin’ichi Satoh (Eds.). ACM, 19–27.               2021. ACM, 3726–3734.
+[32] Ignavier Ng, AmirEmad Ghassami, and Kun Zhang. 2020. On the Role of Spar-               [52] Chang Xu, Dacheng Tao, and Chao Xu. 2013. A Survey on Multi-view Learning.
+     sity and DAG Constraints for Learning Linear DAGs. In Advances in Neural                     CoRR abs/1304.5634 (2013).
+     Information Processing Systems 33: Annual Conference on Neural Information Pro-         [53] Xiaoqiang Yan, Shizhe Hu, Yiqiao Mao, Yangdong Ye, and Hui Yu. 2021. Deep
+     cessing Systems 2020, NeurIPS 2020, December 6-12, 2020, virtual, Hugo Larochelle,           multi-view learning methods: A review. Neurocomputing 448 (2021), 106–129.
+     Marc’Aurelio Ranzato, Raia Hadsell, Maria-Florina Balcan, and Hsuan-Tien Lin            [54] Guangba Yu, Pengfei Chen, Yufeng Li, Hongyang Chen, Xiaoyun Li, and Zibin
+     (Eds.).                                                                                      Zheng. 2023. Nezha: Interpretable Fine-Grained Root Causes Analysis for Mi-
+[33] Roxana Pamfil, Nisara Sriwattanaworachai, Shaan Desai, Philip Pilgerstorfer,                 croservices on Multi-modal Observability Data. (2023).
+     Konstantinos Georgatzis, Paul Beaumont, and Bryon Aragam. 2020. DYNOTEARS:              [55] Shengming Zhang, Yanchi Liu, Xuchao Zhang, Wei Cheng, Haifeng Chen, and
+     Structure Learning from Time-Series Data. In The 23rd International Conference               Hui Xiong. 2022. CAT: Beyond Efficient Transformer for Content-Aware Anomaly
+     on Artificial Intelligence and Statistics, AISTATS 2020, 26-28 August 2020, Online           Detection in Event Sequences. In KDD ’22: The 28th ACM SIGKDD Conference
+     [Palermo, Sicily, Italy] (Proceedings of Machine Learning Research, Vol. 108), Silvia        on Knowledge Discovery and Data Mining, Washington, DC, USA, August 14 - 18,
+     Chiappa and Roberto Calandra (Eds.). PMLR, 1595–1605.                                        2022, Aidong Zhang and Huzefa Rangwala (Eds.). ACM, 4541–4550.
+[34] Jonas Peters, Dominik Janzing, and Bernhard Schölkopf. 2017. Elements of causal         [56] Lecheng Zheng, Yu Cheng, and Jingrui He. 2019. Deep Multimodality Model for
+     inference: foundations and learning algorithms. The MIT Press.                               Multi-task Multi-view Learning. In Proceedings of the 2019 SIAM International
+[35] Carl Martin Rosenberg and Leon Moonen. 2020. Spectrum-Based Log Diagno-                      Conference on Data Mining, SDM 2019, Calgary, Alberta, Canada, May 2-4, 2019,
+     sis. In ESEM ’20: ACM / IEEE International Symposium on Empirical Software                   Tanya Y. Berger-Wolf and Nitesh V. Chawla (Eds.). SIAM, 10–18.
+     Engineering and Measurement, Bari, Italy, October 5-7, 2020. ACM, 18:1–18:12.           [57] Lecheng Zheng, Yu Cheng, Hongxia Yang, Nan Cao, and Jingrui He. 2021. Deep
+[36] Amanpreet Singh, Ronghang Hu, Vedanuj Goswami, Guillaume Couairon, Woj-                      Co-Attention Network for Multi-View Subspace Learning. In WWW ’21: The
+     ciech Galuba, Marcus Rohrbach, and Douwe Kiela. 2022. FLAVA: A Foundational                  Web Conference 2021, Virtual Event / Ljubljana, Slovenia, April 19-23, 2021, Jure
+     Language And Vision Alignment Model. In IEEE/CVF Conference on Computer                      Leskovec, Marko Grobelnik, Marc Najork, Jie Tang, and Leila Zia (Eds.). ACM /
+     Vision and Pattern Recognition, CVPR 2022, New Orleans, LA, USA, June 18-24,                 IW3C2, 1528–1539.
+     2022. IEEE, 15617–15629.                                                                [58] Lecheng Zheng, Dongqi Fu, Ross Maciejewski, and Jingrui He. 2021. Deeper-GXX:
+[37] Jacopo Soldani and Antonio Brogi. 2023. Anomaly Detection and Failure Root                   deepening arbitrary GNNs. arXiv preprint arXiv:2110.13798 (2021).
+     Cause Analysis in (Micro) Service-Based Cloud Applications: A Survey. ACM               [59] Lecheng Zheng, Jinjun Xiong, Yada Zhu, and Jingrui He. 2022. Contrastive
+     Comput. Surv. 55, 3 (2023), 59:1–59:39.                                                      Learning with Complex Heterogeneity. In KDD ’22: The 28th ACM SIGKDD
+[38] Marc Solé, Victor Muntés-Mulero, Annie Ibrahim Rana, and Giovani Estrada. 2017.              Conference on Knowledge Discovery and Data Mining, Washington, DC, USA,
+     Survey on Models and Techniques for Root-Cause Analysis. CoRR abs/1701.08546                 August 14 - 18, 2022, Aidong Zhang and Huzefa Rangwala (Eds.). ACM, 2594–
+     (2017).                                                                                      2604.
+[39] Kai Sporleder, Volker Naumann, Jan Bauer, Susanne Richter, Angelika Hähnel,             [60] Lecheng Zheng, Yada Zhu, and Jingrui He. 2023. Fairness-aware Multi-view
+     Stephan Großer, Marko Turek, and Christian Hagendorf. 2019. Root cause analysis              Clustering. In Proceedings of the 2023 SIAM International Conference on Data
+     on corrosive potential-induced degradation effects at the rear side of bifacial              Mining, SDM 2023, Minneapolis-St. Paul Twin Cities, MN, USA, April 27-29, 2023,
+     silicon PERC solar cells. Solar Energy Materials and Solar Cells 201 (2019), 110062.         Shashi Shekhar, Zhi-Hua Zhou, Yao-Yi Chiang, and Gregor Stiglic (Eds.). SIAM,
+[40] James H Stock and Mark W Watson. 2001. Vector autoregressions. Journal of
+     Economic perspectives 15, 4 (2001), 101–115.
+Multi-modal Root Cause Analysis                                                                                             Conference’17, July 2017, Washington, DC, USA
+
+
+     856–864.                                                                            [63] Dawei Zhou, Lecheng Zheng, Yada Zhu, Jianbo Li, and Jingrui He. 2020. Domain
+[61] Lecheng Zheng, Yada Zhu, Jingrui He, and Jinjun Xiong. 2021. Heterogeneous               Adaptive Multi-Modality Neural Attention Network for Financial Forecasting. In
+     Contrastive Learning. CoRR abs/2105.09401 (2021).                                        WWW ’20: The Web Conference 2020, Taipei, Taiwan, April 20-24, 2020, Yennun
+[62] Xun Zheng, Bryon Aragam, Pradeep K Ravikumar, and Eric P Xing. 2018. Dags                Huang, Irwin King, Tie-Yan Liu, and Maarten van Steen (Eds.). ACM / IW3C2,
+     with no tears: Continuous optimization for structure learning. Advances in neural        2230–2240.
+     information processing systems 31 (2018).
+

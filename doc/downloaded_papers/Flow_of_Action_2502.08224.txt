@@ -1,0 +1,592 @@
+                                           Flow-of-Action: SOP Enhanced LLM-Based Multi-Agent System
+                                                             for Root Cause Analysis
+                                                           Changhua Pei∗                                             Zexin Wang†‡                                     Fengrui Liu
+                                                        chpei@cnic.cn                                           wangzexin@cnic.cn                                      Zeyan Li
+                                               Computer Network Information                              Computer Network Information                      liufengrui.work@bytedance.com
+                                             Center, Chinese Academy of Sciences                       Center, Chinese Academy of Sciences                    lizeyan.42@bytedance.com
+                                                        Beijing, China                                            Beijing, China                                      ByteDance
+                                                                                                                                                                    Beijing, China
+
+
+
+
+arXiv:2502.08224v1 [cs.SE] 12 Feb 2025
+                                                               Yang Liu†                                                  Xiao He                                     Rong Kang
+                                                       liuyang@cnic.cn                                          xiao.hx@bytedance.com                       kangrong.cn@bytedance.com
+                                               Computer Network Information                                            ByteDance                                    ByteDance
+                                             Center, Chinese Academy of Sciences                                   Hangzhou, China                                Beijing, China
+                                                         Beijing, China
+
+                                                          Tieying Zhang§                                               Jianhui Li§                                       Dan Pei
+                                                           Jianjun Chen                                               Gaogang Xie                              peidan@tsinghua.edu.cn
+                                                  tieying.zhang@bytedance.com                                      lijh@cnic.cn                                  Tsinghua University
+                                                   jianjun.chen@bytedance.com                                      xie@cnic.cn                                      Beijing, China
+                                                             ByteDance                                   Computer Network Information
+                                                       San Jose, United States                         Center, Chinese Academy of Sciences
+                                                                                                                  Beijing, China
+
+                                         Abstract                                                                                called SOP flow. SOP flow contains a series of tools, including
+                                         In the realm of microservices architecture, the occurrence of fre-                      one for finding relevant SOPs for incidents, another for automat-
+                                         quent incidents necessitates the employment of Root Cause Anal-                         ically generating SOPs for incidents without relevant ones, and
+                                         ysis (RCA) for swift issue resolution. It is common that a serious                      a tool for converting SOPs into code. This significantly alleviates
+                                         incident can take several domain experts hours to identify the                          the hallucination issues of ReAct in RCA tasks. We also design
+                                         root cause. Consequently, a contemporary trend involves harness-                        multiple auxiliary agents to assist the main agent by removing
+                                         ing Large Language Models (LLMs) as automated agents for RCA.                           useless noise, narrowing the search space, and informing the main
+                                         Though the recent ReAct framework aligns well with the Site Relia-                      agent whether the RCA procedure can stop. Compared to the ReAct
+                                         bility Engineers (SREs) for its thought-action-observation paradigm,                    method’s 35.50% accuracy, our Flow-of-Action method achieves
+                                         its hallucinations often lead to irrelevant actions and directly affect                 64.01%, meeting the accuracy requirements for RCA in real-world
+                                         subsequent results. Additionally, the complex and variable clues of                     systems.
+                                         the incident can overwhelm the model one step further. To confront
+                                         these challenges, we propose Flow-of-Action, a pioneering Stan-                         CCS Concepts
+                                         dard Operation Procedure (SOP) enhanced LLM-based multi-agent                           • Software and its engineering → Software maintenance tools.
+                                         system. By explicitly summarizing the diagnosis steps of SREs, SOP
+                                         imposes constraints on LLMs at crucial junctures, guiding the RCA                       Keywords
+                                         process towards the correct trajectory. To facilitate the rational and
+                                                                                                                                 Root Cause Analysis, Multi-Agent System, Large Language Model
+                                         effective utilization of SOPs, we design an SOP-centric framework
+                                                                                                                                 ACM Reference Format:
+                                         ∗ Also with Hangzhou Institute for Advanced Study, University of Chinese Academy
+                                                                                                                                 Changhua Pei, Zexin Wang, Fengrui Liu, Zeyan Li, Yang Liu, Xiao He, Rong
+                                         of Sciences.
+                                         † Also with University of Chinese Academy of Sciences.                                  Kang, Tieying Zhang, Jianjun Chen, Jianhui Li, Gaogang Xie, and Dan Pei.
+                                         ‡ Also with ByteDance. Work done during the internship at ByteDance.                    2025. Flow-of-Action: SOP Enhanced LLM-Based Multi-Agent System for
+                                         § Corresponding Authors.                                                                Root Cause Analysis. In Companion Proceedings of the ACM Web Conference
+                                                                                                                                 2025 (WWW Companion ’25), April 28-May 2, 2025, Sydney, NSW, Australia.
+                                                                                                                                 ACM, New York, NY, USA, 10 pages. https://doi.org/10.1145/3701716.3715225
+
+                                         This work is licensed under a Creative Commons Attribution 4.0 International License.
+                                         WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia                         1    Introduction
+                                         © 2025 Copyright held by the owner/author(s).
+                                         ACM ISBN 979-8-4007-1331-6/2025/04                                                      In today’s large-scale web systems and services, traditional mono-
+                                         https://doi.org/10.1145/3701716.3715225                                                 lithic applications encounter notable challenges including intricate
+WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia                                                                     Changhua Pei et al.
+
+
+
+
+                                                    Figure 1: Illustration example of challenge 2.
+
+
+deployment processes and limited scalability [1, 8, 24, 26, 37], attrib-     generating hallucinations. Employing an LLM agent for RCA activ-
+uted to the proliferation of services and frequent service iterations.       ities necessitates the retrieval and comprehension of diverse data
+In response to this context, Microservices Architecture (MSA) has            modalities (metric [14], log [20], trace [34]) and the extensive utiliza-
+surfaced and continually evolved [2]. By disassembling monolithic            tion of API tools. As the scope of the context expands, issues often
+applications into small, self-sufficient service units, each dedicated       emerge such as inaccurate parameter extraction leading to failures
+to specific business functionalities, MSA presents benefits such as          in tool invocation and discrepancies between tool invocations and
+loose coupling, independent deployment, and effortless scalability.          the context at hand. Instances of randomness or hallucinations at
+Nevertheless, with the escalation of user numbers and their corre-           any stage can significantly impact the subsequent trajectory of the
+sponding demands, the diversity and quantity of MSA instances                RCA procedure, hindering the accurate identification of the true
+also increase. Despite the implementation of numerous monitor                root cause.
+tools, recurrent incidents arise from hardware malfunctions or mis-          Challenge 2: Complex and variable observations leading to
+configurations, posing challenges to reliability assurance. These            multiple reasonable actions
+incidents lead to substantial financial losses [27]. For instance, on            Existing LLM agents are typically bundled with a diverse array
+November 12, 2023, Alibaba experienced a large-scale outage, re-             of tools [16], especially within complex domains like RCA, where
+sulting in the interruption of multiple services for nearly three            the number of APIs can escalate to hundreds. Each API invocation
+hours1 .                                                                     results in varied observations, thereby introducing intricacies in
+   To promptly tackle these incidents, Root Cause Analysis (RCA)             action selection. Furthermore, even when confronted with identical
+has emerged as a prominent research area within Artificial Intel-            observations, multiple plausible actions may be viable. For example,
+ligence for IT Operations (AIOps) in recent years [4, 6, 13, 30].            as shown in Figure 1, within the context of a code error “Service
+Traditional RCA techniques, in order to address the difficulties of          name not found”, the root cause could originate from errors in
+manual fault diagnosis, have employed deep learning methods to               the code generation phase or inaccuracies in associated SOP docu-
+learn from historical faults [12]. However, these methods have two           ment, prompting multiple feasible actions like code regeneration
+main drawbacks. First, they have poor adaptability to new scenarios,         or document revision.
+requiring model retraining when faced with a new situation. Sec-                 To confront the challenges outlined above, we propose Flow-
+ond, they only output the root cause of the fault without providing          of-Action, a Standard Operating Procedure (SOP) enhanced Multi-
+the entire diagnostic process, resulting in poor explainability. This        Agent System (MAS). Initially, to mitigate the impact of randomness
+situation often results in Site Reliability Engineers (SREs) harboring       and hallucinations in the orchestration process, we integrate SOPs
+a sense of distrust towards the results, as they fear that misidentify-      into the knowledge base and propose the SOP flow. Specifically,
+ing the root cause could potentially result in further wasted repair         SOPs outline a standardized set of steps for RCA, while SOP flow
+time or exacerbate faults by addressing the wrong issue. Over the            represents an efficient and accurate process built upon SOPs for
+recent years, Large Language Model (LLM) agents like ReAct [32]              their effective utilization. Through prompt engineering, we ensure
+and ToolFormer [21] have been deployed across diverse domains.               that the orchestration of the main agent loosely follows the SOP
+LLM agents harness their robust natural language understanding               flow in the absence of unexpected circumstances. Subsequently,
+capabilities to adeptly coordinate various tools, allowing SREs to           to tackle the second challenge, compared with the thought-action-
+see the entire troubleshooting process and providing rich expla-             observation paradigm, we propose the thought-actionset-action-
+nations for the root causes. Nonetheless, despite the considerable           observation paradigm. Flow-of-Action avoids immediate action
+prowess of LLM agents, the efficient and accurate utilization of             selection and instead generates a reasoned action set before making
+LLM agents in RCA encounters ongoing challenges.                             the final decision on the course of action. Besides, we devise a novel
+Challenge 1: Randomness and hallucinations leading to irra-                  MAS. Specifically, we introduce multiple agents such as MainA-
+tional action selection                                                      gent, CodeAgent, JudgeAgent, ObAgent, and ActionAgent, each
+   Current LLMs primarily function as probabilistic models [17, 18],         entrusted with distinct responsibilities, collaborating harmoniously
+thereby exhibiting pronounced randomness and tendencies towards              to enhance root cause identification.
+1 https://www.datacenterdynamics.com/en/news/alibaba-cloud-hit-by-outage-        Our key contributions are summarized as follows:
+second-in-a-month/
+Flow-of-Action: SOP Enhanced LLM-Based Multi-Agent System for Root Cause Analysis               WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia
+
+
+
+
+                                                Figure 2: Multimodal data collection and analysis.
+
+
+      • We propose the Flow-of-Action framework, the first agent-                   we have devised an innovative knowledge base model integrating
+        based fault localization process centered around SOPs. With                 SOP knowledge and historical incident knowledge.
+        this framework, we significantly reduce the inefficiency in
+        action selection of the native ReAct framework and reducing                 2.1.1 SOP Knowledge. With the successful integration of SOPs in
+        the cost of trial and error.                                                the realm of code generation [5], there is a growing recognition
+      • We introduce the concept of SOPs to integrate the expert                    that relying solely on LLMs to execute intricate tasks like RCA
+        experience into the LLM to greatly reduce hallucinations                    is impractical. SOPs, to a certain extent, impose constraints on
+        during RCA. For any given fault, we can automatically match                 LLMs at crucial junctures, guiding the entire process towards the
+        the most relevant set of SOPs and can also generate new SOPs                correct trajectory. Consequently, we have embedded SOPs into the
+        automatically, extending the limited set of human-generated                 knowledge base, which are either authored by engineers based on
+        SOPs.                                                                       domain expertise or extracted through automation tools. As shown
+      • We innovatively propose a multi-agent collaborative sys-                    in Figure 3, each SOP constitutes a self-contained unit comprising
+        tem, including JudgeAgent and ObAgent. JudgeAgent assists                   two attributes: name and steps. The name encapsulates essential
+        the MainAgent in determining whether the root cause of                      information about the SOP, which is translated into a vector for
+        the fault has been identified in the current iteration, while               subsequent retrieval purposes.
+        ObAgent helps MainAgent extract fault types and key in-
+                                                                                    2.1.2 Historical Incidents. As highlighted by Chen et al. [3], in sys-
+        formation from massive amounts of data, addressing the
+                                                                                    tems where similar incidents occur frequently, historical incident
+        information overload issue in the RCA process.
+                                                                                    data proves invaluable in identifying the root cause of ongoing
+      • Through a fault-injection simulation platform of a real-world
+                                                                                    incidents. Consequently, we incorporate the performance details
+        e-commerce system, Flow-of-Action has increased the local-
+                                                                                    of historical incidents into the knowledge base. Each historical in-
+        ization accuracy from 35% to 64% compared to ReAct, proving
+                                                                                    cident is characterized by two key attributes: manifestation and
+        the effectiveness of the Flow-of-Action framework.
+                                                                                    type. When retrieving similar incidents, we evaluate similarity
+                                                                                    by comparing the embedding of the current observation with the
+2     Flow-of-Action                                                                embedding of the manifestation of historical incidents. However,
+                                                                                    relying solely on embeddings for assessment can introduce signifi-
+In this section, we will present the design of Flow-of-Action. As                   cant errors. To tackle this issue, we have intentionally devised the
+illustrated in Figure 3, the Flow-of-Action is a MAS built upon the                 ObAgent (elaborated upon subsequently) to address this challenge.
+ReAct. It encompasses three key design components: the SOP flow,
+the action set, and the MAS. We will delve into each of these compo-
+nents in the subsequent sections. Prior to their detailed exploration,
+                                                                                    2.2    Tools of Agents
+we will introduce the foundational knowledge required, including                    Within LLM agents, tools typically refer to pre-defined functions.
+the knowledge base and tools utilized by the Flow-of-Action.                        During the action phase, LLM invokes relevant tools to obtain the
+                                                                                    necessary information. In Flow-of-Action, the tools utilized primar-
+                                                                                    ily fall into three categories: tools for multimodal data collection and
+2.1     Knowledge Base of Agents                                                    analysis, tools related to SOP flow, and other tools. Each category
+Given the restricted context length of LLMs, Retrieval-Augmented                    will be discussed in detail below.
+Generation (RAG) has experienced notable progress [7]. However,
+the quality of text retrieved by RAG significantly influences the                   2.2.1 Multimodal Data Collection and Analysis. Within the realm
+ultimate outcomes. Many existing RAG methodologies segment                          of MSA, which encompasses diverse modalities of data such as met-
+documents within the knowledge base and employ semantic block                       rics, traces, and logs, the importance of multimodal data for RCA
+embeddings to calculate similarity for retrieval. This approach, how-               has been underscored by existing methodologies [33, 35]. Conse-
+ever, does not consistently yield optimal results in RCA. Therefore,                quently, we have implemented a comprehensive monitoring system
+WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia                                                                      Changhua Pei et al.
+
+
+
+
+Figure 3: Comparison of ReAct and Flow-of-Action. RC means root cause. Dashed lines represent paths triggered under specific
+conditions. When the previous action is 𝑚𝑎𝑡𝑐ℎ_𝑜𝑏𝑠𝑒𝑟𝑣𝑎𝑡𝑖𝑜𝑛, JudgeAgent and ObAgent are triggered. When JudgeAgent finds the
+root cause, it triggers the input of the analysis result to thought and adds 𝑆𝑝𝑒𝑎𝑘 to action set.
+
+                                                       Table 1: Description of SOP flow tools.
+
+                                                                  Input                   Output                LLM Usage
+                                match_sop              Fault Type/Information                SOP                   No
+                                generate_sop           Fault Type/Information                SOP                   Yes
+                                generate_sop_code               SOP                       SOP Code                 Yes
+                                run_sop                       SOP Code          Result after running the code      No
+                                match_observation            Observation              Similar incidents            No
+
+
+to aggregate multimodal data. While LLMs excel in processing tex-               we have introduced 𝑔𝑒𝑡_𝑟𝑒𝑙𝑒𝑣𝑎𝑛𝑡_𝑚𝑒𝑡𝑟𝑖𝑐 to streamline the retrieval
+tual data, their effectiveness in interpreting structured data types            of pertinent metric names.
+like metrics is constrained, especially in the presence of data noise.
+                                                                                 2.2.3 Other Tools. The flow aims to establish a standardized and
+Therefore, it is imperative to preprocess the data by denoising and
+                                                                                 generalized process for intricate RCA tasks, devoid of service- or
+transforming it into textual format for enhanced comprehension
+                                                                                 business-specific components within the tools themselves. How-
+by LLMs. As depicted in Figure 2, we have devised the following
+                                                                                 ever, a broader array of tools is necessitated when generating SOPs
+components: 𝑤ℎ𝑒𝑡ℎ𝑒𝑟 _𝑖𝑠_𝑎𝑏𝑛𝑜𝑟𝑚𝑎𝑙_𝑚𝑒𝑡𝑟𝑖𝑐 to leverage time series
+                                                                                 or SOP code, or when executing operations beyond the flow, to
+anomaly detection algorithms [25, 28, 31] for identifying metric
+                                                                                 query the authentic operational state of the system. In addition to
+anomalies and converting them into fault-related text; 𝑐𝑜𝑙𝑙𝑒𝑐𝑡_𝑡𝑟𝑎𝑐𝑒
+                                                                                 the previously mentioned tools for querying and analyzing mul-
+for capturing abnormal span details across the entire call chain and
+                                                                                 timodal data, a suite of tailored analysis tools has been devised
+converting them into text format; and 𝑘𝑢𝑏𝑒𝑐𝑡𝑙_𝑙𝑜𝑔𝑠 for extracting
+                                                                                 for MSA, including 𝑝𝑜𝑑_𝑎𝑛𝑎𝑙𝑦𝑧𝑒 and 𝑠𝑒𝑟𝑣𝑖𝑐𝑒_𝑎𝑛𝑎𝑙𝑦𝑧𝑒. These tools
+abnormal log information from each pod within the Kubernetes
+                                                                                 employ queries on specific attribute data within the Kubernetes
+system.
+                                                                                 system to ascertain the system’s status. Upon identification, 𝑆𝑝𝑒𝑎𝑘
+                                                                                 is employed to communicate the discovered root cause to all perti-
+2.2.2 SOP Flow Tools. As previously mentioned, we have intro-                    nent stakeholders. For a comprehensive elucidation of these tools,
+duced a flow centered around SOPs. This comprehensive flow is                    kindly consult the Appendix B.
+meticulously crafted based on common workflows employed by
+SREs in practical settings, integrating innovative concepts such                 2.3    SOP Flow
+as code. Details regarding the tools utilized within the flow are               The SOP flow represents a comprehensive logic chain of actions
+delineated in Table 1. Moreover, to preempt unexpected incidents                tailored to the SOP mentioned earlier. It serves to instruct LLMs
+during the flow’s operation, we have developed a variety of targeted            on how to effectively utilize SOP knowledge. For instance, in the
+auxiliary tools. For example, within the context of 𝑔𝑒𝑛𝑒𝑟𝑎𝑡𝑒_𝑠𝑜𝑝,               initial stages of RCA, it is essential to identify which SOPs are most
+Flow-of-Action: SOP Enhanced LLM-Based Multi-Agent System for Root Cause Analysis              WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia
+
+
+
+
+                                                        Figure 4: Example of Flow-of-Action.
+
+
+relevant to the incident (corresponding to 𝑚𝑎𝑡𝑐ℎ_𝑠𝑜𝑝). Additionally,                instances may arise where pertinent SOPs cannot be matched. To
+if a particular incident does not align with any existing SOP, the au-              tackle this challenge, we introduce 𝑔𝑒𝑛𝑒𝑟𝑎𝑡𝑒_𝑠𝑜𝑝 to devise new
+tomation of SOP generation should be considered (corresponding to                   SOPs for queries that do not align with existing SOPs. Specifically,
+𝑔𝑒𝑛𝑒𝑟𝑎𝑡𝑒_𝑠𝑜𝑝). While the comprehensive SOP flow can be visually                     we utilize LLMs to generate new SOPs and leverage existing SOPs
+represented, as illustrated in Figure 3, in practical application, the              as few-shot prompts to guide the development of more standardized
+full SOP flow is presented in the form of prompts to the MainAgent                  and coherent SOPs. Figure 6 shows an example of an SOP for han-
+to aid in thought processes and to the ActionAgent to generate a                    dling IO errors generated by an LLM. Although not highly precise,
+more rational action set. The SOP flow prompt information pro-                      the general direction of analysis is correct. The logic is rigorous,
+vided to the LLMs is displayed in Figure 5. By implementing such                    and the diagnostic results provide useful assistance to SREs.
+soft constraints, we aim to tackle the issue of chaotic tool orchestra-
+tion while still maintaining the flexibility of LLMs. Unlike methods
+like FastGPT [10], we do not enforce strict workflow constraints
+on LLM orchestration. Figure 4 provides an example of the Flow-
+of-Action. Subsequently, we will systematically elucidate critical
+transitional subflows within the SOP flow.
+
+
+
+
+                                                                                                 Figure 6: Generated SOP for IO error.
+
+                                                                                       Within the entirety of the flow, the generation of SOPs stands as
+                                                                                    a pivotal phase as it directly influences the subsequent RCA process.
+                                                                                    To enhance the precision of RCA, we have devised hierarchical SOPs.
+                                                                                    Our objective is for the RCA process to progress from a macro to
+                                                                                    micro level, from a general to specific perspective, mirroring real-
+                                                                                    world scenarios more closely. For instance, we first address network
+                                                                                    issues before delving into network partition problems.
+                                                                                    2.3.2 SOP→SOP Code. Once a suitable SOP is obtained, due to the
+       Figure 5: SOP flow prompt information of LLMs.                               interdependence of steps within the SOP, it is generally necessary
+                                                                                    to execute the SOP step by step to achieve the desired outcome.
+                                                                                    However, in real-world scenarios, SOPs are typically concise texts,
+2.3.1 Fault Type/Information→SOP. In our flow, we initially utilize                 making it relatively difficult for engineers lacking domain knowl-
+𝑚𝑎𝑡𝑐ℎ_𝑠𝑜𝑝 to associate the fault information with the relevant SOP.                 edge to execute the entire SOP. Utilizing an agent based on LLM to
+This matching process involves computing the similarity between                     execute the SOP is a more rational and efficient approach. However,
+the current query and all SOP name embeddings, ranking them,                        directly instructing the agent to execute all steps of the SOP one
+and selecting the top 𝑘 matches. To avoid matching with highly                      by one often leads to errors. This is because LLM tends to focus
+irrelevant SOPs, a filtering threshold is established. Nevertheless,                more on proximal text, and the outcome of a particular step can
+in real-world contexts where new fault types frequently emerge,                     significantly influence the selection of subsequent actions.
+WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia                                                                        Changhua Pei et al.
+
+
+   Therefore, we have designed 𝑔𝑒𝑛𝑒𝑟𝑎𝑡𝑒_𝑠𝑜𝑝_𝑐𝑜𝑑𝑒 to convert the          information and numerous examples in the prompt to enhance
+entire SOP into code for simultaneous execution. This approach           the rationality of the generated actions. However, this may still
+offers three main advantages. Firstly, numerous works, including         overlook reasonable flow actions. Therefore, we have established a
+Chain-of-Code [11], have demonstrated that executing code in LLM         rule based on the flow to ensure that the action set is comprehensive
+environments is far more accurate than executing text [15], align-       and logical. For instance, if the preceding action was 𝑔𝑒𝑛𝑒𝑟𝑎𝑡𝑒_𝑠𝑜𝑝,
+ing well with the precise requirements of RCA. Secondly, in many         the subsequent action of 𝑔𝑒𝑛𝑒𝑟𝑎𝑡𝑒_𝑠𝑜𝑝_𝑐𝑜𝑑𝑒 is added to the set.
+scenarios, including RCA, there exist numerous atomic operations         Secondly, the JudgeAgent evaluates whether the root cause has
+where we wish for several actions to be executed together or none        been identified during the current RCA process. If the root cause is
+at all, as executing a single action in isolation may not yield use-     pinpointed, the action 𝑆𝑝𝑒𝑎𝑘 is included in the action set.
+ful results. SOPs exemplify this situation, where executing only a          Through action set, we have effectively mitigated the challenges
+portion may not yield the desired fault information. Converting          posed by diverse observations and a plethora of feasible actions
+SOPs to code effectively addresses this issue, as once the code is ex-   that could potentially hinder agent planning. Furthermore, the
+ecuted, it must run from start to finish. Lastly, SOP code represents    strategic design of the action set has enabled the LLM Agent to at-
+a collection of multiple actions, enabling the execution of multiple     tain a nuanced equilibrium between stochasticity and determinism.
+actions with a single tool invocation, thereby significantly reducing    Within RCA, excessive randomness may induce divergence in the
+LLM token and resource consumption.                                      localization process, impeding the formation of effective diagnos-
+                                                                         tics. Conversely, an overly deterministic approach may incline the
+2.3.3 SOP Code→Observation. After obtaining the SOP code, the            model towards scripted operations, limiting its capacity to handle
+flow invokes 𝑟𝑢𝑛_𝑠𝑜𝑝 to execute the entire SOP code. However, the        unforeseeable and rapidly changing circumstances.
+generation of code is not always accurate and may lead to various
+issues, such as syntax errors or incorrect variables within the code.    2.5     Multi-Agent System
+In such instances, our flow expects to re-match suitable parameters
+                                                                         We have designed a MAS consisting of a single main agent along
+and use 𝑔𝑒𝑛𝑒𝑟𝑎𝑡𝑒_𝑠𝑜𝑝_𝑐𝑜𝑑𝑒 to generate new, correct code. Once the
+                                                                         with multiple auxiliary agents. The MainAgent serves as the prin-
+code is error-free, we can smoothly execute it to obtain the desired
+                                                                         cipal entity with authority, while the other agents are responsible
+results.
+                                                                         for providing suggestions to it. The MainAgent orchestrates the
+2.3.4 SOP Code→Fault Type/Information. As mentioned earlier,             entire localization process. The ActionAgent provides a feasible set
+the definition of SOP is hierarchical, and our RCA process follows       of actions for the MainAgent to choose from. The ObAgent offers
+a layered and progressive approach. Upon executing 𝑟𝑢𝑛_𝑠𝑜𝑝 and           potential anomaly types or information after the MainAgent com-
+obtaining a new observation, we seek guidance to determine the           pletes 𝑚𝑎𝑡𝑐ℎ_𝑜𝑏𝑠𝑒𝑟𝑣𝑎𝑡𝑖𝑜𝑛. The JudgeAgent determines whether the
+next steps in the localization process. The ideal approach is to iden-   root cause has been identified. However, even if the JudgeAgent
+tify potential fault types based on the observation. Relying solely      believes the root cause has been found, the MainAgent may not
+on the domain knowledge of the LLM agent is evidently insuf-             necessarily use 𝑆𝑝𝑒𝑎𝑘 to conclude the entire localization process.
+ficient for accurate judgment in a specific domain, necessitating        Taking additional steps and gathering more information may lead
+fine-tuning of the LLM model or the introduction of more domain-         to a more accurate root cause determination. The CodeAgent plays
+specific knowledge. Inspiration from various methods [3] suggests        a crucial role in the SOP flow, possessing information on all tools
+that most fault types have occurred historically. Therefore, we use      and generating appropriate code for subsequent use. Through the
+𝑚𝑎𝑡𝑐ℎ_𝑜𝑏𝑠𝑒𝑟𝑣𝑎𝑡𝑖𝑜𝑛 to recall similar historical incidents based on        MAS, the burden on the MainAgent is significantly reduced. It only
+observation. The ObAgent is then utilized to determine potential         needs to consider the opinions of other agents and make relatively
+fault types or provide descriptions of faults for subsequent RCA         accurate judgments based on the entire localization process. Such di-
+processes.                                                               vision of labor also aligns more closely with real-world operational
+                                                                         scenarios.
+2.4    Action Set
+                                                                         3 Evaluation
+In section 1, we mentioned that in RCA, it is relatively challenging
+for the LLM agent to perform reasonable planning. This difficulty        3.1 Experiment Setup
+primarily arises from two reasons: the variability of observations       3.1.1 Dataset. We have deployed the widely used microservices
+and the existence of multiple possible actions for a given observa-      system GoogleOnlineBoutique2 , an e-commerce system consisting
+tion. Instantaneously identifying and executing the most reasonable      of over 10 services, on the Kubernetes platform. Building upon
+action from numerous viable choices is an exceedingly challenging        this, we have implemented Prometheus, Elastic, DeepFlow [22], and
+task for the LLM.                                                        Jaeger to collect metric, log, and trace data (Detailed in Appendix A).
+   To address this challenge, we have devised a mechanism known          Anomalies are injected into microservices’ pods using ChaosMesh3 .
+as the action set. Specifically, drawing inspiration from the CoT        There are a total of 9 types of anomalies injected, including CPU
+[29], we first generate a series of reasonable actions comprising a      stress and memory stress (detailed in Table 2). Leveraging this setup,
+set, with each action accompanied by a textual explanation of the        we have generated a dataset comprising 90 incidents. For further
+rationale behind its selection. This set primarily consists of two
+components: actions generated by the ActionAgent and actions             2 https://github.com/GoogleCloudPlatform/microservices-demo
+
+identified by the JudgeAgent. The ActionAgent incorporates flow          3 https://github.com/chaos-mesh/chaos-mesh
+Flow-of-Action: SOP Enhanced LLM-Based Multi-Agent System for Root Cause Analysis               WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia
+
+
+details on microservices architecture and multimodal data, kindly                   CoT performs reasonably well in some common simple tasks due
+consult the resources available at https://benchmark.aiops.cn/.                     to the robust reasoning capabilities of LLMs. However, in RCA,
+                                                                                    where tasks are complex and diverse scenarios arise, even seasoned
+                         Table 2: Fault Types                                       SREs struggle to promptly determine a series of pinpointing steps.
+                                                                                    Consequently, CoT fares poorly in the RCA domain. While ReAct
+                                                                                    integrates reasoning for each observation, the array of tools and
+          Type                              Description
+                                                                                    diverse observations present challenges in rational orchestration.
+  CPU Stress               Generate threads to occupy CPU resources.                This is why we introduce the action set and SOP flow. Reflexion
+  Memory Stress            Generate threads to occupy memory.                       builds upon ReAct by introducing a path reflection mechanism.
+  Pod Failure              Make pods inaccessible for a period of time.
+                                                                                    However, given that previous paths are predominantly incorrect,
+  Network Delay            Cause network delay for a pod.
+  Network Loss             Cause packet loss in a pod’s network.
+                                                                                    reflecting on a wealth of erroneous knowledge makes it arduous to
+  Network Partition        Network disconnection, partition.                        arrive at accurate insights.
+  Network Duplicate        Cause network packet to be retransmitted.                   In terms of the APL metric, ReAct often erroneously identifies
+  Network Corrupt          Cause packets on network to be out of order.             root causes due to a lack of proper judgment criteria, resulting in a
+  Network Bandwidth        Limit the bandwidth between nodes.                       relatively low APL. In contrast, Reflexion necessitates continuous
+                                                                                    path reflection, leading to numerous iterations and a higher APL.
+                                                                                    Flow-of-Action maintains an APL within an acceptable range, cru-
+3.1.2 Evaluation Metric And Baseline Methods. In the field of RCA,                  cial for optimal performance in RCA tasks. In RCA tasks, the APL’s
+the specific location of the root cause is a critical focus for SREs. Ad-           magnitude is not fixed. Excessive values can escalate resource con-
+ditionally, categorizing the type of root cause is equally important,               sumption and induce knowledge clutter, while inadequate values
+as SREs often specialize in different department like networking                    may lead to incomplete knowledge.
+group or hardware group. Therefore, we have designed evaluation
+metrics focusing on both root cause location and fault type. Follow-
+ing the principle from mABC [36], we consider redundant causes
+                                                                                    3.3    RQ2: Impact of Action Set Size
+to be less detrimental than missing causes. Hence, we utilize two
+metrics: Root Cause Location Accuracy (LA) and Root Cause Type
+Accuracy (TA).
+
+                      𝐿𝑐 − 𝜎 × 𝐿𝑖         𝑇𝑐 − 𝜎 ∗ 𝑇𝑖
+                 𝐿𝐴 =             , 𝑇𝐴 =                            (1)
+                           𝐿𝑡                 𝑇𝑡
+   𝐿𝑐 and 𝑇𝑐 represent all correctly identified root cause locations
+and types, while 𝐿𝑖 and 𝑇𝑖 denote the incorrectly identified locations
+and types. 𝐿𝑡 and 𝑇𝑡 represent total number of locations and types.
+𝜎 serves as a hyperparameter with a default value of 0.1. To prevent
+an excessive number of root causes, we limit the maximum number
+of root causes to three in LLM-based methods. In addition, we
+employed the Average Path Length (APL) to evaluate the efficiency
+                                           Í𝑁
+                                            𝑘    𝐿
+of the LLM Agents. APL is defined as 𝑘=1𝑁     , where 𝐿𝑘 represents
+the diagnosis path length of the k-th sample, and 𝑁 denotes the                            Figure 7: Accuracy of different action set sizes.
+number of samples for which diagnosis was completed within the
+specified maximum path length.
+   Regarding baseline methods, we have chosen several open-source                      As shown in Figure 3, we have introduced the action set mech-
+Kubernetes RCA tools, such as K8SGPT [9] and HolmesGPT [19].                        anism, where the size of the action set impacts the subsequent
+Since the implementation of RCA agents is highly specific to the                    selection of actions. We conducted validation on a subset of the
+scenarios, they are not open-source and are challenging to migrate.                 dataset and the results are shown in Figure 7. We observed that
+Therefore, we have developed some general-purpose open-source                       the LA and TA remain relatively stable with changes in the action
+frameworks, such as CoT [29], ReAct [32], and Reflexion [23], to                    set size. This stability is attributed to the fact that, despite varia-
+serve as our baselines.                                                             tions in the action set size, relevant flow tools are encompassed
+                                                                                    within the action set due to the constraints of the rules in SOP flow.
+3.2    RQ1: Overall Performance                                                     Furthermore, the entire RCA process typically follows the flow,
+Based on Table 3, our Flow-of-Action surpasses the SOTA by 23%                      thereby minimizing significant fluctuations in accuracy. However,
+in the LA metric and 28% in the TA metric. Despite the support of                   as the size increases, accuracy initially rises and then declines. This
+LLMs, K8SGPT and HolmesGPT continue to exhibit poor perfor-                         phenomenon occurs because smaller action sets restrict random-
+mance. This can be attributed to the significant limitations in the                 ness, rendering the model incapable of handling complex scenarios.
+information they access. For instance, K8SGPT primarily queries                     Conversely, larger sizes introduce more randomness, leading to a
+Kubernetes metadata for attribute information, which is often insuf-                loss of control by the model. Hence, we opt for a moderately sized
+ficient for RCA, as faults may not necessarily manifest in metadata.                default value of 5 as it strikes a balance between these extremes.
+WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia                                                                         Changhua Pei et al.
+
+
+Table 3: Performance of different models. The best scores for each evaluation metric are bolded, and the second-best scores are
+underlined. Exclusive utilization of the APL metric is restricted to methodologies leveraging LLM agents. The fixed and specific
+accuracy of K8SGPT and HolmesGPT, i.e. 11.11, is due to their ability to handle only one type of fault.
+
+                        Model                           Base               LA                TA              Average             APL
+                      K8SGPT                       GPT-3.5-Turbo          11.11             11.11             11.11               -
+                    HolmesGPT                      GPT-3.5-Turbo          11.11             11.11             11.11               -
+                        CoT                        GPT-3.5-Turbo          20.89             15.56             18.26               -
+                        CoT                         GPT-4-Turbo           36.00             29.22             32.61               -
+                       ReAct                       GPT-3.5-Turbo          13.11             25.22             19.17             9.41
+                       ReAct                        GPT-4-Turbo           47.67             23.33             35.50             10.76
+                      Reflexion                    GPT-3.5-Turbo          21.56             22.22             21.89             22.38
+                      Reflexion                     GPT-4-Turbo           33.67             24.44             29.06             28.09
+                   Flow-of-Action                  GPT-3.5-Turbo          54.22             53.89             54.06             18.83
+                   Flow-of-Action                  GPT-4-Turbo            70.89             57.12             64.01             15.10
+
+
+                                    Table 4: Ablation study. The LLM backbone we use is GPT-3.5-Turbo.
+
+                                    Method                         LA             TA            Average            APL
+                                Flow-of-Action                    54.22         53.89             54.06            18.83
+                              w/o SOP Knowledge                    8.56         22.11             15.39            20.00
+                                 w/o SOP Flow                     15.11         39.89             27.50            19.78
+                                w/o Action Set                    44.67         40.00             42.34            11.48
+                               w/o ActionAgent                    32.78         34.56             33.67            18.42
+                                 w/o ObAgent                      40.11         28.67             34.39            19.31
+                                w/o JudgeAgent                    36.11         33.89             35.00            20.00
+
+
+3.4    RQ3: Ablation Study                                                      a MAS with one main agent and multiple auxiliary agents effec-
+We conducted a detailed ablation study by removing each module                  tively addresses this issue. The main agent can make decisions by
+and each agent of Flow-of-Action, with the results summarized in                considering the opinions of others, reducing the cognitive load and
+Table 4. When the SOP was removed, lacking domain-specific guid-                consequently achieving higher accuracy.
+ance, the model relied solely on its own orchestration, essentially                Regarding APL, apart from the significant impact of removing
+reverting to ReAct. The significantly low accuracy underscores                  the action set, the effects of other ablations were relatively similar.
+the crucial role of SOP. It is worth mentioning that when SOP                   This is due to the imposed limit of 20 steps to prevent unbounded
+knowledge is removed, the SOP flow becomes ineffective as well,                 loops that could render the RCA process unending.
+thus removing SOP knowledge is equivalent to removing both SOP
+knowledge and SOP flow.                                                         4       Conclusion
+    Upon removing the prompts related to the SOP flow, we no-                   The occurrence of frequent incidents necessitates RCA for swift
+ticed a significant decrease in LA, while TA remained relatively                issue resolution. Applying LLM agents in RCA presents numerous
+effective. This is because SOP knowledge and relevant tools were                challenges. To address the challenges, we propose Flow-of-Action,
+still present and could provide type information through tools like             a novel SOP-enhanced MAS. Flow-of-Action effectively leverages
+𝑚𝑎𝑡𝑐ℎ_𝑜𝑏𝑠𝑒𝑟𝑣𝑎𝑡𝑖𝑜𝑛 or 𝑚𝑎𝑡𝑐ℎ_𝑠𝑜𝑝. However, the absence of the flow                SOP by designing the SOP flow to alleviate hallucinations in the
+hindered the complete execution of the SOP, leading to the inca-                orchestration process. The action set mechanism efficiently tackles
+pacity to discern location information.                                         the challenge of selecting actions in the face of diverse observa-
+    The absence of the action set rendered the model unable to make             tions. By employing a main agent supported by multiple auxiliary
+correct judgments in complex and rare scenarios. However, in most               agents, Flow-of-Action further refines the delineation of respon-
+cases, the model still performed adequately, resulting in a moderate            sibilities among agents, thereby enhancing the overall accuracy.
+decrease in effectiveness. Without the action set, the model tended             Experimental results demonstrate the efficacy of Flow-of-Action.
+to rely more on tools determined by the flow, reducing the likelihood
+of excessive tool invocations and thus significantly lowering APL.              5       Acknowledgment
+    At the multi-agent level, the removal of any single agent led to
+                                                                                This work was supported by the Chinese Academy of Sciences
+a certain degree of decrease in accuracy. This is attributed to the
+                                                                                (241711KYSB20200023), the National Natural Science Foundation
+complexity of the RCA task, where having a single agent handle
+                                                                                of China (62202445), and the National Natural Science Foundation
+all processes may lead to oversight and hallucinations. In contrast,
+                                                                                of China-Research Grants Council (RGC) Joint Research Scheme
+                                                                                (62321166652).
+Flow-of-Action: SOP Enhanced LLM-Based Multi-Agent System for Root Cause Analysis                          WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia
+
+
+References                                                                                   [24] Gagan Somashekar, Anurag Dutt, Mainak Adak, Tania Lorido Botran, and An-
+ [1] Sarthak Chakraborty, Shaddy Garg, Shubham Agarwal, Ayush Chauhan, and                        shul Gandhi. 2024. GAMMA: Graph Neural Network-Based Multi-Bottleneck
+     Shiv Kumar Saini. 2023. Causil: Causal graph for instance level microservice                 Localization for Microservices Applications. In Proceedings of the ACM on Web
+     data. In Proceedings of the ACM Web Conference 2023. 2905–2915.                              Conference 2024. 3085–3095.
+ [2] Hongyang Chen, Pengfei Chen, Guangba Yu, Xiaoyun Li, Zilong He, and Huxing              [25] Shreshth Tuli, Giuliano Casale, and Nicholas R Jennings. 2022. Tranad: Deep
+     Zhang. 2024. MicroFI: Non-Intrusive and Prioritized Request-Level Fault Injection            transformer networks for anomaly detection in multivariate time series data.
+     for Microservice Applications. IEEE Transactions on Dependable and Secure                    arXiv preprint arXiv:2201.07284 (2022).
+     Computing (2024).                                                                       [26] Lu Wang, Chaoyun Zhang, Ruomeng Ding, Yong Xu, Qihang Chen, Wentao
+ [3] Yinfang Chen, Huaibing Xie, Minghua Ma, Yu Kang, Xin Gao, Liu Shi, Yunjie Cao,               Zou, Qingjun Chen, Meng Zhang, Xuedong Gao, Hao Fan, et al. 2023. Root
+     Xuedong Gao, Hao Fan, Ming Wen, et al. 2024. Automatic root cause analysis                   cause analysis for microservice systems via hierarchical reinforcement learning
+     via large language models for cloud incidents. In Proceedings of the Nineteenth              from human feedback. In Proceedings of the 29th ACM SIGKDD Conference on
+     European Conference on Computer Systems. 674–688.                                            Knowledge Discovery and Data Mining. 5116–5125.
+ [4] Ruomeng Ding, Chaoyun Zhang, Lu Wang, Yong Xu, Minghua Ma, Xiaomin                      [27] Zexin Wang, Jianhui Li, Minghua Ma, Ze Li, Yu Kang, Chaoyun Zhang, Chetan
+     Wu, Meng Zhang, Qingjun Chen, Xin Gao, Xuedong Gao, et al. 2023. Trace-                      Bansal, Murali Chintalapati, Saravan Rajmohan, Qingwei Lin, et al. 2024. Large
+     Diag: Adaptive, Interpretable, and Efficient Root Cause Analysis on Large-Scale              Language Models Can Provide Accurate and Interpretable Incident Triage. In 2024
+     Microservice Systems. In Proceedings of the 31st ACM Joint European Software En-             IEEE 35th International Symposium on Software Reliability Engineering (ISSRE).
+     gineering Conference and Symposium on the Foundations of Software Engineering.               IEEE, 523–534.
+     1762–1773.                                                                              [28] Zexin Wang, Changhua Pei, Minghua Ma, Xin Wang, Zhihan Li, Dan Pei, Saravan
+ [5] Sirui Hong, Xiawu Zheng, Jonathan Chen, Yuheng Cheng, Jinlin Wang, Ceyao                     Rajmohan, Dongmei Zhang, Qingwei Lin, Haiming Zhang, et al. 2024. Revisiting
+     Zhang, Zili Wang, Steven Ka Shing Yau, Zijuan Lin, Liyang Zhou, et al. 2023.                 VAE for Unsupervised Time Series Anomaly Detection: A Frequency Perspective.
+     Metagpt: Meta programming for multi-agent collaborative framework. arXiv                     In Proceedings of the ACM on Web Conference 2024. 3096–3105.
+     preprint arXiv:2308.00352 (2023).                                                       [29] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Fei Xia, Ed Chi,
+ [6] Azam Ikram, Sarthak Chakraborty, Subrata Mitra, Shiv Saini, Saurabh Bagchi, and              Quoc V Le, Denny Zhou, et al. 2022. Chain-of-thought prompting elicits reasoning
+     Murat Kocaoglu. 2022. Root cause analysis of failures in microservices through               in large language models. Advances in neural information processing systems 35
+     causal discovery. Advances in Neural Information Processing Systems 35 (2022),               (2022), 24824–24837.
+     31158–31170.                                                                            [30] Li Wu, Johan Tordsson, Erik Elmroth, and Odej Kao. 2020. Microrca: Root cause
+ [7] Soyeong Jeong, Jinheon Baek, Sukmin Cho, Sung Ju Hwang, and Jong C Park.                     localization of performance issues in microservices. In NOMS 2020-2020 IEEE/IFIP
+     2024. Adaptive-rag: Learning to adapt retrieval-augmented large language models              Network Operations and Management Symposium. IEEE, 1–9.
+     through question complexity. arXiv preprint arXiv:2403.14403 (2024).                    [31] Haowen Xu, Wenxiao Chen, Nengwen Zhao, Zeyan Li, Jiahao Bu, Zhihan Li,
+ [8] Xinrui Jiang, Yicheng Pan, Meng Ma, and Ping Wang. 2023. Look Deep into the                  Ying Liu, Youjian Zhao, Dan Pei, Yang Feng, et al. 2018. Unsupervised anomaly
+     Microservice System Anomaly through Very Sparse Logs. In Proceedings of the                  detection via variational auto-encoder for seasonal kpis in web applications. In
+     ACM Web Conference 2023. 2970–2978.                                                          Proceedings of the 2018 world wide web conference. 187–196.
+ [9] k8sgpt ai. 2023. k8sgpt. https://github.com/k8sgpt-ai/k8sgpt.                           [32] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan,
+[10] Labring. 2023. FastGPT. https://github.com/labring/FastGPT.                                  and Yuan Cao. 2022. React: Synergizing reasoning and acting in language models.
+[11] Chengshu Li, Jacky Liang, Andy Zeng, Xinyun Chen, Karol Hausman, Dorsa                       arXiv preprint arXiv:2210.03629 (2022).
+     Sadigh, Sergey Levine, Li Fei-Fei, Fei Xia, and Brian Ichter. 2023. Chain of code:      [33] Zhenhe Yao, Changhua Pei, Wenxiao Chen, Hanzhang Wang, Liangfei Su, Huai
+     Reasoning with a language model-augmented code emulator. arXiv preprint                      Jiang, Zhe Xie, Xiaohui Nie, and Dan Pei. 2024. Chain-of-Event: Interpretable
+     arXiv:2312.04474 (2023).                                                                     Root Cause Analysis for Microservices through Automatically Learning Weighted
+[12] Zeyan Li, Nengwen Zhao, Mingjie Li, Xianglin Lu, Lixin Wang, Dongdong Chang,                 Event Causal Graph. In Companion Proceedings of the 32nd ACM International
+     Xiaohui Nie, Li Cao, Wenchi Zhang, Kaixin Sui, et al. 2022. Actionable and                   Conference on the Foundations of Software Engineering. 50–61.
+     interpretable fault localization for recurring failures in online service systems. In   [34] Zhenhe Yao, Haowei Ye, Changhua Pei, Guang Cheng, Guangpei Wang, Zhiwei
+     Proceedings of the 30th ACM Joint European Software Engineering Conference and               Liu, Hongwei Chen, Hang Cui, Zeyan Li, Jianhui Li, et al. 2024. SparseRCA:
+     Symposium on the Foundations of Software Engineering. 996–1008.                              Unsupervised Root Cause Analysis in Sparse Microservice Testing Traces. In 2024
+[13] Cheng-Ming Lin, Ching Chang, Wei-Yao Wang, Kuang-Da Wang, and Wen-Chih                       IEEE 35st International Symposium on Software Reliability Engineering (ISSRE).
+     Peng. 2024. Root Cause Analysis in Microservice Using Neural Granger Causal             [35] Guangba Yu, Pengfei Chen, Yufeng Li, Hongyang Chen, Xiaoyun Li, and Zibin
+     Discovery. In Proceedings of the AAAI Conference on Artificial Intelligence, Vol. 38.        Zheng. 2023. Nezha: Interpretable fine-grained root causes analysis for microser-
+     206–213.                                                                                     vices on multi-modal observability data. In Proceedings of the 31st ACM Joint
+[14] Panagiotis Misiakos, Chris Wendler, and Markus Püschel. 2024. Learning DAGs                  European Software Engineering Conference and Symposium on the Foundations of
+     from data with few root causes. Advances in Neural Information Processing Systems            Software Engineering. 553–565.
+     36 (2024).                                                                              [36] Wei Zhang, Hongcheng Guo, Jian Yang, Yi Zhang, Chaoran Yan, Zhoujin Tian,
+[15] Liangming Pan, Alon Albalak, Xinyi Wang, and William Yang Wang. 2023. Logic-                 Hangyuan Ji, Zhoujun Li, Tongliang Li, Tieqiao Zheng, et al. 2024. mABC: multi-
+     lm: Empowering large language models with symbolic solvers for faithful logical              Agent Blockchain-Inspired Collaboration for root cause analysis in micro-services
+     reasoning. arXiv preprint arXiv:2305.12295 (2023).                                           architecture. arXiv preprint arXiv:2404.12135 (2024).
+[16] Yujia Qin, Shihao Liang, Yining Ye, Kunlun Zhu, Lan Yan, Yaxi Lu, Yankai Lin, Xin       [37] Lecheng Zheng, Zhengzhang Chen, Jingrui He, and Haifeng Chen. 2024. MULAN:
+     Cong, Xiangru Tang, Bill Qian, et al. 2023. Toolllm: Facilitating large language             Multi-modal Causal Structure Learning and Root Cause Analysis for Microservice
+     models to master 16000+ real-world apis. arXiv preprint arXiv:2307.16789 (2023).             Systems. In Proceedings of the ACM on Web Conference 2024. 4107–4116.
+[17] Alec Radford. 2018. Improving language understanding by generative pre-
+     training. (2018).
+[18] Alec Radford, Jeffrey Wu, Rewon Child, David Luan, Dario Amodei, Ilya Sutskever,
+     et al. 2019. Language models are unsupervised multitask learners. OpenAI blog
+                                                                                             A     Multimodal Data Collection
+     1, 8 (2019), 9.                                                                         We first deploy various data collection systems (Figure 8, Figure 9,
+[19] robusta dev. 2024. holmesgpt. https://github.com/robusta-dev/holmesgpt.
+[20] Carl Martin Rosenberg and Leon Moonen. 2020. Spectrum-based log diagnosis. In
+                                                                                             Figure 10, Figure 11). For metrics, we start by deploying Prometheus,
+     Proceedings of the 14th ACM/IEEE International Symposium on Empirical Software          which collects architecture-level metrics, such as pod-level and
+     Engineering and Measurement (ESEM). 1–12.                                               node-level indicators that are generally standardized and unre-
+[21] Timo Schick, Jane Dwivedi-Yu, Roberto Dessì, Roberta Raileanu, Maria Lomeli,
+     Eric Hambro, Luke Zettlemoyer, Nicola Cancedda, and Thomas Scialom. 2024.               lated to business logic. Additionally, we deploy DeepFlow to gather
+     Toolformer: Language models can teach themselves to use tools. Advances in              business-level metrics, such as business traffic data. For anomaly
+     Neural Information Processing Systems 36 (2024).                                        detection, we use traditional rule-based methods because they are
+[22] Junxian Shen, Han Zhang, Yang Xiang, Xingang Shi, Xinrui Li, Yunxi Shen,
+     Zijian Zhang, Yongxiang Wu, Xia Yin, Jilong Wang, et al. 2023. Network-centric          fast and convenient.
+     distributed tracing with deepflow: Troubleshooting your microservices in zero              For trace data, we deploy Jaeger to collect all trace data, where
+     code. In Proceedings of the ACM SIGCOMM 2023 Conference. 420–437.
+[23] Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik Narasimhan, and
+                                                                                             each trace represents a call chain containing multiple spans, with
+     Shunyu Yao. 2024. Reflexion: Language agents with verbal reinforcement learning.        each span corresponding to a single call. Anomalies can occur
+     Advances in Neural Information Processing Systems 36 (2024).                            within any span. In the current environment, detecting trace anom-
+                                                                                             alies is relatively straightforward, as a span failure typically includes
+WWW Companion ’25, April 28-May 2, 2025, Sydney, NSW, Australia                                                           Changhua Pei et al.
+
+
+an associated error message. Therefore, we directly extract error
+messages to generate alert reports. For log data, we use Elastic for
+collection. Since abnormal logs usually contain specific keywords,
+extracting anomalies based on keywords has become widely ac-
+cepted. We also adopt this keyword-based approach for log anomaly
+detection.
+
+
+
+
+                                                                                      Figure 11: Elastic Dashboard.
+
+
+                                                                       B   Tools
+
+                                                                                      Table 5: Description of Tools
+
+                                                                                   Tool                     Description
+                                                                           pod_analyze           Analyzing all pods’ status.
+                                                                           node_analyze          Analyzing all nodes’ status.
+                                                                           service_analyze       Analyzing all services’ status.
+                                                                           deployment_analyze    Analyzing all deployments’ status.
+                                                                           statefulset_analyze   Analyzing all statefulsets’ status.
+                                                                           run_kubectl_command   Executing kubectl commands gen-
+                                                                                                 erated by LLMs.
+                Figure 8: Prometheus Dashboard.                            get_all_namespace     Obtaining a list of all namespaces.
+                                                                           get_relevant_metric   Obtaining relevant metric names
+                                                                                                 according to query.
+
+
+
+
+                  Figure 9: Deepflow Dashboard.
+
+
+
+
+                   Figure 10: Jaeger Dashboard.
+

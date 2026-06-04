@@ -1,0 +1,8 @@
+graph TB
+    M["Manager Agent<br/>任务分解 + 协调"] --> W1["Worker: 指标组"]
+    M --> W2["Worker: 日志组"]
+    M --> W3["Worker: 追踪组"]
+    W1 --> M
+    W2 --> M
+    W3 --> M
+    M --> R["综合决策"]

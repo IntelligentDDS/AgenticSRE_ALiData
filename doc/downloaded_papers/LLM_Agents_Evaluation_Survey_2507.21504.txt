@@ -1,0 +1,744 @@
+                                                     Evaluation and Benchmarking of LLM Agents: A Survey
+                                                                  Mahmoud Mohammadi                                                                      Yipeng Li
+                                                              mahmoud.mohammadi@sap.com                                                              yipeng.li@sap.com
+                                                                        SAP Labs                                                                          SAP Labs
+                                                                   Bellevue, WA, USA                                                                 Bellevue, WA, USA
+
+                                                                                Jane Lo                                                                 Wendy Yip
+                                                                         jane.lo@sap.com                                                            wendy.yip@sap.com
+                                                                             SAP Labs                                                                    SAP Labs
+                                                                        Palo Alto, CA, USA                                                          Palo Alto, CA, USA
+                                         Abstract                                                                                1   Introduction
+
+
+
+
+arXiv:2507.21504v1 [cs.LG] 29 Jul 2025
+                                         The rise of LLM-based agents has opened new frontiers in AI ap-                         Agents based on LLMs are autonomous or semi-autonomous sys-
+                                         plications, yet evaluating these agents remains a complex and un-                       tems that use LLMs to reason, plan, and act, and represent a rapidly
+                                         derdeveloped area. This survey provides an in-depth overview of                         growing frontier in artificial intelligence [69, 105]. From customer
+                                         the emerging field of LLM agent evaluation, introducing a two-                          service bots and coding copilots to digital assistants, LLM agents
+                                         dimensional taxonomy that organizes existing work along (1) eval-                       are redefining how we build intelligent systems.
+                                         uation objectives—what to evaluate, such as agent behavior, capa-                          As these agents move from research prototypes to real-world
+                                         bilities, reliability, and safety—and (2) evaluation process—how to                     applications [23, 62], the question of how to rigorously evaluate
+                                         evaluate, including interaction modes, datasets and benchmarks,                         them becomes both pressing and complex. However, evaluating
+                                         metric computation methods, and tooling. In addition to taxonomy,                       LLM agents is more complex than evaluating LLMs in isolation.
+                                         we highlight enterprise-specific challenges, such as role-based ac-                     Unlike LLMs, which are primarily assessed for text generation or
+                                         cess to data, the need for reliability guarantees, dynamic and long-                    question answering, LLM agents operate in dynamic, interactive
+                                         horizon interactions, and compliance, which are often overlooked                        environments. They reason and make plans, execute tools, lever-
+                                         in current research. We also identify the future research directions,                   age memory, and even collaborate with humans or other agents
+                                         including holistic, more realistic, and scalable evaluation. This work                  [20]. This complex behavior and dependence on real-world effects
+                                         aims to bring clarity to the fragmented landscape of agent evalua-                      make standard LLM evaluation approaches insufficient. To make an
+                                         tion and provide a framework for systematic assessment, enabling                        analogy, LLM evaluation is like examining the performance of an
+                                         researchers and practitioners to evaluate LLM agents for real-world                     engine. In contrast, agent evaluation assesses a car’s performance
+                                         deployment.                                                                             comprehensively, as well as under various driving conditions.
+                                                                                                                                    LLM agent evaluation also differs from traditional software eval-
+                                         CCS Concepts                                                                            uation. While software testing focuses on deterministic and static
+                                         • Computing methodologies → Natural language processing;                                behavior, LLM agents are inherently probabilistic and behave dy-
+                                         • Software and its engineering → Software verification and                              namically; therefore, they require new approaches to assessing their
+                                         validation; • Human-centered computing → Human com-                                     performance. The evaluation of LLM agents is at the intersection
+                                         puter interaction (HCI).                                                                of natural language processing (NLP), human-computer interac-
+                                                                                                                                 tion (HCI), and software engineering, which demands additional
+                                         Keywords                                                                                perspectives.
+                                         LLM Agents; Agent Evaluation; Evaluation Taxonomy; Agent Be-                               Despite increasing interest in this space, existing surveys focus
+                                         havior, Benchmarks, Safety; Enterprise AI                                               narrowly on LLM evaluation or cover specific agent capabilities
+                                                                                                                                 without a holistic perspective [121]. In addition, enterprise appli-
+                                         ACM Reference Format:                                                                   cations bring additional requirements to agents, including secure
+                                         Mahmoud Mohammadi, Yipeng Li, Jane Lo, and Wendy Yip. 2025. Evaluation                  access to data and systems, a high degree of reliability for audit
+                                         and Benchmarking of LLM Agents: A Survey. In Proceedings of the 31st ACM                and compliance purposes, and more complex interaction patterns,
+                                         SIGKDD Conference on Knowledge Discovery and Data Mining V.2 (KDD ’25),                 which are rarely addressed in the existing literature [107]. This
+                                         August 3–7, 2025, Toronto, ON, Canada. ACM, New York, NY, USA, 11 pages.                survey aims to serve as a helpful reference for practitioners and
+                                         https://doi.org/10.1145/3711896.3736570                                                 researchers in the field of agent evaluation. Our contributions in
+                                                                                                                                 this survey are twofold.
+
+                                                                                                                                     • We propose a taxonomy of LLM agent evaluation that orga-
+                                                                                                                                       nizes prior work by evaluation objectives (what to evaluate,
+                                         This work is licensed under a Creative Commons Attribution 4.0 International License.         such as behavior, capabilities, reliability, and safety) and
+                                         KDD ’25, Toronto, ON, Canada                                                                  evaluation process (how to evaluate, including interaction
+                                         © 2025 Copyright held by the owner/author(s).
+                                         ACM ISBN 979-8-4007-1454-2/2025/08                                                            modes, datasets and benchmarks, metrics computation meth-
+                                         https://doi.org/10.1145/3711896.3736570                                                       ods, evaluation tooling, and evaluation environments).
+KDD ’25, August 3–7, 2025, Toronto, ON, Canada                                               Mahmoud Mohammadi, Yipeng Li, Jane Lo, and Wendy Yip
+
+
+     • We highlight enterprise-specific challenges, including role-         As LLM agents are deployed in increasingly diverse and complex
+       based access control, reliability guarantees, long-term inter-    settings, factors such as single-turn versus multi-turn interactions,
+       action, and compliance requirements.                              multilingualism, and multimodality all become more important.
+                                                                         While the taxonomy remains applicable across these variations,
+   The remainder of this paper is structured as follows. Section 2       tailored metrics and evaluation strategies are often required. We
+describes the taxonomy used in this survey paper to analyze the          will discuss these specific adaptations in the relevant sections that
+agent evaluation landscape. Section 3 dives into the first dimension     follow.
+of the taxonomy, evaluation objectives, and focuses on the aspects
+of the agent to be evaluated. Section 4 describes the second dimen-      3     Evaluation Objectives
+sion, the evaluation process, and focuses on the evaluation method.
+Section 5 discusses the challenges of assessing LLM agents in enter-     3.1    Agent Behavior
+prise environments. Section 6 outlines open questions and future         Agent behavior refers to the overall performance of the agent as
+research directions to guide the next phase of work in evaluating        perceived by a user, treating the agent as a black box. It represents
+LLM agents.                                                              the highest-level view in evaluation and offers the most direct
+                                                                         insight into the user experience. This category encompasses aspects
+2    Taxonomy for LLM-based Agent Evaluation                             such as task completion, output quality, latency, and cost.
+We propose a two-dimensional taxonomy to organize different as-
+                                                                         3.1.1 Task Completion: Task completion is a fundamental objec-
+pects of the evaluation of LLM-based agents, structured along the
+                                                                         tive of agent evaluation, assessing whether an agent successfully
+axes of Evaluation Objectives (what to evaluate) and Evalua-
+                                                                         achieves the predefined goals of a given task [11, 80, 96, 115]. It
+tion Process (how to evaluate). This taxonomy is visualized as a
+                                                                         involves determining whether a desired state is reached or if spe-
+hierarchical tree in 1.
+                                                                         cific criteria defined for task success are met [57, 93]. Although
+   The Evaluation Objectives dimension is concerned with the tar-
+                                                                         sometimes noted for providing limited fine-grained insight into
+gets of evaluation. The first category, Agent Behavior, in this dimen-
+                                                                         failures, especially when most models achieve low success rates
+sion focuses on outcome-oriented aspects such as task completion
+                                                                         [64], task completion remains a predominant and essential measure
+and output quality, capturing how well an agent meets end-users’
+                                                                         of overall agent performance [64].
+expectations. Next, Agent Capabilities emphasize process-oriented
+                                                                             Task completion is commonly quantified using metrics such as
+competencies, including tool use, planning and reasoning, mem-
+                                                                         Success Rate (SR) [11, 57, 64], which can also be referred to as Task
+ory and context retention, and multi-agent collaboration. These
+                                                                         Success Rate [115] or Overall Success Rate [57]. Other related metrics
+capabilities provide insights into how agents achieve their goals
+                                                                         include Task Goal Completion (TGC) [91] and Pass Rate [76]. Some
+and how well they meet their design specification. Reliability as-
+                                                                         evaluations employ binary indicators, such as a reward function
+sesses whether an agent behaves consistently for the same input
+                                                                         that returns 0 or 1 for goal achievement [42]. Metrics such as pass@𝑘
+and robustly when input varies or the system encounters errors.
+                                                                         and pass^𝑘 extend this by considering success over multiple trials
+Finally, Safety and Alignment evaluates the agent’s trustworthiness
+                                                                         [104].
+and security, including fairness, compliance, and the prevention of
+                                                                             This crucial objective is applied across a wide range of LLM agent
+harmful or unethical behaviors.
+                                                                         evaluation domains and benchmarks [93]. This includes tasks re-
+   The Evaluation Process dimension describes how agents are as-
+                                                                         lated to coding and software engineering, such as resolving GitHub
+sessed. Interaction Mode distinguishes between static evaluation,
+                                                                         issues (SWE-bench [40]), scientific data analysis programming (Sci-
+where agents respond to fixed inputs, and interactive assessment,
+                                                                         enceAgentBench [11]), reproducing research (CORE-Bench [86],
+where agents engage with users. Evaluation Data discusses both
+                                                                         PaperBench [87]), and interactive coding in apps (AppWorld [91]).
+synthetic and real-world datasets, as well as benchmarks tailored
+                                                                         It is also extensively used for agents interacting with web envi-
+to specific domains such as software engineering, healthcare, and
+                                                                         ronments, including general web navigation (BrowserGym [14],
+finance [23, 62]. Metrics Computation Methods encompasses quan-
+                                                                         WebArena [126], WebCanvas [73]), multimodal web tasks (Visual-
+titative measures, such as task success and factual accuracy, as
+                                                                         WebArena [42], MMInA [124]), and realistic time-consuming web
+well as qualitative evaluations based on human or LLM judgments.
+                                                                         tasks (ASSISTANTBENCH [109]).
+Evaluation Tooling refers to the supporting infrastructure, such as
+instrumentation frameworks (e.g., LangSmith, Arize AI) and pub-          3.1.2 Output Quality: Output quality refers to the characteristics
+lic leaderboards (e.g., Holistic Evaluation of Agents), that enable      of responses by an LLM agent. It is an umbrella term encompassing
+scalable and reproducible assessment. Lastly, Evaluation Contexts        aspects such as accuracy, relevance, clarity, coherence, and adher-
+define the environment in which evaluations are conducted, from          ence to agent specifications or task requirements [80]. An agent
+controlled simulations to open-world settings such as web browsers       may complete a task yet still deliver a subpar user experience if the
+or APIs.                                                                 interaction lacks the qualities mentioned above. Output quality is
+   This taxonomy serves both as a conceptual framework and a             particularly relevant in evaluating conversational agents, where
+practical guide, enabling systematic comparison and analysis of          user goals are often achieved over multiple turns. Many metrics in
+LLM agents across a wide range of goals, methodologies, and de-          this category overlap with those used in large language model (LLM)
+ployment conditions. In the following sections, we examine each          evaluation. For example, the fluency metric is used to measure the
+dimension in detail, highlighting key evaluation practices and rep-      degree to which the output of an LLM satisfies the conventions of
+resentative studies.                                                     natural language [120]. The logical coherence metric focuses on
+Evaluation and Benchmarking of LLM Agents: A Survey                                                  KDD ’25, August 3–7, 2025, Toronto, ON, Canada
+
+
+
+
+                                                  Figure 1: Taxonomy of LLM Agent Evaluation
+
+
+the rigor in arguments [120]. As LLM agents may utilize tools for        memory and context retention, and multi-agent collaboration. Eval-
+retrieving grounding information and providing context-aware text        uating these capabilities helps determine an agent’s strengths and
+answers, standard metrics used in retrieval-augmented generation         weaknesses on a more granular level.
+(RAG) systems also apply. Such metrics include Response Relevance
+or Factual Correctness [21].
+                                                                         3.2.1 Tool Use: Tool use is a core capability for LLM-based agents,
+                                                                         enabling them to retrieve grounding information, perform actions,
+3.1.3 Latency & Cost: Latency is a critical aspect of agent behav-
+                                                                         and interact with external environments. In this survey, tool use
+ior, especially in scenarios where users interact with agents syn-
+                                                                         involves invocation of a single tool and is interchangeable with
+chronously. Long wait times can significantly degrade user experi-
+                                                                         function calling; more complex cases of determining tool sequences
+ence and erode trust in the system. A commonly used metric in this
+                                                                         for complex tasks will be discussed in 3.2.2. Recent advances have
+context is Time To First Token (TTFT), which measures the delay
+                                                                         allowed LLMs, such as ChatGPT-3.5 and beyond, to support function
+before a user sees the first token of an LLM’s response in stream-
+                                                                         calling natively. These models can autonomously decide whether to
+ing mode. For use cases where the agent operates asynchronously,
+                                                                         invoke a function, select the appropriate one from a candidate set,
+End-to-End Request Latency—the time to receive the complete re-
+                                                                         and generate the required parameters. As a result, LLM agents can
+sponse—is often more relevant [70].
+                                                                         directly build on the functions of the underlying model, allowing
+   While cost is not directly observable by end-users, it plays a
+                                                                         many of the evaluation techniques originally developed for LLMs
+crucial role in determining the practicality of deploying agents
+                                                                         to use tools [47].
+at scale. We include cost as a measure of an agent’s monetary
+                                                                            The evaluation of the tool’s use involves answering several key
+efficiency. It is typically estimated based on the number of input and
+                                                                         questions. First, can the agent correctly determine whether tool
+output tokens, which directly correlate with usage-based pricing
+                                                                         invocation is necessary for a given task? If so, can it select the
+in most LLM deployments.
+                                                                         appropriate tool from a defined set of candidates? Once the tool is
+                                                                         selected, the agent must be able to identify the correct parameters
+3.2    Agent Capabilities                                                required by the tool and then generate appropriate values for each
+                                                                         parameter to ensure proper execution. In cases where the candidate
+Beyond external behavior, evaluations often target specific capa-        toolset is extensive, the agent may also need to retrieve the correct
+bilities of LLM-based agents that enable their performance. Key          tool from a repository based on a natural language description of
+aspects of this category include tool use, planning and reasoning,       the task [83].
+KDD ’25, August 3–7, 2025, Toronto, ON, Canada                                              Mahmoud Mohammadi, Yipeng Li, Jane Lo, and Wendy Yip
+
+
+    Several metrics have been proposed to assess these abilities.       3.2.3 Memory and Context Retention: A critical capability for long-
+Invocation Accuracy [54] evaluates whether the agent makes the          running agents is the ability to retain information throughout many
+correct decision about whether to call a tool at all. Tool Selection    interactions and apply previous context to current requests. Guan et
+Accuracy measures whether the proper tool is chosen from a list         al. [31] categorize memory evaluation in multi-turn conversations
+of options. Retrieval Accuracy focuses on whether the system can        by Memory Span (how long information is stored) and Memory
+retrieve the correct tool from a larger toolset, often measured using   Forms (how information is represented). For example, LongEval
+rank accuracy 𝑘. For ranking-based evaluation, Mean Reciprocal          [43] and SocialBench [9] are benchmarks that test an agent’s con-
+Rank (MRR) quantifies the position of the correct tool in the ranked    text retention in long dialogues (40+ turns). An agent might be
+list. In contrast, Normalized Discounted Cumulative Gain (NDCG)         given a conversation that spans dozens of exchanges and later
+reflects how well the system ranks all relevant tools[54].              asked questions that require recalling details from early in the
+    Parameter-related evaluation involves two aspects. The param-       conversation. Maharana et al. [65] demonstrate evaluation with
+eter name F1 score [83] measures the agent’s ability to identify the    dialogues spanning hundreds of turns (600+ turns), and Li et al.
+parameter names required for a given function correctly and then        [50] introduce memory-enhanced evaluation techniques, tracking
+correctly assign values to them. While some evaluations rely on         how well agents maintain consistency in long-horizon tasks. These
+the correctness of abstract syntax trees (ASTs) to check if the tool    evaluations often use synthetic or logged conversations as datasets,
+call is syntactically valid, this approach may miss semantic errors,    and metrics include Factual Recall Accuracy or Consistency Score
+such as incorrect or hallucinated parameter values, especially for      (no contradictions between turns). Memory evaluation may also
+parameters constrained to enumerated types [75]. To address this        consider working memory for tool-using agents (i.e., whether the
+limitation, recent work, such as the Gorilla paper, has proposed        agent keeps track of intermediate results) and forgetting strategies
+execution-based evaluation, in which the system runs the tool calls     (i.e., whether it appropriately forgets irrelevant details to avoid
+and assesses their outcomes, offering a more comprehensive and          confusion).
+grounded assessment of tool use capability [75].
+                                                                        3.2.4 Multi-Agent Collaboration: Evaluating multi-agent collab-
+3.2.2 Planning and Reasoning: Planning and reasoning are essen-         oration in LLM-based systems requires different methodologies
+tial capabilities for LLM-based agents, especially in complex tasks     compared to traditional reinforcement learning-driven coordina-
+that require multiple steps or making decisions under uncertainty.      tion [7, 48, 89]. Unlike conventional agents that rely on prede-
+Planning involves selecting the correct set of tools in an appro-       fined reward structures, LLM agents coordinate through natural
+priate order. At the same time, reasoning enables agents to make        language, strategic reasoning, and decentralized problem-solving
+context-aware decisions, either ahead of time or dynamically dur-       [32, 33]. These capabilities are crucial in real-world applications
+ing task execution [37]. T-eval [12] formulated planning evaluation     such as financial decision-making and structured data analysis,
+as comparing the set of predicted tools against a reference. Since      where autonomous agents must exchange information, negotiate,
+tool order and dependency also matter, some benchmarks adopt            and synchronize decision-making processes efficiently [50, 55]. Au-
+graph-based representations and introduce metrics such as Node          tonomous Agents for Collaborative Tasks [55] evaluates Collabora-
+F1 for tool selection and Edge F1 or Normalized Edit Distance for       tive Efficiency, assessing how well multiple agents share responsi-
+assessing tool invocation sequences and structural accuracy [83].       bilities and distribute tasks dynamically.
+   In dynamic environments, agents often need to interleave plan-
+ning and execution, adapting their actions in response to evolving      3.3    Reliability
+context [37]. This pattern is illustrated by the ReAct paradigm,
+where agents alternate between reasoning steps and tool usage           Reliability is a crucial objective, especially as LLM agents are consid-
+[106]. Evaluating such adaptive reasoning requires more than com-       ered for use in enterprise and safety-critical applications. It encom-
+paring static plans—it demands metrics that reflect decision-making     passes consistency, robustness to variations, and trustworthiness of
+in real time. The T-Eval framework [12] addresses this by intro-        the agents’ outputs. Unlike task performance (which might measure
+ducing a reasoning metric that assesses how closely an agent’s          best-case capabilities), reliability evaluation probes worst-case and
+predicted next tool call aligns with the expected one at each step.     average-case scenarios.
+This captures the agent’s ability to make informed decisions when
+tool outputs are not known in advance. Similarly, AgentBoard [64]       3.3.1 Consistency: Consistency refers to the stability of the output
+proposes the metric Progress Rate, which compares the agent’s ac-       when the same task is repeated multiple times [54]. Since LLMs
+tual trajectory against the expected one, offering a fine-grained       are inherently non-deterministic, LLM-based agents also exhibit
+measure of how effectively the agent advances toward its goal.          variability in their behavior. For agents to be trusted in enterprise or
+   When agents are instructed to plan in the form of generating         other high-stakes applications, they must demonstrate consistent
+complete multi-step programs, evaluation methods from code gen-         performance across repeated runs of the same task. A commonly
+eration become relevant. Benchmarks like ScienceAgentBench com-         used metric in this context is pass@k, which measures the probabil-
+pare the generated plans against annotated references using pro-        ity that an agent succeeds at least once over k attempts. However,
+gram similarity metrics [11]. Additionally, the Step Success Rate has   a stricter measure of consistency is whether the agent succeeds
+been proposed to measure the percentage of steps in the generated       in all k attempts. This is formalized in the 𝜏-benchmark as the
+plan that are successfully executed, providing a holistic view of       pass^𝑘 metric, which better captures the consistency requirements
+planning quality during execution [28].                                 of mission-critical deployments.
+Evaluation and Benchmarking of LLM Agents: A Survey                                                   KDD ’25, August 3–7, 2025, Toronto, ON, Canada
+
+
+3.3.2 Robustness: Robustness refers to the stability of an agent’s       3.4.2 Harm, Toxicity, and Bias: One aspect of safety is ensuring
+output when faced with input variations or changes in the environ-       that an agent’s outputs do not contain harmful content such as
+ment. To remain effective and trustworthy, LLM-based agents must         hate speech, harassment, or extremely biased statements. Evalua-
+consistently deliver high performance under a range of challeng-         tion for toxicity often uses specialized test sets and metrics, such
+ing conditions. Evaluating robustness often involves stress-testing      as the RealToxicityPrompts dataset [27] – a collection of prompts
+the agent with perturbed inputs—such as paraphrased instructions,        likely to elicit toxic content—where its responses are checked with
+irrelevant or misleading context, or linguistic variations like typos    automated toxicity detectors or human raters. Metrics include the
+and dialects—to assess whether it can still complete the task success-   percentage of responses containing toxic language or the average
+fully. For example, robustness evaluations may involve applying          toxicity score (as given by a classifier). HELM [51] includes toxicity
+systematic transformations to standard prompts and measuring the         and bias metrics as part of holistic evaluation, indicating how fre-
+resulting drop in task success rate or output quality. The HELM          quently a model produces offensive content or exhibits undesired
+benchmark [51] explicitly incorporates such tests, tracking how          biases. For an interactive agent, one might evaluate it by giving
+model performance degrades under input variation.                        provocative or ethically challenging inputs (red-teaming) and then
+   Robustness also encompasses adaptive resilience—the agent’s           measuring its failure rate (how often it responds in an unsafe man-
+ability to recover from dynamic changes in the environment. For          ner). Safety-focused datasets, such as CoSafe, target exactly this: Yu
+instance, WebLinX [63] examines how agents behave when the               et al. introduce CoSafe [110] to evaluate conversation agents on ad-
+structure of a web page changes during execution. In such settings,      versarial prompts designed to trick them into breaking safety rules
+an effective agent must adjust its strategy rather than stall or fail.   (e.g., a user subtly asks for self-harm advice or illicit instructions).
+   In tool-using agents, robustness is further reflected in error-       CoSafe revealed that even advanced agents had vulnerabilities,
+handling capabilities. As demonstrated in ToolEmu’s evaluation           such as falling for coreference-based attacks (where a user refers to
+[82], agents must be able to respond to tool failures or unexpected      something ambiguously to bypass filters). The evaluation process
+outputs gracefully. Robustness tests may include intentionally in-       involved monitoring the agent’s responses for policy violations
+jecting failures—such as API errors or null responses—to observe         when faced with these adversarial queries. Having a numeric score
+whether the agent recovers (e.g., retries, switches tools, or explains   (like “agent produced a disallowed response in X% of adversarial
+the issue to the user) or breaks down. A key metric could be the pro-    cases”) quantifies safety.
+portion of induced failures that are handled appropriately, reflecting   3.4.3 Compliance and Privacy: Beyond avoiding overt toxicity,
+the agent’s reliability in uncertain or imperfect conditions.            many deployments require agents to comply with specific regula-
+                                                                         tory or policy constraints [6, 123]. For instance, a finance chatbot
+3.4    Safety and Alignment
+                                                                         must not disclose confidential information or provide particular
+Safety covers an agent’s adherence to ethical guidelines, avoidance      types of financial advice, and a medical assistant must not deviate
+of harmful behavior, and compliance with legal or policy constraints.    from established medical guidelines. Evaluating compliance may
+As LLM agents become more powerful and autonomous, the risk              be highly domain-specific, as it involves scenarios crafted to test
+of unintended adverse outcomes (e.g., generating disinformation,         whether the agent respects boundaries (e.g., a user asks the medical
+hate speech, or unsafe instructions) grows, making safety eval-          bot for a prescription-only drug recommendation—the correct, safe
+uation indispensable. These evaluations are especially critical in       behavior is to refuse and advise consulting a doctor).
+fields such as financial services, cybersecurity, and autonomous            In enterprise contexts, compliance evaluation may require pro-
+decision-making, where agent vulnerabilities can lead to severe          prietary test cases that reflect actual policies. One approach is to
+consequences [22, 26, 34, 49].                                           integrate those concerns into evaluation frameworks. For example,
+                                                                         the HELM benchmark [51] for enterprises was proposed to include
+3.4.1 Fairness: The lack of fairness and transparency in AI agents       domain-specific prompts and metrics (such as accuracy on financial
+can result in biased outcomes, decreased users’ trust, and unin-         jargon or compliance in responses) for fields like finance and law.
+tended societal consequences [16]. In financial applications, for        The process involves gathering representative enterprise scenarios
+example, biased decision-making in loan approvals or investment          (which may contain confidential or custom data) and designing eval-
+strategies can reinforce systemic inequalities (FinCon [111], Auto-      uation metrics that reflect real-world success criteria (e.g., Did the
+Guide [24]). Ethical concerns also arise in multi-agent interactions,    agent follow all legal disclaimer requirements in its response?). For
+where decision-making frameworks must ensure compliance with             example, TheAgentCompany [97] evaluates enterprise AI agents
+standards and social norms [67].                                         under structured correctness constraints, requiring them to follow
+   Explainability is crucial in enhancing user trust, especially in      predefined organizational policies when completing tasks.
+interactive systems where AI agents provide recommendations or
+automated assistance. Methods such as guideline-driven decision-         4     Evaluation Process
+making (AutoGuide [24]) and structured transparency mechanisms
+(MATSA [66], FinCon [111]) provide users with clear reasoning            4.1    Interaction Mode
+paths. Meanwhile, Rjudge [112] analyzes how agents perceive risk         Evaluating LLM agents can occur in various interaction modes
+when making autonomous decisions, emphasizing transparency               and with different tooling. A fundamental distinction is between
+and trustworthiness in AI interactions. Evaluating these dimen-          offline evaluation (using pre-generated, static datasets) and online
+sions ensures that AI agents align with ethical standards while          assessment (involving reactive simulations, humans in the loop, or
+maintaining fairness in their operational contexts.                      live system monitoring).
+KDD ’25, August 3–7, 2025, Toronto, ON, Canada                                                 Mahmoud Mohammadi, Yipeng Li, Jane Lo, and Wendy Yip
+
+
+                                                 Table 1: Evaluation Objectives and Their Metrics.
+
+ Objectives             Category       Metrics                              Relevant Papers
+ Agent Behavior         Task CompletionSuccess Rate (SR), F1-score, AgentBoard [8], WebShop [103], AgentBench [58], Tool
+                                       Pass@k, Progress Rate, Execution Use Evaluation [53], InformativeBench, SQuAD [79][78]
+                                       Accuracy, Transfer Learning [56], ResearchArena [41], AgentBoard [8], AppWorld [91],
+                                       Success, Zero-Shot Generalization TheAgentCompany [97], MAGIC [99], Mobile-Env [117],
+                                       Accuracy                             Re-ReST [19], XMC-AGENT [59], SWE-bench [40]
+                  Output Quality       Coherence, User Satisfaction, Us- PredictingIQ [80], EnDex [98], PsychoGAT [101]
+                                       ability, Likability, Overall Quality
+                  Latency & Cost       Latency, Token Usage, Cost           Cluster diagnosis [84], MobileBench [18], MobileAgent-
+                                                                            Bench [92], LangSuitE [39], WebArena [126], Mobile-env
+                                                                            [116], GUI Agents [94], GPTDroid [60], Spa-bench [10]
+ Agent Capability Tool Use             Task Completion Rate, Tool Selec- ToolEmu [81], MetaTool [38], AutoCodeRover [119]
+                                       tion Accuracy
+                  Planning & Reasoning Reasoning Quality, Accuracy, Fine- AgentBoard [8] Massive Multitask Language Understand-
+                                       Grained Progress Rate, Self Consis- ing [36], LLM-Augmented Autonomous Agents [55], Clus-
+                                       tency, Plan Quality                  ter diagnosis questions [84], SimuCourt [35], Magis [90]
+                  Memory & Context Factual Accuracy Recall, Consis- LongEval [43], SocialBench [9], LoCoMo [65], Optimus-1
+                  Retention            tency Scores                         [50]
+                  Multi-Agent Collabo- Information Sharing Effectiveness, AgentSims [52], WebArena [126], MATSA [66],
+                  ration               Adaptive Role Switching, Reason- GAMEBENCH [15], BALROG [72], TheAgentCompany
+                                       ing Rating                           [97]
+ Reliability      Consistency          pass^k                               𝜏-Bench [104]
+                  Robustness           Accuracy, Task Success Rate Under HELM [51], WebLinX [63]
+                                       Perturbation
+ Safety           Fairness             Awareness Coverage, Violation CASA [77], R-Judge [112], SimuCourt [35], MATSA [66],
+                                       Rate, Transparency, Ethics, Moral- FinCon [111], AutoGuide [24]
+                                       ity
+                  Harm                 Adversarial Robustness, Prompt In- Agent Security Bench(ASB) [118], AgentPoison [13],
+                                       jection Resistance, Harmfulness, AgentDojo [17], Backdoor Attacks [102], SafeAgentBench
+                                       Bias Detection                       [108], Agent-Safety Bench [122], AgentHarm [5], Adap-
+                                                                            tive Attacks [113], RealToxicityPrompts [27]
+                  Compliance & Pri- Risk Awareness, Task Completion R-Judge [112], Cybench [114], TheAgentCompany [97]
+                  vacy                 Under Constraints
+
+
+4.1.1 Static & Offline Evaluation Often performed as a baseline,            to agent behavior. For example, in the assessment of web agents,
+offline evaluations typically rely on datasets and static test cases:       researchers built web simulators (MiniWoB [85], WebShop [103],
+collections of tasks, prompts, or conversations that represent chal-        WebArena [126], etc.) where the behavior of an agent (clicking links,
+lenges the agent might face. Simulated conversations may be used            filling forms) can be programmed to verify the correct sequence.
+to help develop these data, but are ultimately inert between different          The concept of Evaluation-driven Development (EDD) has
+runs. Though comparatively cheaper and simpler to run and main-             also been proposed [95], proposing making evaluation an integral
+tain, offline evaluations typically lack the nuance to fully address        part of the agent development cycle. It advocates for continuous
+the wide range of responses an LLM agent may be able or expected            evaluation of the agent, both offline (during development) and
+to provide. As such, they are more prone to error propagation and           online (after deployment), to detect regressions and adapt to new
+are generally less accurate representations of system performance.          use cases. They further outline a reference architecture in which an
+                                                                            AgentOps component monitors agent performance in production
+4.1.2 Dynamic & Online Evaluation As with other ML systems, on-             and provides insights back to developers. While still an emerging
+line evaluation often occurs after an LLM agent has been deployed.          idea, it underscores that evaluation is not a one-time task but an
+Instead of relying on synthetic, historical, or manually crafted data,      ongoing process, especially for agents that learn or evolve.
+online evaluations leverage simulations or fundamental user inter-
+actions. This adaptive data is crucial for identifying pain points and      4.2    Evaluation Data
+issues that are not discovered during static testing and is often rich
+in domain context that is more difficult to capture with synthetic or       The growing interest in evaluating LLM-based agents has led to
+generalized benchmarks. Dynamic evaluations may use proxies to              the development of diverse datasets, benchmarks, and leaderboards
+simulate users or environments in reactive, real-time response              specifically targeting the agent capabilities discussed in Section 3.
+Evaluation and Benchmarking of LLM Agents: A Survey                                                   KDD ’25, August 3–7, 2025, Toronto, ON, Canada
+
+
+Many of these resources are designed to reflect real-world complex-       scale, making it impractical for large-scale automated systems that
+ity and are built using a mix of human-annotated, synthetic, and          require frequent evaluations.
+interaction-generated data. For instance, datasets such as AAAR-1.0
+[61], ScienceAgentBench [11], and TaskBench [83] provide struc-           4.4    Evaluation Tooling
+tured, expert-labeled benchmarks for assessing research reasoning,        A notable aspect in the process dimension is the emergence of soft-
+scientific workflows, and multi-tool planning. Others, such as Flow-      ware frameworks and platforms that support automated, scalable,
+Bench [96], ToolBench [38], and API-Bank [47], focus on tool use          and continuous agent evaluation workflows. These tools enable
+and function-calling across large API repositories. These bench-          integration of evaluation directly into the development lifecycle,
+marks typically include not only the gold tool sequences but also         reflecting a growing movement toward Evaluation-driven Develop-
+expected parameter structures, enabling fine-grained evaluation.          ment (EDD) [95] in agent building. OpenAI Evals is an open-source
+   In parallel, datasets like AssistantBench [109], AppWorld [91],        framework that allows developers to specify evaluation tasks and
+and WebArena [126] simulate more open-ended and interactive               metrics for models, automating the execution and reporting of
+agent behaviors in web and application environments. They empha-          results (though not formally described in academic literature, it re-
+size dynamic decision-making, long-horizon planning, and user-            flects practical needs) [71]. Other open-source or commercial tools
+agent interactions. Several benchmarks also support safety and            such as DeepEval [2], InspectAI [3], Phoenix [1], and GALILEO
+robustness testing—for example, AgentHarm [5] assesses poten-             [25] provide rich analytics, evaluation orchestration, and debugging
+tially harmful behaviors, while AgentDojo [17] evaluates resilience       capabilities. Moreover, agent development platforms like Azure AI
+against prompt injection attacks. Leaderboards such as the Berke-         Foundry [68], Google Vortex AI [29], LangGraph [44], and Amazon
+ley Function-Calling Leaderboard (BFCL) [100] and Holistic Agent          Bedrock [4] increasingly incorporate evaluation features, helping
+Leaderboard [88] consolidate these evaluations by providing stan-         developers monitor performance, detect regressions, and adapt
+dardized test cases, automated metrics (e.g., AST correctness, Win        agents to evolving user needs. Xia et al. [95] further propose an
+Rate), and ranking mechanisms to compare systems.                         AgentOps architecture to continuously monitor deployed agents,
+                                                                          closing the loop between development and deployment through
+4.3    Metrics Computation Methods                                        real-time feedback and quality control.
+The code-based method is the most deterministic and objective
+approach [8, 53, 57]. [8] It relies on explicit rules, test cases, or     4.5    Evaluation Contexts
+assertions to verify whether an agent’s response meets predefined         The evaluation context pertains to the environment in which an
+criteria. This method is particularly effective for tasks with well-      evaluation is performed. Similar to software engineering, a tradeoff
+defined outputs, such as numerical calculations, structured query         exists between more realistic (but often more costly and potentially
+generation, or syntactic correctness in programming tasks. Its pri-       less secure) and simpler, more controlled (but usually less represen-
+mary advantage is its consistency and reproducibility, making it          tative of final performance) environments. The context in which a
+highly reliable for benchmarking. However, code-based methods             system is assessed is typically guided by the system’s intended use;
+are typically inflexible. They struggle with evaluating open-ended        a simpler LLM agent without edit access might be tested in its work-
+or qualitative responses, such as natural language generation or          ing environment directly, whereas an LLM agent designed to work
+creative problem-solving, where correctness is subjective. Despite        with and make changes to many intertwined systems will likely
+this, it remains a fundamental technique for evaluating structured        be evaluated in a mocked API or sandbox environment. For less
+tasks where correctness is well-defined.                                  contained systems, the evaluation context may take the form of a
+   The LLM-as-a-Judge approach [125] leverages the reasoning              web simulator, such as MiniWoB [85], WebShop [103], or WebArena
+capabilities of LLMs to evaluate agent responses based on qualita-        [126]. As the development of an agent continues, the evaluation con-
+tive criteria, assessing responses according to the criteria provided     text often evolves with it, from smaller, mocked API environments
+through instructions. This method has gained traction due to its          to live deployment as agent performance and trustworthiness are
+ability to handle tasks that are subjective and nuanced, such as          determined.
+summarization, reasoning, and conversational interactions. One
+recent extension of this method is Agent-as-a-Judge [127], where          5     Enterprise-Specific Challenges
+the evaluation process involves multiple AI agents interacting to         As LLM-based agents transition from research demos to deployment
+refine the assessment, potentially improving evaluation reliability.      in enterprise settings, new challenges are emerging. Enterprises
+This method is highly scalable and can adapt to complex tasks. As         often demand high performance in conjunction with predictable
+a result, it has received increasing attention [30, 46].                  reliability, compliance with regulations, data security, and maintain-
+   Human-in-the-loop evaluation remains the gold standard for             ability, which are usually overlooked during evaluation. To address
+subjective aspects (like naturalness and user satisfaction) and safety-   these gaps, we discuss the concerns outlined in the following sec-
+critical judgment calls. Human evaluations can take the form of           tions and outline future directions.
+user studies, expert audits (where domain experts review agent
+outputs), or Crowdworker annotations (where outputs are rated             5.1    Complexity from Role-based Access
+along dimensions such as relevance, correctness, and tone). This          A key challenge in evaluating LLM-based agents in enterprise set-
+method offers the highest reliability in open-ended tasks, such as        tings is the need to account for Role-Based Access Control (RBAC),
+content generation, strategic decision-making, or dialogue coher-         which governs users’ permissions to access data and services. In
+ence. However, it is expensive, time-consuming, and challenging to        these environments, users operate with varying levels of access
+KDD ’25, August 3–7, 2025, Toronto, ON, Canada                                              Mahmoud Mohammadi, Yipeng Li, Jane Lo, and Wendy Yip
+
+
+depending on their roles, and agents acting on their behalf must ad-     5.4    Adherence to Domain-Specific Policies and
+here to the same constraints. This introduces complexity into agent             Compliance Requirements
+evaluation, as an agent’s ability to retrieve or act on information is
+not uniform but contextually bound to the user’s permissions.            Another significant challenge in evaluating enterprise agents is
+   To address this, some evaluation frameworks have begun incor-         ensuring that they can operate within domain-specific policies and
+porating access control constraints into their design. For example,      compliance constraints. Enterprises often enforce strict operational
+IntellAgent [45] includes evaluation tasks that require authentica-      rules—such as approval workflows, data retention policies, usage
+tion of user identity and enforce policies that deny access to other     quotas, and legal regulations like GDPR or HIPAA—that must be
+users’ information. By embedding role-specific restrictions into task    respected by agents throughout task execution. Evaluating agents
+generation, these approaches more accurately model how agents            in such contexts requires more than measuring task success; it
+behave in permission-sensitive enterprise contexts.                      demands verification that agent behaviors align with formal policy
+                                                                         constraints and legal compliance standards. For instance, an agent
+                                                                         generating financial reports must avoid unauthorized access to
+5.2     Reliability Guarantees                                           confidential forecasts and ensure that generated content adheres
+Reliability guarantees are especially important in enterprise set-       to regulatory reporting standards. Without explicit modeling of
+tings, where agents are expected to operate within compliance and        these constraints during evaluation, agents deemed "correct" in
+auditing frameworks that require deterministic or repeatable be-         traditional benchmarks may still fail in production due to policy
+havior that is explainable. In such contexts, occasional success is      violations or compliance risks.
+insufficient; agents must perform reliably across time and usage
+scenarios to be considered production-ready.
+                                                                         6     Future Research Directions
+   Evaluating reliability is nontrivial. Because LLM-based agents        As LLM-based agents continue to grow in complexity and applica-
+are inherently stochastic, measuring consistency requires execut-        tion scope, future research must push toward more robust, practical,
+ing the same task multiple times and observing the variation in          and scalable evaluation methodologies. We highlight four key di-
+outcomes. This introduces significant evaluation overhead: run-          rections that can significantly advance the field:
+ning multiple trials per input can be computationally expensive,            Holistic Evaluation Frameworks: Current evaluation efforts
+especially when testing complex tasks involving tools, memory,           often focus on isolated dimensions such as task success, planning
+or multi-agent coordination. Moreover, to draw meaningful con-           quality, or tool use. However, agents in real-world applications
+clusions, benchmarks must include a representative dataset that          must simultaneously balance multiple competencies. Future work
+reflects the types of tasks and conditions the agent may encounter.      should develop holistic evaluation frameworks that assess agent
+   Some efforts have begun to tackle this challenge. For example,        performance across multiple, interdependent dimensions.
+the 𝜏-benchmark [104] explicitly incorporates the pass^𝑘 metric to          More Realistic Evaluation Settings: To bridge the gap be-
+evaluate the consistency of an agent. By applying this to domains        tween lab settings and production environments, agent evaluation
+such as retail and airline booking, the authors show that current        must move toward more realistic conditions. This includes creating
+agents struggle with consistency.                                        evaluation environments that incorporate enterprise-specific ele-
+                                                                         ments such as dynamic multi-user interactions, role-based access
+5.3     Dynamic and Long-Horizon Interactions                            controls, and domain-specific knowledge. These settings can be
+                                                                         achieved through real-world deployment trials or through simu-
+One major challenge in evaluating LLM-based agents is assessing          lated environments that mimic enterprise workflows.
+their performance on long-horizon tasks in dynamic, evolving en-            Automated and Scalable Evaluation Techniques: Manual
+vironments. Unlike most current benchmarks that focus on short           evaluation of agent behavior, especially in multi-turn or long-horizon
+episodes or single interactions, real-world enterprise agents often      scenarios, is costly and complicated to scale. Future research should
+operate continuously over extended periods while interacting with        explore automated evaluation approaches to reduce human effort
+users, systems, and data.                                                and improve reproducibility. This includes using synthetic data
+   Addressing this challenge is essential for understanding how          generation for controllable test cases, leveraging simulated envi-
+agents behave over time, particularly in enterprise settings where       ronments to emulate task contexts, and advancing LLM-based eval-
+reliability, adaptability, and goal alignment are crucial throughout     uation techniques such as LLM-as-a-judge or Agent-as-a-judge.
+the agent’s lifecycle. Standard, short-term evaluations cannot cap-         Time- and Cost-Bounded Evaluation Protocols: Evalua-
+ture phenomena such as performance drift, context retention, or          tion must be efficient and able to support iterative agent develop-
+the cumulative effect of decisions on business outcomes.                 ment. Today’s methods—especially those requiring repeated trials
+   To begin tackling this issue, some research efforts have intro-       or human-in-the-loop assessments—can be both time- and resource-
+duced long-running simulations and extended dialogues as evalua-         intensive. Future research should aim to develop time- and cost-
+tion tools. For instance, Park et al. [74] observed generative agents    bounded evaluation protocols that strike a balance between depth
+in a continuously running simulated town environment to study            and efficiency.
+emergent behaviors across multi-day interactions. Similarly, Maha-          In summary, future research should focus on developing eval-
+rana et al. [65] evaluated long-term conversational memory through       uation methods that are holistic, realistic, scalable, and efficient.
+600-turn dialogues, focusing on how well agents maintain coher-          These directions are essential for building reliable and trustworthy
+ence and context over extended conversations.                            LLM-based agents at scale.
+Evaluation and Benchmarking of LLM Agents: A Survey                                                                          KDD ’25, August 3–7, 2025, Toronto, ON, Canada
+
+
+References                                                                                [23] Adam Fourney, Gagan Bansal, Hussein Mozannar, Cheng Tan, Eduardo Sali-
+                                                                                               nas, Erkang, Zhu, Friederike Niedtner, Grace Proebsting, Griffin Bassman,
+  [1] Arize AI. 2025. Phoenix. https://github.com/Arize-ai/phoenix                             Jack Gerrits, Jacob Alber, Peter Chang, Ricky Loynd, Robert West, Victor
+  [2] Confident AI. 2025. DeepEval. https://github.com/confident-ai/deepeval                   Dibia, Ahmed Awadallah, Ece Kamar, Rafah Hosn, and Saleema Amershi. 2024.
+  [3] UK AI Security Institute. 2024. Inspect AI: Framework for Large Language Model           Magentic-One: A Generalist Multi-Agent System for Solving Complex Tasks.
+      Evaluations. https://github.com/UKGovernmentBEIS/inspect_ai                              doi:10.48550/arXiv.2411.04468
+  [4] Amazon. 2024. Amazon Bedrock Agents. https://aws.amazon.com/bedrock/                [24] Yao Fu, Dong-Ki Kim, Jaekyeom Kim, Sungryull Sohn, Lajanugen Logeswaran,
+      agents/                                                                                  Kyunghoon Bae, and Honglak Lee. 2024. AutoGuide: Automated Generation
+  [5] Maksym Andriushchenko, Alexandra Souly, Mateusz Dziemian, Derek Due-                     and Selection of Context-Aware Guidelines for Large Language Model Agents.
+      nas, Maxwell Lin, Justin Wang, Dan Hendrycks, Andy Zou, Zico Kolter,                     In Advances in Neural Information Processing Systems, A. Globerson, L. Mackey,
+      Matt Fredrikson, Eric Winsor, Jerome Wynne, Yarin Gal, and Xander Davies.                D. Belgrave, A. Fan, U. Paquet, J. Tomczak, and C. Zhang (Eds.), Vol. 37. Curran
+      2025. AgentHarm: a benchmark for measuring harmfulness of LLM agents.                    Associates, Inc., 119919–119948.
+      doi:10.48550/arXiv.2410.09024                                                       [25] Galileo. 2025. Introducing agentic evaluations. https://www.galileo.ai/blog/
+  [6] Nik Bear Brown. 2024. Enhancing trust in llms: Algorithms for comparing and              introducing-agentic-evaluations Accessed: 2025-05-20.
+      interpreting llms. arXiv preprint arXiv:2406.01943 (2024).                          [26] Yuyou Gan, Yong Yang, Zhe Ma, Ping He, Rui Zeng, Yiming Wang, Qingming
+  [7] Chi-Min Chan, Weize Chen, Yusheng Su, Jianxuan Yu, Wei Xue, Shanghang                    Li, Chunyi Zhou, Songze Li, Ting Wang, et al. 2024. Navigating the risks: A
+      Zhang, Jie Fu, and Zhiyuan Liu. 2023. Chateval: Towards better llm-based                 survey of security, privacy, and ethics threats in llm-based agents. arXiv preprint
+      evaluators through multi-agent debate. arXiv preprint arXiv:2308.07201 (2023).           arXiv:2411.09523 (2024).
+  [8] Ma Chang, Junlei Zhang, Zhihao Zhu, Cheng Yang, Yujiu Yang, Yaohui Jin, Zhen-       [27] Samuel Gehman, Suchin Gururangan, Maarten Sap, Yejin Choi, and Noah A.
+      zhong Lan, Lingpeng Kong, and Junxian He. 2024. AgentBoard: An Analytical                Smith. 2020. RealToxicityPrompts: Evaluating Neural Toxic Degeneration in
+      Evaluation Board of Multi-turn LLM Agents. Advances in Neural Information                Language Models. arXiv:2009.11462 [cs.CL] https://arxiv.org/abs/2009.11462
+      Processing Systems 37 (2024), 74325–74362.                                          [28] Luca Gioacchini, Giuseppe Siracusano, Davide Sanvito, Kiril Gashteovski, David
+  [9] Hongzhan Chen, Hehong Chen, Ming Yan, Wenshen Xu, Xing Gao, Weizhou                      Friede, Roberto Bifulco, and Carolin Lawrence. 2024. AgentQuest: A Modular
+      Shen, Xiaojun Quan, Chenliang Li, Ji Zhang, Fei Huang, and Jingren Zhou.                 Benchmark Framework to Measure Progress and Improve LLM Agents. doi:10.
+      2024. SocialBench: Sociality Evaluation of Role-Playing Conversational Agents.           48550/arXiv.2404.06411
+      arXiv:2403.13679 [cs.CL] https://arxiv.org/abs/2403.13679                           [29] Google. 2024. Google Vortex AI. https://cloud.google.com/vertex-ai
+ [10] Jingxuan Chen, Derek Yuen, Bin Xie, Yuhao Yang, Gongwei Chen, Zhihao Wu,            [30] Jiawei Gu, Xuhui Jiang, Zhichao Shi, Hexiang Tan, Xuehao Zhai, Chengjin Xu,
+      Li Yixing, Xurui Zhou, Weiwen Liu, Shuai Wang, et al. 2024. Spa-bench: A                 Wei Li, Yinghan Shen, Shengjie Ma, Honghao Liu, et al. 2024. A survey on
+      comprehensive benchmark for smartphone agent evaluation. In NeurIPS 2024                 llm-as-a-judge. arXiv preprint arXiv:2411.15594 (2024).
+      Workshop on Open-World Agents.                                                      [31] Zhenyu Guan, Xiangyu Kong, Fangwei Zhong, and YIzhou Wang. 2024. Riche-
+ [11] Ziru Chen, Shijie Chen, Yuting Ning, Qianheng Zhang, Boshi Wang, Botao Yu,               lieu: Self-Evolving LLM-Based Agents for AI Diplomacy. In Advances in Neural
+      Yifei Li, Zeyi Liao, Chen Wei, Zitong Lu, Vishal Dey, Mingyi Xue, Frazier N.             Information Processing Systems, A. Oh, T. Naumann, A. Globerson, K. Saenko,
+      Baker, Benjamin Burns, Daniel Adu-Ampratwum, Xuhui Huang, Xia Ning,                      M. Hardt, and S. Levine (Eds.), Vol. 38. Curran Associates, Inc., 0.
+      Song Gao, Yu Su, and Huan Sun. 2025. ScienceAgentBench: toward rigorous             [32] Taicheng Guo, Xiuying Chen, Yaqi Wang, Ruidi Chang, Shichao Pei, Nitesh V
+      assessment of language agents for data-driven scientific discovery. doi:10.48550/        Chawla, Olaf Wiest, and Xiangliang Zhang. 2024. Large language model
+      arXiv.2410.05080                                                                         based multi-agents: A survey of progress and challenges. arXiv preprint
+ [12] Zehui Chen, Weihua Du, Wenwei Zhang, Kuikun Liu, Jiangning Liu, Miao                     arXiv:2402.01680 (2024).
+      Zheng, Jingming Zhuo, Songyang Zhang, Dahua Lin, Kai Chen, and Feng Zhao.           [33] Shanshan Han, Qifan Zhang, Yuhang Yao, Weizhao Jin, Zhaozhuo Xu, and
+      2024. T-eval: evaluating the tool utilization capability of large language models        Chaoyang He. 2024. LLM multi-agent systems: Challenges and open problems.
+      step by step. doi:10.48550/arXiv.2312.14033                                              arXiv preprint arXiv:2402.03578 (2024).
+ [13] Zhaorun Chen, Zhen Xiang, Chaowei Xiao, Dawn Song, and Bo Li. 2024. Agent-          [34] Feng He, Tianqing Zhu, Dayong Ye, Bo Liu, Wanlei Zhou, and Philip S Yu. 2024.
+      Poison: Red-teaming LLM Agents via Poisoning Memory or Knowledge Bases.                  The emerged security and privacy of llm agent: A survey with case studies.
+      arXiv:2407.12784 [cs.LG] https://arxiv.org/abs/2407.12784                                arXiv preprint arXiv:2407.19354 (2024).
+ [14] Thibault Le Sellier De Chezelles, Maxime Gasse, Alexandre Drouin, Massimo           [35] Zhitao He, Pengfei Cao, Chenhao Wang, Zhuoran Jin, Yubo Chen, Jiexin Xu,
+      Caccia, Léo Boisvert, Megh Thakkar, Tom Marty, Rim Assouel, Sahar Omidi                  Huaijun Li, Xiaojian Jiang, Kang Liu, and Jun Zhao. 2024. AgentsCourt: Build-
+      Shayegan, Lawrence Keunho Jang, Xing Han Lù, Ori Yoran, Dehan Kong, Frank F.             ing Judicial Decision-Making Agents with Court Debate Simulation and Legal
+      Xu, Siva Reddy, Quentin Cappart, Graham Neubig, Ruslan Salakhutdinov, Nico-              Knowledge Augmentation. arXiv:2403.02959v3 (2024). https://arxiv.org/pdf/
+      las Chapados, and Alexandre Lacoste. 2025. The BrowserGym ecosystem for                  2403.02959
+      web agent research. doi:10.48550/arXiv.2412.05467                                   [36] Dan Hendrycks, Collin Burns, Steven Basart, Andy Zou, Mantas Mazeika, Dawn
+ [15] Anthony Costarelli, Mat Allen, Roman Hauksson, Grace Sodunke, Suhas Har-                 Song, and Jacob Steinhardt. 2021. Measuring Massive Multitask Language
+      iharan, Carlson Cheng, Wenjie Li, Joshua Clymer, and Arjun Yadav. 2024.                  Understanding. arXiv:2009.03300 [cs.CY] https://arxiv.org/abs/2009.03300
+      Gamebench: Evaluating strategic reasoning abilities of llm agents. arXiv preprint   [37] Xu Huang, Weiwen Liu, Xiaolong Chen, Xingmei Wang, Hao Wang, Defu Lian,
+      arXiv:2406.06613 (2024).                                                                 Yasheng Wang, Ruiming Tang, and Enhong Chen. 2024. Understanding the
+ [16] José Antonio Siqueira de Cerqueira, Mamia Agbese, Rebekah Rousi, Nannan                  planning of LLM agents: A survey. doi:10.48550/arXiv.2402.02716
+      Xi, Juho Hamari, and Pekka Abrahamsson. 2024. Can we trust AI agents? An            [38] Yue Huang, Jiawen Shi, Yuan Li, Chenrui Fan, Siyuan Wu, Qihui Zhang, Yixin
+      experimental study towards trustworthy LLM-based multi-agent systems for                 Liu, Pan Zhou, Yao Wan, Neil Zhenqiang Gong, and Lichao Sun. 2024. MetaTool
+      AI ethics. arXiv preprint arXiv:2411.08881 (2024).                                       Benchmark for Large Language Models: Deciding Whether to Use Tools and
+ [17] Edoardo Debenedetti, Jie Zhang, Mislav Balunović, Luca Beurer-Kellner, Marc              Which to Use. arXiv:2310.03128 [cs.SE] https://arxiv.org/abs/2310.03128
+      Fischer, and Florian Tramèr. 2024. AgentDojo: A Dynamic Environment to              [39] Zixia Jia, Mengmeng Wang, Baichen Tong, Song-Chun Zhu, and Zilong Zheng.
+      Evaluate Prompt Injection Attacks and Defenses for LLM Agents. doi:10.48550/             2024. LangSuitE: Planning, Controlling and Interacting with Large Language
+      arXiv.2406.13352                                                                         Models in Embodied Text Environments. arXiv preprint arXiv:2406.16294 (2024).
+ [18] Shihan Deng, Weikai Xu, Hongda Sun, Wei Liu, Tao Tan, Jianfeng Liu, Ang             [40] Carlos E. Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir
+      Li, Jian Luan, Bin Wang, Rui Yan, et al. 2024. Mobile-bench: An evaluation               Press, and Karthik Narasimhan. 2024. SWE-bench: Can Language Models
+      benchmark for llm-based mobile agents. arXiv preprint arXiv:2407.00993 (2024).           Resolve Real-World GitHub Issues? doi:10.48550/arXiv.2310.06770
+ [19] Zi-Yi Dou, Cheng-Fu Yang, Xueqing Wu, Kai-Wei Chang, and Nanyun Peng.               [41] H Kang and C Xiong. 2024. ResearchArena: Benchmarking LLMs’ Ability to
+      2024. Re-rest: Reflection-reinforced self-training for language agents. arXiv            Collect and Organize Information as Research Agents. (2024).
+      preprint arXiv:2406.01495 (2024).                                                   [42] Jing Yu Koh, Robert Lo, Lawrence Jang, Vikram Duvvur, Ming Chong Lim, Po-Yu
+ [20] Zane Durante, Qiuyuan Huang, Naoki Wake, Ran Gong, Jae Sung Park, Bidipta                Huang, Graham Neubig, Shuyan Zhou, Ruslan Salakhutdinov, and Daniel Fried.
+      Sarkar, Rohan Taori, Yusuke Noda, Demetri Terzopoulos, Yejin Choi, et al. 2024.          2024. VisualWebArena: evaluating multimodal agents on realistic visual web
+      Agent ai: Surveying the horizons of multimodal interaction. arXiv preprint               tasks. doi:10.48550/arXiv.2401.13649
+      arXiv:2401.03568 (2024).                                                            [43] Kalpesh Krishna, Erin Bransom, Bailey Kuehl, Mohit Iyyer, Pradeep Dasigi,
+ [21] Shahul Es, Jithin James, Luis Espinosa-Anke, and Steven Schockaert.                      Arman Cohan, and Kyle Lo. 2023. LongEval: Guidelines for Human Evaluation
+      2025. Ragas: Automated Evaluation of Retrieval Augmented Generation.                     of Faithfulness in Long-form Summarization. arXiv:2301.13298 [cs.CL] https:
+      arXiv:2309.15217 [cs.CL] https://arxiv.org/abs/2309.15217                                //arxiv.org/abs/2301.13298
+ [22] Richard Fang, Rohan Bindu, Akul Gupta, and Daniel Kang. 2024. Llm agents can        [44] LangChain. 2024. LangGraph Platform. https://www.langchain.com/langgraph-
+      autonomously exploit one-day vulnerabilities. arXiv preprint arXiv:2404.08144            platform
+      13 (2024), 14.                                                                      [45] Elad Levi and Ilan Kadar. 2025. IntellAgent: a multi-agent framework for evalu-
+                                                                                               ating conversational AI systems. doi:10.48550/arXiv.2501.11067
+KDD ’25, August 3–7, 2025, Toronto, ON, Canada                                                                   Mahmoud Mohammadi, Yipeng Li, Jane Lo, and Wendy Yip
+
+
+ [46] Haitao Li, Qian Dong, Junjie Chen, Huixue Su, Yujia Zhou, Qingyao Ai, Ziyi               arXiv.2410.22394
+      Ye, and Yiqun Liu. 2024. Llms-as-judges: a comprehensive survey on llm-based        [62] Chris Lu, Cong Lu, Robert Tjarko Lange, Jakob Foerster, Jeff Clune, and David Ha.
+      evaluation methods. arXiv preprint arXiv:2412.05579 (2024).                              2024. The ai scientist: Towards fully automated open-ended scientific discovery.
+ [47] Minghao Li, Yingxiu Zhao, Bowen Yu, Feifan Song, Hangyu Li, Haiyang Yu,                  arXiv preprint arXiv:2408.06292 (2024).
+      Zhoujun Li, Fei Huang, and Yongbin Li. 2023. API-bank: a comprehensive              [63] Xing Han Lù, Zdeněk Kasner, and Siva Reddy. 2024. WebLINX: Real-World Web-
+      benchmark for tool-augmented LLMs. doi:10.48550/arXiv.2304.08244                         site Navigation with Multi-Turn Dialogue. (Feb. 2024). arXiv:2402.05930 [cs.CL]
+ [48] Xinyi Li, Sai Wang, Siqi Zeng, Yu Wu, and Yi Yang. 2024. A survey on LLM-based      [64] Chang Ma, Junlei Zhang, Zhihao Zhu, Cheng Yang, Yujiu Yang, Yaohui Jin, Zhen-
+      multi-agent systems: workflow, infrastructure, and challenges. Vicinagearth 1,           zhong Lan, Lingpeng Kong, and Junxian He. 2024. AgentBoard: An Analytical
+      1 (2024), 9.                                                                             Evaluation Board of Multi-turn LLM Agents. doi:10.48550/arXiv.2401.13178
+ [49] Yuanchun Li, Hao Wen, Weijun Wang, Xiangyu Li, Yizhen Yuan, Guohong Liu,            [65] Adyasha Maharana, Dong-Ho Lee, Sergey Tulyakov, Mohit Bansal, Francesco
+      Jiacheng Liu, Wenxing Xu, Xiang Wang, Yi Sun, et al. 2024. Personal llm agents:          Barbieri, and Yuwei Fang. 2024. Evaluating Very Long-Term Conversational
+      Insights and survey about the capability, efficiency and security. arXiv preprint        Memory of LLM Agents. arXiv:2402.17753 [cs.CL] https://arxiv.org/abs/2402.
+      arXiv:2401.05459 (2024).                                                                 17753
+ [50] Zaijing Li, Yuquan Xie, Rui Shao, Gongwei Chen, Dongmei Jiang, and Liqiang          [66] Puneet Mathur, Alexa Siu, Nedim Lipka, and Tong Sun. 2024. MATSA: Multi-
+      Nie. 2024. Optimus-1: Hybrid Multimodal Memory Empowered Agents Excel                    Agent Table Structure Attribution. In Proceedings of the 2024 Conference on
+      in Long-Horizon Tasks. In Advances in Neural Information Processing Systems,             Empirical Methods in Natural Language Processing: System Demonstrations. 250–
+      A. Globerson, L. Mackey, D. Belgrave, A. Fan, U. Paquet, J. Tomczak, and C. Zhang        258.
+      (Eds.), Vol. 37. Curran Associates, Inc., 49881–49913.                              [67] Siddharth Mehrotra, Carolina Centeio Jorge, Catholijn M Jonker, and Myrthe L
+ [51] Percy Liang, Rishi Bommasani, Tony Lee, Dimitris Tsipras, Dilara Soylu, Michi-           Tielman. 2024. Integrity-based explanations for fostering appropriate trust in AI
+      hiro Yasunaga, Yian Zhang, Deepak Narayanan, Yuhuai Wu, Ananya Kumar,                    agents. ACM Transactions on Interactive Intelligent Systems 14, 1 (2024), 1–36.
+      Benjamin Newman, Binhang Yuan, Bobby Yan, Ce Zhang, Christian Cosgrove,             [68] Microsoft. 2024. Azure Foundry. https://azure.microsoft.com/en-us/products/ai-
+      Christopher D. Manning, Christopher Ré, Diana Acosta-Navas, Drew A. Hudson,              foundry
+      Eric Zelikman, Esin Durmus, Faisal Ladhak, Frieda Rong, Hongyu Ren, Huaxiu          [69] Yohei Nakajima. 2023. Babyagi. GitHub repository (2023).
+      Yao, Jue Wang, Keshav Santhanam, Laurel Orr, Lucia Zheng, Mert Yuksekgonul,         [70] Nvidia. 2024. LLM Benchmark Metrics.               https://docs.nvidia.com/nim/
+      Mirac Suzgun, Nathan Kim, Neel Guha, Niladri Chatterji, Omar Khattab, Peter              benchmarking/llm/latest/metrics.htm
+      Henderson, Qian Huang, Ryan Chi, Sang Michael Xie, Shibani Santurkar, Surya         [71] OpenAI. 2023. OpenAI Evals. https://github.com/openai/evals
+      Ganguli, Tatsunori Hashimoto, Thomas Icard, Tianyi Zhang, Vishrav Chaud-            [72] Davide Paglieri, Bartłomiej Cupiał, Samuel Coward, Ulyana Piterbarg, Ma-
+      hary, William Wang, Xuechen Li, Yifan Mai, Yuhui Zhang, and Yuta Koreeda.                ciej Wolczyk, Akbir Khan, Eduardo Pignatelli, Łukasz Kuciński, Lerrel Pinto,
+      2023. Holistic Evaluation of Language Models. doi:10.48550/arXiv.2211.09110              Rob Fergus, Jakob Nicolaus Foerster, Jack Parker-Holder, and Tim Rocktäschel.
+ [52] Jiaju Lin, Haoran Zhao, Aochi Zhang, Yiting Wu, Huqiuyue Ping, and Qin Chen.             2024. BALROG: Benchmarking Agentic LLM and VLM Reasoning On Games.
+      2023. Agentsims: An open-source sandbox for large language model evaluation.             arXiv:2411.13543 [cs.AI] https://arxiv.org/abs/2411.13543
+      arXiv preprint arXiv:2308.04026 (2023).                                             [73] Yichen Pan, Dehan Kong, Sida Zhou, Cheng Cui, Yifei Leng, Bing Jiang, Hangyu
+ [53] Bing Liu, Zhou Jianxiang, Dan Meng, and Haonan Lu. 2024. An Evaluation                   Liu, Yanyi Shang, Shuyan Zhou, Tongshuang Wu, and Zhengyang Wu. 2024.
+      Mechanism of LLM-based Agents on Manipulating APIs. In Findings of the                   WebCanvas: benchmarking web agents in online environments. doi:10.48550/
+      Association for Computational Linguistics: EMNLP 2024, Yaser Al-Onaizan, Mohit           arXiv.2406.12373
+      Bansal, and Yun-Nung Chen (Eds.). Association for Computational Linguistics,        [74] Joon Sung Park, Joseph O’Brien, Carrie Jun Cai, Meredith Ringel Morris, Percy
+      Miami, Florida, USA, 4649–4662. doi:10.18653/v1/2024.findings-emnlp.267                  Liang, and Michael S Bernstein. 2023. Generative agents: Interactive simulacra
+ [54] Bang Liu, Xinfeng Li, Jiayi Zhang, Jinlin Wang, Tanjin He, Sirui Hong,                   of human behavior. In Proceedings of the 36th annual acm symposium on user
+      Hongzhang Liu, Shaokun Zhang, Kaitao Song, Kunlun Zhu, Yuheng Cheng,                     interface software and technology. 1–22.
+      Suyuchen Wang, Xiaoqiang Wang, Yuyu Luo, Haibo Jin, Peiyan Zhang, Ollie             [75] Shishir G. Patil, Tianjun Zhang, Xin Wang, and Joseph E. Gonzalez. 2023. Gorilla:
+      Liu, Jiaqi Chen, Huan Zhang, Zhaoyang Yu, Haochen Shi, Boyan Li, Dekun                   Large Language Model Connected with Massive APIs. doi:10.48550/arXiv.2305.
+      Wu, Fengwei Teng, Xiaojun Jia, Jiawei Xu, Jinyu Xiang, Yizhang Lin, Tian-                15334 arXiv:2305.15334 [cs].
+      ming Liu, Tongliang Liu, Yu Su, Huan Sun, Glen Berseth, Jianyun Nie, Ian            [76] Yujia Qin, Shihao Liang, Yining Ye, Kunlun Zhu, Lan Yan, Yaxi Lu, Yankai Lin,
+      Foster, Logan Ward, Qingyun Wu, Yu Gu, Mingchen Zhuge, Xiangru Tang,                     Xin Cong, Xiangru Tang, Bill Qian, Sihan Zhao, Lauren Hong, Runchu Tian,
+      Haohan Wang, Jiaxuan You, Chi Wang, Jian Pei, Qiang Yang, Xiaoliang Qi, and              Ruobing Xie, Jie Zhou, Mark Gerstein, Dahai Li, Zhiyuan Liu, and Maosong Sun.
+      Chenglin Wu. 2025. Advances and Challenges in Foundation Agents: From                    2023. ToolLLM: facilitating large language models to master 16000+ real-world
+      Brain-Inspired Intelligence to Evolutionary, Collaborative, and Safe Systems.            APIs. doi:10.48550/arXiv.2307.16789
+      doi:10.48550/arXiv.2504.01990                                                       [77] Haoyi Qiu, Alexander R. Fabbri, Divyansh Agarwal, Kung-Hsiang Huang, Sarah
+ [55] Wei Liu, Chenxi Wang, Yifei Wang, Zihao Xie, Rennai Qiu, Yufan Dang, Zhuoyun             Tan, Nanyun Peng, and Chien-Sheng Wu. 2025. Evaluating Cultural and Social
+      Du, Weize Chen, Cheng Yang, and Chen Qian. 2024. Autonomous agents for                   Awareness of LLM Web Agents. arXiv:2410.23252 (2025).
+      collaborative task under information asymmetry. arXiv preprint arXiv:2406.14928     [78] Pranav Rajpurkar, Robin Jia, and Percy Liang. 2018. Know what you don’t know:
+      (2024).                                                                                  Unanswerable questions for SQuAD. arXiv preprint arXiv:1806.03822 (2018).
+ [56] Wei Liu, Chenxi Wang, YiFei Wang, Zihao Xie, Rennai Qiu, Yufan Dang,                [79] Pranav Rajpurkar, Jian Zhang, Konstantin Lopyrev, and Percy Liang.
+      Zhuoyun Du, Weize Chen, Cheng Yang, and Chen Qian. 2024. Autonomous                      2016. SQuAD: 100,000+ Questions for Machine Comprehension of Text.
+      Agents for Collaborative Task under Information Asymmetry. In The Thirty-                arXiv:1606.05250 [cs.CL]
+      eighth Annual Conference on Neural Information Processing Systems.                  [80] Merle M. Reimann, Catharine Oertel, Florian A. Kunneman, and Koen V. Hin-
+ [57] Xiao Liu, Hao Yu, Hanchen Zhang, Yifan Xu, Xuanyu Lei, Hanyu Lai, Yu Gu,                 driks. 2023. Predicting interaction quality aspects using level-based scores for
+      Hangliang Ding, Kaiwen Men, Kejuan Yang, Shudan Zhang, Xiang Deng, Aohan                 conversational agents. In Proceedings of the 23rd ACM International Conference on
+      Zeng, Zhengxiao Du, Chenhui Zhang, Sheng Shen, Tianjun Zhang, Yu Su, Huan                Intelligent Virtual Agents. ACM, Würzburg Germany, 1–8. doi:10.1145/3570945.
+      Sun, Minlie Huang, Yuxiao Dong, and Jie Tang. 2023. AgentBench: Evaluating               3607332
+      LLMs as Agents. doi:10.48550/arXiv.2308.03688                                       [81] Wenjie Ruan, Wei Huang, Xiaowei Huang, Gaojie Jin, Yi Dong, Changshun Wu,
+ [58] Xiao Liu, Hao Yu, Hanchen Zhang, Yifan Xu, Xuanyu Lei, Hanyu Lai, Yu Gu,                 Saddek Bensalem, Ronghui Mu, Yi Qi, Xingyu Zhao, et al. 2024. ToolEmu. In
+      Hangliang Ding, Kaiwen Men, Kejuan Yang, Shudan Zhang, Xiang Deng, Aohan                 Proceedings of t.
+      Zeng, Zhengxiao Du, Chenhui Zhang, Sheng Shen, Tianjun Zhang, Yu Su, Huan           [82] Yangjun Ruan, Honghua Dong, Andrew Wang, Silviu Pitis, Yongchao Zhou,
+      Sun, Minlie Huang, Yuxiao Dong, and Jie Tang. 2023. AgentBench: Evaluating               Jimmy Ba, Yann Dubois, Chris J Maddison, and Tatsunori Hashimoto. 2023.
+      LLMs as Agents. arXiv:2308.03688 [cs.AI] https://arxiv.org/abs/2308.03688                Identifying the risks of lm agents with an lm-emulated sandbox. arXiv preprint
+ [59] Yanjiang Liu, Tianyun Zhong, Yaojie Lu, Hongyu Lin, Ben He, Shuheng Zhou,                arXiv:2309.15817 (2023).
+      Huijia Zhu, Weiqiang Wang, Zhongyi Liu, Xianpei Han, et al. 2024. XMC-Agent:        [83] Yongliang Shen, Kaitao Song, Xu Tan, Wenqi Zhang, Kan Ren, Siyu Yuan, Weim-
+      Dynamic Navigation over Scalable Hierarchical Index for Incremental Extreme              ing Lu, Dongsheng Li, and Yueting Zhuang. 2024. TaskBench: Benchmarking
+      Multi-label Classification. In Findings of the Association for Computational Lin-        Large Language Models for Task Automation. doi:10.48550/arXiv.2311.18760
+      guistics ACL 2024. 5659–5672.                                                       [84] Honghao Shi, Longkai Cheng, Wenli Wu, Yuhang Wang, Xuan Liu, Shaokai Nie,
+ [60] Zhe Liu, Chunyang Chen, Junjie Wang, Mengzhuo Chen, Boyu Wu, Xing Che,                   Weixv Wang, Xuebin Min, Chunlei Men, and Yonghua Lin. 2024. Enhancing
+      Dandan Wang, and Qing Wang. 2023. Chatting with gpt-3 for zero-shot human-               Cluster Resilience: LLM-agent Based Autonomous Intelligent Cluster Diagnosis
+      like mobile automated gui testing. arXiv preprint arXiv:2305.09434 (2023).               System and Evaluation Framework. arXiv:2411.05349 (2024). https://arxiv.org/
+ [61] Renze Lou, Hanzi Xu, Sijia Wang, Jiangshu Du, Ryo Kamoi, Xiaoxin Lu, Jian                pdf/2411.05349
+      Xie, Yuxuan Sun, Yusen Zhang, Jihyun Janice Ahn, Hongchao Fang, Zhuoyang            [85] Tianlin Shi, Andrej Karpathy, Linxi Fan, Jonathan Hernandez, and Percy Liang.
+      Zou, Wenchao Ma, Xi Li, Kai Zhang, Congying Xia, Lifu Huang, and Wenpeng                 2017. World of bits: An open-domain platform for web-based agents. In Interna-
+      Yin. 2025. AAAR-1.0: Assessing AI’s Potential to Assist Research. doi:10.48550/          tional Conference on Machine Learning. PMLR, 3135–3144.
+Evaluation and Benchmarking of LLM Agents: A Survey                                                                            KDD ’25, August 3–7, 2025, Toronto, ON, Canada
+
+
+ [86] Zachary S. Siegel, Sayash Kapoor, Nitya Nagdir, Benedikt Stroebl, and Arvind         [107] Asaf Yehudai, Lilach Eden, Alan Li, Guy Uziel, Yilun Zhao, Roy Bar-Haim, Arman
+      Narayanan. 2024. CORE-bench: fostering the credibility of published research               Cohan, and Michal Shmueli-Scheuer. 2025. Survey on Evaluation of LLM-based
+      through a computational reproducibility agent benchmark. doi:10.48550/arXiv.               Agents. doi:10.48550/arXiv.2503.16416
+      2409.11363                                                                           [108] Sheng Yin, Xianghe Pang, Yuanzhuo Ding, Menglan Chen, Yutong Bi, Yichen
+ [87] Giulio Starace, Oliver Jaffe, Dane Sherburn, James Aung, Jun Shern Chan, Leon              Xiong, Wenhao Huang, Zhen Xiang, Jing Shao, and Siheng Chen. 2024.
+      Maksin, Rachel Dias, Evan Mays, Benjamin Kinsella, Wyatt Thompson, Johannes                SafeAgentBench: A Benchmark for Safe Task Planning of Embodied LLM Agents.
+      Heidecke, Amelia Glaese, and Tejal Patwardhan. 2025. PaperBench: Evaluating                arXiv preprint arXiv:2412.13178 (2024).
+      AI’s Ability to Replicate AI Research. doi:10.48550/arXiv.2504.01848                 [109] Ori Yoran, Samuel Joseph Amouyal, Chaitanya Malaviya, Ben Bogin, Ofir Press,
+ [88] Benedikt Stroebl, Sayash Kapoor, and Arvind Narayanan. 2025. HAL: A Holistic               and Jonathan Berant. 2024. AssistantBench: can web agents solve realistic and
+      Agent Leaderboard for Centralized and Reproducible Agent Evaluation. https:                time-consuming tasks? doi:10.48550/arXiv.2407.15711
+      //github.com/princeton-pli/hal-harness.                                              [110] Erxin Yu, Jing Li, Ming Liao, Siqi Wang, Zuchen Gao, Fei Mi, and Lanqing Hong.
+ [89] Yashar Talebirad and Amirhossein Nadiri. 2023. Multi-agent collaboration:                  2024. Cosafe: Evaluating large language model safety in multi-turn dialogue
+      Harnessing the power of intelligent llm agents. arXiv preprint arXiv:2306.03314            coreference. arXiv preprint arXiv:2406.17626 (2024).
+      (2023).                                                                              [111] Yangyang Yu, Zhiyuan Yao, Haohang Li, Zhiyang Deng, Yuechen Jiang, Yu-
+ [90] Wei Tao, Yucheng Zhou, Yanlin Wang, Wenqiang Zhang, Hongyu Zhang, and                      peng Cao, Zhi Chen, Jordan Suchow, Zhenyu Cui, Rong Liu, Zhaozhuo Xu,
+      Yu Cheng. 2024. Magis: Llm-based multi-agent framework for github issue                    Denghui Zhang, Koduvayur (Suba) Subbalakshmi, GUOJUN XIONG, Yueru
+      resolution. Advances in Neural Information Processing Systems 37 (2024), 51963–            He, Jimin Huang, Dong Li, and Qianqian Xie. 2024. FinCon: A Synthesized
+      51993.                                                                                     LLM Multi-Agent System with Conceptual Verbal Reinforcement for Enhanced
+ [91] Harsh Trivedi, Tushar Khot, Mareike Hartmann, Ruskin Manku, Vinty Dong,                    Financial Decision Making. In Advances in Neural Information Processing Sys-
+      Edward Li, Shashank Gupta, Ashish Sabharwal, and Niranjan Balasubramanian.                 tems, A. Globerson, L. Mackey, D. Belgrave, A. Fan, U. Paquet, J. Tomczak, and
+      2024. AppWorld: A Controllable World of Apps and People for Benchmarking                   C. Zhang (Eds.), Vol. 37. Curran Associates, Inc., 137010–137045.
+      Interactive Coding Agents. doi:10.48550/arXiv.2407.18901                             [112] Tongxin Yuan, Zhiwei He, Lingzhong Dong, Yiming Wang, Ruijie Zhao, Tian
+ [92] Luyuan Wang, Yongyu Deng, Yiwei Zha, Guodong Mao, Qinmin Wang,                             Xia, Lizhen Xu, Binglin Zhou, Fangqi Li, Zhuosheng Zhang, et al. 2024. R-
+      Tianchen Min, Wei Chen, and Shoufa Chen. 2024. MobileAgentBench: An                        judge: Benchmarking safety risk awareness for llm agents. arXiv preprint
+      Efficient and User-Friendly Benchmark for Mobile LLM Agents. arXiv preprint                arXiv:2401.10019 (2024).
+      arXiv:2406.08184 (2024).                                                             [113] Qiusi Zhan, Richard Fang, Henil Shalin Panchal, and Daniel Kang. 2025. Adaptive
+ [93] Lei Wang, Chen Ma, Xueyang Feng, Zeyu Zhang, Hao Yang, Jingsen Zhang,                      Attacks Break Defenses Against Indirect Prompt Injection Attacks on LLM
+      Zhiyuan Chen, Jiakai Tang, Xu Chen, Yankai Lin, Wayne Xin Zhao, Zhewei Wei,                Agents. arXiv:2503.00061 [cs.CR] https://arxiv.org/abs/2503.00061
+      and Ji-Rong Wen. 2024. A Survey on Large Language Model based Autonomous             [114] Andy K. Zhang, Neil Perry, and Riya Dulepet et al. 2024. Cybench: A Frame-
+      Agents. Frontiers of Computer Science 18, 6 (Dec. 2024), 186345. doi:10.1007/              work for Evaluating Cybersecurity Capabilities and Risks of Language Models.
+      s11704-024-40231-1                                                                         arXiv:2408.08926v3 (2024). https://arxiv.org/pdf/2408.08926
+ [94] Shuai Wang, Weiwen Liu, Jingxuan Chen, Yuqi Zhou, Weinan Gan, Xingshan               [115] Chaoyun Zhang, Shilin He, Jiaxu Qian, Bowen Li, Liqun Li, Si Qin, Yu Kang,
+      Zeng, Yuhan Che, Shuai Yu, Xinlong Hao, Kun Shao, et al. 2024. Gui agents with             Minghua Ma, Guyue Liu, Qingwei Lin, Saravan Rajmohan, Dongmei Zhang,
+      foundation models: A comprehensive survey. arXiv preprint arXiv:2411.04890                 and Qi Zhang. 2025. Large Language Model-Brained GUI Agents: A Survey.
+      (2024).                                                                                    doi:10.48550/arXiv.2411.18279
+ [95] Boming Xia, Qinghua Lu, Liming Zhu, Zhenchang Xing, Dehai Zhao, and Hao              [116] Danyang Zhang, Lu Chen, and Kai Yu. 2023. Mobile-env: A universal platform
+      Zhang. 2024. An Evaluation-Driven Approach to Designing LLM Agents: Process                for training and evaluation of mobile interaction. CoRR (2023).
+      and Architecture. arXiv preprint arXiv:2411.13768 (2024).                            [117] Danyang Zhang, Zhennan Shen, Rui Xie, Situo Zhang, Tianbao Xie, Zihan
+ [96] Ruixuan Xiao, Wentao Ma, Ke Wang, Yuchuan Wu, Junbo Zhao, Haobo Wang,                      Zhao, Siyuan Chen, Lu Chen, Hongshen Xu, Ruisheng Cao, and Kai Yu. 2024.
+      Fei Huang, and Yongbin Li. 2024. FlowBench: revisiting and benchmarking                    Mobile-Env: Building Qualified Evaluation Benchmarks for LLM-GUI Interac-
+      workflow-guided planning for LLM-based agents. doi:10.48550/arXiv.2406.14884               tion. arXiv:2305.08144 [cs.AI] https://arxiv.org/abs/2305.08144
+ [97] Frank F Xu, Yufan Song, Boxuan Li, Yuxuan Tang, Kritanjali Jain, Mengxue Bao,        [118] Hanrong Zhang, Jingyuan Huang, Kai Mei, Yifei Yao, Zhenting Wang, Chenlu
+      Zora Z Wang, Xuhui Zhou, Zhitong Guo, Murong Cao, et al. 2024. Theagent-                   Zhan, Hongwei Wang, and Yongfeng Zhang. 2024. Agent security bench (asb):
+      company: benchmarking llm agents on consequential real world tasks. arXiv                  Formalizing and benchmarking attacks and defenses in llm-based agents. arXiv
+      preprint arXiv:2412.14161 (2024).                                                          preprint arXiv:2410.02644 (2024).
+ [98] Guangxuan Xu, Ruibo Liu, Fabrice Harel-Canada, Nischal Chandra, and Nanyun           [119] Yuntong Zhang, Haifeng Ruan, Zhiyu Fan, and Abhik Roychoudhury. 2024.
+      Peng. 2022. EnDex: Evaluation of Dialogue Engagingness at Scale. 4884–4893.                AutoCodeRover: Autonomous Program Improvement (ISSTA 2024). Association
+      doi:10.18653/v1/2022.findings-emnlp.359                                                    for Computing Machinery, New York, NY, USA, 1592–1604. doi:10.1145/3650212.
+ [99] Lin Xu, Zhiyuan Hu, Daquan Zhou, Hongyu Ren, Zhen Dong, Kurt Keutzer,                      3680384
+      See Kiong Ng, and Jiashi Feng. 2023. Magic: Investigation of large language          [120] Yue Zhang, Ming Zhang, Haipeng Yuan, Shichun Liu, Yongyao Shi, Tao Gui, Qi
+      model powered multi-agent in cognition, adaptability, rationality and collabora-           Zhang, and Xuanjing Huang. 2023. LLMEval: A Preliminary Study on How to
+      tion. arXiv preprint arXiv:2311.08562 (2023).                                              Evaluate Large Language Models. arXiv:2312.07398 [cs.AI] https://arxiv.org/
+[100] Fanjia Yan, Huanzhi Mao, Charlie Cheng-Jie Ji, Tianjun Zhang, Shishir G.                   abs/2312.07398
+      Patil, Ion Stoica, and Joseph E. Gonzalez. 2024. Berkeley Function Calling           [121] Zeyu Zhang, Xiaohe Bo, Chen Ma, Rui Li, Xu Chen, Quanyu Dai, Jieming Zhu,
+      Leaderboard. https://gorilla.cs.berkeley.edu/blogs/8_berkeley_function_calling_            Zhenhua Dong, and Ji-Rong Wen. 2024. A Survey on the Memory Mechanism
+      leaderboard.html.                                                                          of Large Language Model based Agents. doi:10.48550/arXiv.2404.13501
+[101] Qisen Yang, Zekun Wang, Honghui Chen, Shenzhi Wang, Yifan Pu, Xin Gao,               [122] Zhexin Zhang, Shiyao Cui, Yida Lu, Jingzhuo Zhou, Junxiao Yang, Hongning
+      Wenhao Huang, Shiji Song, and Gao Huang. 2024. PsychoGAT: A Novel Psycho-                  Wang, and Minlie Huang. 2024. Agent-SafetyBench: Evaluating the Safety of
+      logical Measurement Paradigm through Interactive Fiction Games with LLM                    LLM Agents. arXiv preprint arXiv:2412.14470 (2024).
+      Agents. arXiv:2402.12326v2 (2024). https://arxiv.org/pdf/2402.12326                  [123] Zhiping Zhang, Michelle Jia, B Yao, S Das, A Lerner, D Wang, and T Li. 2023. It’sa
+[102] Wenkai Yang, Xiaohan Bi, Yankai Lin, Sishuo Chen, Jie Zhou, and Xu Sun. 2024.              fair game, or is it? examining how users navigate disclosure risks and benefits
+      Watch Out for Your Agents! Investigating Backdoor Threats to LLM-Based                     when using llm-based conversational agents. arXiv preprint arXiv:2309.11653
+      Agents. arXiv:2402.11208 [cs.CR] https://arxiv.org/abs/2402.11208                          (2023).
+[103] Shunyu Yao, Howard Chen, John Yang, and Karthik Narasimhan. 2022. Webshop:           [124] Ziniu Zhang, Shulin Tian, Liangyu Chen, and Ziwei Liu. 2024. MMInA: bench-
+      Towards scalable real-world web interaction with grounded language agents.                 marking multihop multimodal internet agents. doi:10.48550/arXiv.2404.09992
+      Advances in Neural Information Processing Systems 35 (2022), 20744–20757.            [125] Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu,
+[104] Shunyu Yao, Noah Shinn, Pedram Razavi, and Karthik Narasimhan. 2024. 𝜏 -                   Yonghao Zhuang, Zi Lin, Zhuohan Li, Dacheng Li, Eric Xing, et al. 2023. Judging
+      bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains.                  llm-as-a-judge with mt-bench and chatbot arena. Advances in Neural Information
+      doi:10.48550/arXiv.2406.12045                                                              Processing Systems 36 (2023), 46595–46623.
+[105] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan,        [126] Shuyan Zhou, Frank F Xu, Hao Zhu, Xuhui Zhou, Robert Lo, Abishek Sridhar,
+      and Yuan Cao. 2023. ReAct: Synergizing Reasoning and Acting in Language                    Xianyi Cheng, Tianyue Ou, Yonatan Bisk, Daniel Fried, et al. 2023. Webarena:
+      Models. In Proceedings of the International Conference on Learning Representations         A realistic web environment for building autonomous agents. arXiv preprint
+      (ICLR). https://arxiv.org/abs/2210.03629v3                                                 arXiv:2307.13854 (2023).
+[106] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan,        [127] Mingchen Zhuge, Changsheng Zhao, Dylan Ashley, Wenyi Wang, Dmitrii
+      and Yuan Cao. 2023. ReAct: Synergizing Reasoning and Acting in Language                    Khizbullin, Yunyang Xiong, Zechun Liu, Ernie Chang, Raghuraman Krish-
+      Models. doi:10.48550/arXiv.2210.03629                                                      namoorthi, Yuandong Tian, et al. 2024. Agent-as-a-judge: Evaluate agents
+                                                                                                 with agents. arXiv preprint arXiv:2410.10934 (2024).
+

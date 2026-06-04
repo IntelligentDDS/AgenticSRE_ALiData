@@ -1,0 +1,1305 @@
+                                         A Comprehensive Survey on Root Cause Analysis in (Micro) Services:
+                                         Methodologies, Challenges, and Trends
+
+                                         TINGTING WANG and GUILIN QI∗ , Southeast University, China
+                                         The complex dependencies and propagative faults inherent in microservices, characterized by a dense network of interconnected
+                                         services, pose significant challenges in identifying the underlying causes of issues. Prompt identification and resolution of disruptive
+                                         problems are crucial to ensure rapid recovery and maintain system stability. Numerous methodologies have emerged to address
+                                         this challenge, primarily focusing on diagnosing failures through symptomatic data. This survey aims to provide a comprehensive,
+                                         structured review of root cause analysis (RCA) techniques within microservices, exploring methodologies that include metrics, traces,
+
+
+
+
+arXiv:2408.00803v1 [cs.SE] 23 Jul 2024
+                                         logs, and multi-model data. It delves deeper into the methodologies, challenges, and future trends within microservices architectures.
+                                         Positioned at the forefront of AI and automation advancements, it offers guidance for future research directions.
+
+                                         CCS Concepts: • Computing methodologies → Machine learning approaches; Artificial intelligence; Knowledge representa-
+                                         tion and reasoning; Natural language processing; Information extraction; • Information systems → Computing platforms;
+                                         Data mining; • Computer systems organization → Cloud computing.
+
+                                         Additional Key Words and Phrases: AIOps, IT Operations, Artificial Intelligence, Root Cause Analysis, Failure Diagnosis
+
+                                         ACM Reference Format:
+                                         Tingting Wang and Guilin Qi. 2024. A Comprehensive Survey on Root Cause Analysis in (Micro) Services: Methodologies, Challenges,
+                                         and Trends. In . ACM, New York, NY, USA, 31 pages. https://doi.org/XXXXXXX.XXXXXXX
+
+
+                                         1   INTRODUCTION
+                                         The evolution of IT operations has undergone three significant phases, manual operations, DevOps, and AIOps.
+                                         Initially, IT operations were predominantly manual, relying heavily on human intervention for system monitoring,
+                                         troubleshooting, and problem resolution. However, with the escalating scale and complexity of systems, the efficacy
+                                         and precision of manual operations have been increasingly challenged. Subsequently, DevOps was introduced, building
+                                         upon manual operations and fostering a synergistic collaboration between development and operations. Through
+                                         automated deployment and continuous integration, DevOps has the capability to expedite the release of new features
+                                         and rectify issues with greater speed and reliability. Nonetheless, DevOps still necessitates manual involvement in
+                                         certain complex decision-making processes and tasks. To further mitigate this challenge and enhance cost-effectiveness
+                                         and efficiency, AIOps leverages machine learning and data analysis to automatically collect and scrutinize vast amounts
+                                         of IT operation data, enabling real-time monitoring, anomaly detection, fault localization, and automated processing of
+                                         IT systems. AIOps not only augments the efficiency and accuracy of IT operations but also equips IT operations with
+                                         the capacity to adapt more effectively to complex and dynamic IT environments, utilizing artificial intelligence and big
+                                         data technologies.
+                                         ∗ Corresponding author.
+
+
+                                         Permission to make digital or hard copies of all or part of this work for personal or classroom use is granted without fee provided that copies are not
+                                         made or distributed for profit or commercial advantage and that copies bear this notice and the full citation on the first page. Copyrights for components
+                                         of this work owned by others than the author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, to post on
+                                         servers or to redistribute to lists, requires prior specific permission and/or a fee. Request permissions from permissions@acm.org.
+                                         © 2024 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+                                         Manuscript submitted to ACM
+       Table 1. Recent Notable Cloud Service and Online Platform Outage Events.[Public domain], via publicly websites.
+
+
+   Date    Event Name                        Duration       Transaction Impact                        Cause
+ 2024/5/23 Bing search engine, Mi-           5 hours        429 HTTP error code                       Bing’s API error
+           crosoft Copilot error [100]
+ 2024/5/2 Google Cloud UniSuper                7 days       UniSuper 50 thousand users access Configuration faults
+           disruption [101]                                 125 billion dollars
+ 2024/4/8 Tencent Cloud Console ex-         87 minutes      Console login exception           Incompatible versions
+           ception [24]
+2023/11/27 Didi Platform Service in-               Ten million orders, 400 million RMB Kubernetes cluster and infras-
+                                              12 hours
+           terruption [7]                          in transactions                       tructure issues
+2023/11/22 Google Drive files disap-  six months Any uploaded data from May 2023 -
+           pearance [99]                           was gone and Drive had reverted to
+                                                   a state from May.
+2023/11/12 Aliyun Global Outage [3] 185.76 minutes Services products, OSS, OTS, SLS, Access key (AK) component
+                                                   MNS, Cloud Console and manage- whitelist contamination
+                                                   ment APIs were affected.
+ 2023/11/8 ChatGPT Service Outage      1.5 hours   ChatGPT of OpenAI and API service System overloaded due to far
+           [66]                                    interrupted                           more usage than expected.
+ 2023/6/8 Outlook Access and Ser-      12 hours    Users unable to send, receive, or Server configuration changes
+           vice Issues [28]                        search emails through Outlook.com
+ 2023/3/29 Vipshop Nansha Data         12 hours    Losses exceeding 100 million RMB, Failure of the Nansha IDC cool-
+           Center Failure [117]                    affecting over 80 million customers ing system
+ 2023/3/29 Tencent Wechat, QQ Ser-      6 hours    Criticism from the Ministry of Indus- Cooling system anomaly
+           vice Outage [69]                        try and Information Technology
+ 2023/3/7 Twitter Service Outage        2 hours    Unable to access TweetDeck and API change leads to massive
+           [25]                                    8,000 Twitter outage reports          ramifications
+2022/12/18 Aliyun Zone C of the        24 hours    Caused significant public opinion im- Data center cooling failure trig-
+           China (Hong Kong) Re-                   pact                                  gered the fire sprinkler system
+           gion Service Outage [2]
+ 2021/12/7 Amazon AWS Service Out-      6 hours    Impacted APIs and cloud computing An automated process to scale
+           age [5]                                 management console functionalities capacities resulting in a large
+                                                   in the US East (N. Virginia) region, surge in connection activity and
+                                                   affecting Seller Central business     network congestion.
+ 2021/7/13 Bilibili Site-wide Anom-     3 hours    Numerous reports of 404 and 502 er- Load balancer code defect, roll-
+           alies [11]                              ror codes                             back operation failed to restore,
+                                                                                         loss mitigated by rebuilding
+                                                                                         SLB
+
+
+  As applications migrate to the cloud, containerization, and microservices, the dependencies and invocation relation-
+ships between services, as well as between services and components or infrastructure, become increasingly intricate.
+From a holistic system perspective, the service calls within the system form a network-like structure. When examining
+an individual service from a vertical perspective, dependencies are organized in a hierarchical manner from top to
+bottom. Fluctuations in a single service component or service can potentially trigger cascading effects throughout
+the entire network structure of the system. Although businesses have established a series of defensive measures for
+stability, including contingency plans, degradation strategies, and disaster recovery, rapid and accurate fault localization
+at the onset of an issue remains a critical step for subsequent loss prevention and swift system recovery. Inaccurate
+fault localization can lead to ineffective loss prevention measures, prolonged recovery times, and a negative impact
+                                       Fig. 1. Micro-service-framework of service X
+
+
+
+on the service level agreement (SLA) for availability. In practice, significant faults occur frequently, Table 1 displays
+the faults recently perceived by users. According to the OpenAI status dashboard, there were 11 incidents in 2024,
+14 in February, 34 in March, and 17 and 24 in April and May, respectively; as of now, the total number of reported
+incidents in 2024 has exceeded 112 [75]. Faults that are perceived by users often lead to significant business losses,
+increased operational expenses, substantial compensation claims, commercial crises, and heightened risks associated
+with security and compliance, among a host of other detrimental effects.
+  During a malfunction, faults demonstrate characteristics: destructiveness, dependencies complexity, propagative
+and recurring, particularly within microservice environment. Faults’ destructiveness can result in partial or complete
+system collapse, severely impacting business operations, disrupting service level agreement and potentially leading
+to substantial financial and reputational damage. When system availability is compromised, it not only disrupts the
+continuity of service but also violates service level agreements, which can erode customer trust and satisfaction.
+The aftermath of such destructive faults often extends beyond immediate technical difficulties, potentially incurring
+significant financial losses and long-term damage to the company’s reputation. Ensuring robust fault tolerance and rapid
+response mechanisms is therefore crucial to mitigate the destructive potential of system faults. Faults can be diverse
+and of dependencies complexity, encompassing various facets such as system hardware, components, and network
+configurations. The complexity of dependencies within microservices architectures (shown in Figure 1) significantly
+increases due to the intricate web of interrelations among components and services. This "Dependencies Complexity"
+spans a wide array of elements, including system hardware, individual components, and network configurations. Such
+multifaceted and intertwined dependencies make the task of diagnosing and resolving faults particularly challenging.
+Propagative. Because of the dependency’s complexity, faults are propagative [33]. They can propagate from original
+causes components to another and may even enlarge explosion radius if this affected component is a platform-type like
+component, which of plenty of call-dependent parties. Thus, the propagation impacts other components of a system and
+triggers a cascade fault or even anomaly storm [129], magnifying the repercussions of a single fault. Recurring. Faults
+frequently occur in an unpredictable fashion at any given moment and location, posing a challenge for anticipation.
+Among the frequently failures, about 74.38% failures are recurring in the investigated applications [49]. Because the
+repetitive and regular occurrence of faults provides historical data guidance for timely diagnosis when faults reoccur.
+  Considering these characteristics, it is critically important for IT operations teams to rapidly and accurately identify
+and rectify faults. Root cause analysis represents a pivotal methodology employed within the domain of Artificial
+Intelligence for IT Operations. This approach facilitates the automated identification of the fundamental causes
+precipitating a given issue or problem. RCA is achieved through the comprehensive analysis of data derived from a
+multitude of sources, inclusive of logs, metrics, and alerts. The analytical process leverages machine learning and other
+advanced AI techniques to discern patterns and anomalies that may indicate the root cause of a particular case. The
+primary objective of RCA within the context of AIOps is to expedite the resolution process of issues so as to reduce Mean
+Time to Recovery(MTTR) and to preempt their recurrence in the future. This not only enhances operational efficiency
+but also contributes to the overall reliability and robustness of the systems. Advanced RCA diagnostic methodologies
+are proposed spanning across academia and industry.
+  Unlike [92], which explores RCA broadly across various fields, this survey specifically narrows the scope, focusing
+on approaches that enable a more precise understanding of the nuances and complexities involved in AIOps, especially
+microservices RCA. It provides a deeper and more targeted analysis of the methodologies, challenges, and future
+trends related to identifying the root causes of issues within microservices architectures. [89, 113] primarily focus on
+graph-based RCA methods. By casting a broader net, this survey examines a wide range of categorical approaches.
+It captures the diversity of RCA techniques available, offering a more comprehensive understanding of the field and
+its various methodologies. This survey ensures that readers gain a holistic view of RCA practices in microservices,
+enabling them to make more informed decisions when selecting or developing RCA strategies. While other reviews
+might touch on both anomaly detection and RCA [21, 90], this survey deliberately focuses solely on RCA. It offers a
+comprehensive breakdown of different RCA methodologies, delving into their challenges and future trends within
+microservices environments. This detailed exploration fills a gap in the existing literature, which often overlooks the
+specificities of RCA in favor of a broader discussion that includes anomaly detection. Incorporating the latest research
+methodologies, this survey not only reviews historical approaches to RCA but also includes cutting-edge research. At a
+turning point in the widespread application of advancements in AI and automation, this survey, while reviewing past
+approaches, provides some possible guidance for subsequent research.
+  The remainder of the paper is organized as follows (shown in Figure 2 ). Section 2, Preliminaries, introduces the
+data used for RCA, the category of graphs in RCA, and various RCA methods. Section 3, Methodologies, delves into
+approaches from five different aspects: metric-based RCA (Section 3.1), trace-based RCA (Section 3.2), log-based RCA
+(Section 3.3), multi-modal RCA (Section 3.4), and LLM’s role in enhancing RCA (Section 3.5). Each subsection discusses
+the respective approaches. Section 4 presents an Evaluation of RCA, assessing the performance of these methodologies.
+Finally, Section 5 explores the broader Challenges and Future Trends in the field of RCA.
+Fig. 2. Structure of this paper.
+2     PRELIMINARIES
+In the realm of cloud services, an incident signifies any event that disrupts regular service operations or degrades SLA.
+Upon such incidents arise, a root cause analysis is undertaken to identify the underlying issue responsible for the
+disturbance. RCA, in the realm of cloud services, represents a sophisticated endeavor involving several stages:
+       • Data Collection: The initial phase entails gathering relevant data about the incident from various sources,
+         such as logs, metrics (or KPIs), traces, as well as events stemming from publications or configuration changes.
+       • Data Analysis: Subsequently, the amassed data undergoes thorough analysis to discern patterns, deviations,
+         or connections that may offer insights into the underlying cause of the incident.
+       • Hypothesis Validation: Following the data analysis, potential root causes are hypothesized and subsequently
+         validated by SREs.
+
+2.1    Data for RCA
+
+
+
+
+                                              Fig. 3. Metrics-traces-logs scope
+
+
+    Data for root cause analysis can originate from various sources, including metrics, traces, or logs. When selecting
+datasets for such analysis, the following types are commonly considered. Figure 3 demonstrates the scope, intersection,
+and volume of metric data, trace data, and log data. Metrics data encompasses system metrics, such as CPU utilization,
+memory consumption, disk I/O activity, and network traffic, as well as transaction metrics like Queries Per Second (QPS)
+and Top Percent 99 (TP99). By scrutinizing fluctuations in these performance indicators, deviations from normal system
+behavior can be identified. Metrics often harbor a substantial amount of anomalous data, providing a direct window into
+potentially faulty or impacted modules, frequently leveraged for precise fault localization. Nevertheless, the intricacies
+of call relationships among metric data, graph construction methodologies, and the sequential triggering of metric
+alerts all play pivotal roles in conducting an accurate root cause analysis. Table 2 lists the hierarchical metric groups of
+microservice A. Log data, encompassing application, system, and network logs, constitute the predominantly utilized
+form of data. These logs harbor an abundance of operational status information, encompassing error messages, warning
+notifications, and status alterations, among others. This diverse array of data serves as a valuable tool for identifying the
+underlying causes of emerging issues. However, logs often come with significant challenges, given their vast volume,
+unstructured nature, and diverse formats. Additionally, the rate at which these logs are gathered can be influenced by
+the sampling rate, which must strike a careful balance between cost-effectiveness and the adequacy of data sampling.
+Trace data serves as a valuable tool for documenting and analyzing request paths within distributed systems. In intricate
+microservice architectures, where a single request often traverses multiple services to reach completion, trace data
+offers critical insights. By meticulously logging the commencement and termination times of each service involved, as
+well as their interconnected relationships, a comprehensive map of the request’s journey can be assembled. Trace data
+reveals a detailed link topology and call relationships, providing fine-grained information invaluable for graph-based
+RCA. However, the potentially extensive trace links, resulting from complex call relationships, may undergo truncation,
+thereby complicating the root cause analysis. Figure 4 demonstrates a distributed service request trace with request
+timeout anomaly. The trace illustrates the path taken by the request through multiple services, specifically from service
+A to C, then to D, and finally to the database (DB). Notably, the total time taken along the path A->C->D->DB was
+1000ms, with a significant delay of 990ms observed between D and DB, indicating a possible performance degradation
+in DB access.
+
+
+
+
+                                           Fig. 4. Distributed service request trace
+
+
+
+  In addition to harnessing real-world datasets from both public and private sources, the creation of datasets can also
+be aided by employing diverse benchmarks. Among the numerous benchmarks available for microservices evaluation,
+several stand out, including TrainTicket [30], Sockshop [37], OnlineBoutique [57], and SocialNetwork [76]. These
+benchmarks play a pivotal role in the evaluation and advancement of microservice architectures by offering standardized
+environments crucial for conducting RCA.
+  When conducting root cause analysis, ensuring data reliability is absolutely essential, whether the data comes
+from metrics, traces or logs. For example, anomalies must be monitorable, which means they should be detectable
+through metrics. Moreover, these anomalies need to be identifiable through logs, requiring that they are logged with
+corresponding log levels. Similarly, anomalies should be reflected in traces, indicating that the impacted business
+processes have undergone comprehensive tracking and instrumentation. In situations where monitoring is not feasible,
+and anomalies cannot be identified through metrics, traces or logs, even the most advanced root cause analysis methods
+                                       Table 2. Metric groups of microservice A
+
+
+    Category                Group            Metrics
+  App(service)           Transaction      QPS, RT, tp99, log_error_count, key business metrics such as total sales,
+                                          average order value, and conversion rates.
+      Java                  JVM           jvm_heap_memory_usage,                jvm_non_heap_memory_usage,
+                                          jvm_thread_count,          jvm_gc_frequency,         jvm_gc_duration,
+                                          jvm_class_loading,            young_gc_count,            full_gc_count,
+                                          young_generation_usage, old_generation_usage, survivor_s0_usage,
+                                          survivor_s1_usage, jvm_thread_pool_waiting_count
+  Component                  DB           IOPS,      connection_count,       queue_length/waiting_connections,
+                                          active_connections, database_size, slow_query_count, transac-
+                                          tion_throughput, response_time, error_rate, session_durations
+  Component                Kafka          broker_connections, topic_message_backlog, topic_consumer_lag,
+                                          topic_consumer_offset
+Container runtime           CPU           container_cpu_usage, container_idle_cpu, container_user_cpu_time,
+                                          io_cpu_usage
+Container runtime           load          1/5/10_mins_container_average_load
+Container runtime         Memory          container_memory_util, container_memory_free
+Container runtime           Disk          container_disk_io_util, container_disk_io_r, container_disk_io_w
+Container runtime         network         container_network_in_rate, container_network_out_rate
+       K8s                ingress         Used_space, request_response_time, error_rate, load_balancer_util,
+                                          backend_health_checks, TLS_handshake_time, caches_hit_rate, traf-
+                                          fic_distribution, config_change_events
+       K8s                kubelet         Kubelet_runtime_operations_total, kubelet_runtime_erroers_total
+       K8s              kube-proxy        connection_status,         active_connections,       idle_connections,
+                                          load_balancing_status,         load_balancing_algorithm,         abnor-
+                                          mal_exit_count, restart_count, failover_status, request_duration,
+                                          throughput, rule_sync_status, iptables_rules_count/ipvs_rules_count
+       K8s            kuber-scheduler     scheduler_status,       scheduler_scheduler_cache_size,        schedul-
+                                          ing_attempts, scheduling_successes, scheduling_failures, sched-
+                                          uling_latency, pending_pods, scheduled_pods, available_nodes
+       K8s        kube-controller-manager workqueue_adds_total,               work_queue_depth,               con-
+                                          troller_runtime_reconciler_queue_work_duration,
+                                          controller_runtime_reconciler_reconcile_total,                      con-
+                                          troller_manager_operation_duration, controller_manager_errors_total
+       K8s             kube-apiserver     apiserver_request_duration_seconds, apiserver_request_total, apis-
+                                          erver_request_errors_total
+Physical machine            CPU           cpu_usage, idle_cpu, system_cpu_time, user_cpu_time, sys-
+                                          tem_block/wait_queue_length, ZombieProcess
+Physical machine          Memory          memory_util, memory_free, Buffers, cached_memory, swap_used,
+                                          swap_free, page_faults, page_in, page_out
+Physical machine            Disk          disk_io_util,         disk_io_r,        disk_io_w,          disk_await,
+                                          disk_average_queue_size,                 disk_r_io_operation_per_sec,
+                                          disk_read_KB_per_sec, disk_average_service_time, disk_w_io_per_sec,
+                                          disk_w_io_operation_per_sec, FS_max_avaliable_space, FS_max_util,
+                                          FS_total_space, FS_used_percentage, FS_used_space
+Physical machine          network         network_in/out_rate,                       network_packet_loss_ratio,
+                                          bandwidth_consumption,              received/sent_packets,            re-
+                                          ceived/sent_errors_packets, queue
+would be rendered useless. Therefore, ensuring the reliability of data is fundamental to the success of any root cause
+analysis.
+
+2.2   RCA Methods
+The Dependency (Topology) Graph illustrates the intricate interdependencies among various components, modules,
+services, or systems, which are prevalent entities in root cause analysis. Dependency graph based approaches involve
+constructing a graph utilizing Key Performance Indicators (KPIs) and domain expertise. Subsequently, anomalous
+subgraphs or paths are identified and extracted in response to observed anomalies. The utilization of dependency
+graphs in root cause analysis aligns seamlessly with actual manual judgment when determining the influence among
+modules, components, and services. Within dependency graphs, the status of given node can directly impact other
+nodes that are dependent on it. Dependency graphs serve as a valuable tool for tracing potential problem propagation
+paths in RCA. For example, in the event of a malfunction in a foundational service, the dependency graph can reveal all
+upper-tier applications reliant on this service. This, in turn, facilitates the determination of the disruption’s scope and
+potential underlying causes. In contrast to the dependency graph, topology places greater emphasis on the structure of
+the network, emphasizing the connections between elements rather than their dependency or causal relationships. This
+approach provides a comprehensive visualization of the network’s layout, enabling a more holistic understanding of its
+components and their interactions. Figure 5 illustrates a framework of graph-based RCA.
+
+
+
+
+                                          Fig. 5. A framework of graph-based RCA
+
+
+  Typically, in Bayesian Network graphical model, variables are represented as nodes, and the conditional dependencies
+among them are depicted by directed edges. The model adheres to the local Markov property, which asserts that any
+given node is conditionally independent of all its non-descendants when conditioned on its parent nodes. This property
+ensures a structured and efficient representation of the conditional relationships within the model.
+  Operation and Maintenance Knowledge Graph (O&M Knowledge Graph) offers a way to consolidate and represent
+the intricate relationships existing between the various components and entities that constitute complex systems. This
+is accomplished by seamlessly integrating both structured and unstructured data culled from a wide array of sources.
+Multi-modal integration significantly aids in the comprehension and analysis of the intricate web of interactions and
+dependencies among system components. Construct a knowledge graph (KG) based on pre-defined entities, relationships,
+and their associated attributes. Utilize semantic querying and reasoning to retrieve relevant results. This can depict the
+knowledge graph of either a flawed application architecture or the knowledge graph representing various fault types.
+The constructed KG, housed in a graph database, allows for swift access and exploration. Furthermore, the semantic
+nodes and relationships within the KG can be leveraged for causal inference and associative analysis, enhancing the
+depth and breadth of insights derived from the data. Figure 6 presents a knowledge graph of high CPU usage case.
+                                   Fig. 6. An O&M knowledge graph of high CPU usage
+
+
+
+  Rule-Based RCA relies on predefined rules and patterns to identify the root cause of a problem. These methods work
+well in clear, rule-defined scenarios, but may require significant human involvement and maintenance when dealing
+with complex, dynamically changing IT environment issues.
+  Statistical-Based RCA employs statistical techniques to assess the correlation between two Key Performance Indicators
+(KPIs) by analyzing the relatedness of metrics from historical data, such as the Pearson correlation coefficient or the
+Spearman rank correlation coefficient, to identify and predict the root cause. This method can handle large amounts of
+data but may require professional statistical knowledge. The effectiveness may be affected when the data quality is
+poor or the data volume is insufficient.
+  Time Series Analysis-Based RCA. In AIOps, operational monitoring metrics and business monitoring metrics exhibit
+daily, weekly, and other time-series periodicities. Time series analysis can be used to identify abnormal patterns in
+these data, thereby finding out the root cause of the problem.
+  Graph Theory-Based RCA. In the microservices environment, complex interrelations exist among services, between
+services and components, as well as between components and the underlying infrastructure. These interactions are
+reflected in various graphical representations, including dependency graphs, topological graphs, and causal graphs,
+which illustrate call dependencies and event causality. By examining the nodes (representing elements) and edges
+(representing relationships) within these graphs, researchers can conduct root cause analysis. For example, analyzing
+graph paths and connectivity reveals the patterns of problem propagation, pinpointing the routes through which failures
+spread. Additionally, centrality measures, such as degree centrality, closeness centrality, and betweenness centrality,
+enable us to identify the most critical nodes in the network, which are potential root causes of issues. Furthermore,
+community detection techniques aid in recognizing tightly-knit clusters of nodes, possibly indicating groups of entities
+sharing similar functionalities or problem areas. By employing graph traversal methods like breadth-first search, we
+can efficiently locate potential root causes of problems within the microservices architecture.
+  Machine Learning/Deep Learning-Based RCA. Machine learning and deep learning techniques can be employed to
+process intricate datasets for the purpose of identifying and predicting root causes, based on the constructed graph
+structures. As an example, graph neural networks (GNNs) can model the intricate relationships and interdependencies
+among system components by harnessing the inherent graph-based structure of the data. These networks encapsulate
+dependencies within graphs through mechanisms like message passing or neighborhood aggregation, thereby facilitating
+accurate root cause analysis.
+
+
+
+3     METHODOLOGIES
+3.1    Metric-based Root Cause Analysis Techniques
+Metric-based Root Cause Analysis can be categorized into graph-based and non-graph methods. Table 3 illustrates
+the investigated root cause analysis approaches of metrics. Among the non-graph methods, PAL [72] and FChain [71]
+firstly conduct direct KPI correlation analysis. In contrast, PAL derives the propagation pattern within components,
+whereas FChain takes into consideration both fault propagation patterns and intercomponent dependencies. DLA
+analyzes the metrics (CPU, Memory, or Network usage) associated with each level (container, node, micro-service) to
+pinpoint the source of the issue by training a Hierarchical Hidden Markov Model (HHMM) [82]. [86] aims to identify
+the e correlation in time by measuring the similarity of time series. iSQUAD [61] diagnoses cause of intermittent slow
+Queries (iSQs) by clustering iSQs in databases. [116] leverages random control trials (RCT) to obtain less ambiguous
+data in data-driven root cause analysis.
+    On the other hand, graph-based methods are widely used in RCA. Methods based on Dependency Graphs typically
+begin by employing a graph construction approach, initially creating causal graphs or topological graphs. Methods
+[12, 15, 34, 45, 49, 53, 98, 109, 111, 112] perform root cause analysis on the constructed graph by building topological
+or dependency graphs. During the dependency graph construction process, Granger Causality [98] and PC algorithm
+[45, 53] are used to construct completed partially directed acyclic graph. There are also more through the trace request to
+construct the dependency graph [12, 15, 109, 111, 112], there are also through the law of large numbers and the Markov
+properties [34], deployment relationships to construct call graph or dependency graph [49]. Quite many approaches
+use metric data to construct call graphs, however, ambiguous correspondences between upstream and downstream
+calls may exist and result in exploring unexpected edges in the constructed call graph, while advocate conducting RCA
+on this graph may lead to misjudgments [122]. CMDiagnostor leverages the law of large numbers and the Markov
+properties of network traffic to investigate ambiguity problem and construct an ambiguity-free call graph.
+    Once the dependency graph has been constructed, subsequent RCA can be performed through various methodologies,
+including graph theory, machine learning, and deep learning. These approaches leverage the established graph to analyze
+data for fault diagnosis and problem resolution. [98] uses correlation of a correct version and faulty version to realize
+RCA. FacGraph [53] and RCA-graph [34] utilize subgraph mining (FSM) algorithm graph or graph similarity-based
+pattern matching through traversal techniques, such as breadth-first search (BFS) ordered strings and depth-first search
+(DFS) on dependency graphs, to identify the root cause. TON18 [109], MicroRCA [112] and [94] employ random walks
+on graphs for root cause analysis. Concurrently, [12] adopts subgraph similarity pattern matching on topological
+structures for fault diagnosis.
+    The advancement of deep learning methods on dependency graphs has led to significant progress in fault diagnosis.
+[111] applies an autoencoder to identify abnormal service metrics, utilizing a ranked list of reconstruction errors to
+pinpoint potential culprit services. On the other hand, DéjàVu [49] methodology harnesses Gated Recurrent Units
+(GRU) and Convolutional Neural Networks (CNN) to encode the metrics of a fault unit into a fixed-length vector. It then
+employs a binary classification scheme to output a root cause score ranging from 0 to 1 for each fault unit, representing
+the likelihood of the unit being the root cause of the failure, based on the aggregated features. Furthermore, DéjàVu
+posits that recurrent events are of particular interest RCA, as they provide valuable insights into recurring patterns of
+failure.
+   As a classic example of dependency graphs, Bayesian Networks have garnered attention from both researchers
+and industry practitioners for it excel in probabilistic deduction and causal inference, particularly when dealing with
+uncertain and incomplete information. CIRCA [45] takes full advantage of the Causal Bayesian Network (CBN), bridging
+between observational data and interventional knowledge, the change of probability distribution conditioned on the
+parents in the CBN. [15] exploits the explainable AI (XAI) Bayesian Linear Attribution (BALANCE) for RCA. BALANCE
+uses a Bayesian multi collinear feature selection (BMFS) model to predict the target KPIs given the candidate root
+causes in a forward manner while promoting sparsity and concurrently paying attention to the correlation between the
+candidate root causes. And it introduces attribution analysis to compute the attribution score for each candidate in a
+backward manner.
+   Unlike dependency or topology aimed at understanding the structure and connectivity of a system, while causal graph
+is concerned with the cause-and-effect relationships within the system. In particular, causal graph are instrumental in
+identifying and interpreting the underlying reasons for RCA. Causality Graph-based RCA also comprises two stages:
+the initial stage involves generating a directed acyclic the causality graph with spatiotemporal restriction, followed
+by performing RCA on the causality graph. In the realm of causal relationship discovery, considerable number of
+researchers [18, 51, 59, 60, 67, 106] have also constructed component or service causality graphs using the PC algorithm
+and its variants and they put more emphasis on RCA methods. [73] employs a data mining method to extract an
+initial causality graph, which is then refined using the random forest algorithm to construct a more precise causality
+graph. The correctness and completeness of causality discovery influents second stage RCA. Concerning this, CAR [46]
+discovers almost a complete graph based on XG-Boost active learning in case of miss a large proportion of relations
+and fluctuation propagation among time series. REASON [103] employs novel hierarchical graph neural networks to
+model both intra-level and inter-level non-linear causal relations, thereby constructing interdependent causal networks.
+CORAL [102], an incremental disentangled causal graph learning approach, aims at decoupling state-invariant and
+state-dependent information. Completeness and complexity often present a paradox in causality graph analysis, where
+intricate causal relationships can lead to reduced efficiency and accuracy in processing. CausIL [14] provides a list of
+general rules in the form of prohibited edges, along with ways to incorporate them, aiming to improve computation
+time and accuracy.
+   Following the construction of the causality graph, in the second phase of causality graph analysis, correlation of
+causality graph analysis is employed for conducting root cause analysis [64, 73] under the hypothesis that the anomalous
+KPIs related to a fault are highly correlated and form a connected subgraph of the propagation graph. [18, 51]traverse
+the causal graph in DFS (Depth First Search) and reverse DFS to inspect the neighboring nodes of each node, introducing
+correlation coefficient to measure the relationship between the service level objective of the anomalous front service
+and that of the potential root cause candidates. Numerous researchers tend to utilizes random walks on the constructed
+causality graph, and place greater emphasis on the construction of the causality graph itself. CloudRanger [106],
+MS-Rank [59], AutoMAP [60] MicroCause [67], CAR [46], CORAL [102], and REASON [103] apply random walk to
+perform RCA leveraging the learned interdependent causal networks. MicroCause captures the sequential relationships
+in time series data when performing temporal cause oriented random walk.
+   Knowledge graph within the domain of expertise is referred to as O&M Knowledge Graph, a completely undirected
+graph. In O&M Knowledge Graph, the entity and relation demonstrate a faulty architecture. [81, 94] and OpsKG [130]
+construct O&M knowledge graph by extracting a joint entity-relation extraction according to alarm query, root-cause
+                            Table 3. Investigated root cause analysis approaches of metrics
+
+
+     Method         Data source    RCA category RCA method                            Graph construction   Graph category
+     PAL [72]         Metrics         Statistical Direct KPI correlation                   -            Non-graph
+   Fchain [71]        Metrics         Statistical  Direct KPI correlation                  -            Non-graph
+ 𝜀-diagnosis [86]     Metrics         Statistical  Similarity of time series               -            Non-graph
+    DLA [82]          Metrics         Statistical  Hierarchical Hidden Markov              -            Non-graph
+                                                   Model analysis
+   iSQUAD [61]       Metrics         Statistical  Type-Oriented Pattern Inte-              -            Non-graph
+                                                   gration Clustering
+    CARE [116]         KPIs          Statistical   Random Control Trial                    -            Non-graph
+     Sieve [98]      Metrics         Statistical   KPI correlation                 Granger causality Dependency graph
+  FacGraph [53]      Metrics       Graph Theory Breadth first ordered string         PC algorithm     Topology graph
+CMDiagnostor [34]    Metrics       Graph Theory DFS on dependency graph                  BFS         Dependency graph
+   TON18 [109]       Metrics       Graph Theory Random walk on dependency           Trace request    Dependency graph
+                                                   graph
+ MicroRCA [112]      Metrics       Graph Theory Random walk on topology             Trace request    Dependency graph
+                                                   graphs
+ RCA-graph [12]      Metrics       Graph Theory Subgraph matching on topol-         Trace request     Topology graph
+                                                   ogy
+     CSL [111]       Metrics       Deep Learning Autoencoder                        Trace request    Dependency graph
+    DéjàVu [49]   Metris, events Deep Learning Deep learning on dependencyDeployment structureDependency graph
+                                                   graph
+    CIRCA [45]       Metrics      Machine learningBayesian network                System knowledge Dependency graph
+ BALANCE [15]          KPIs       Machine learningBayesian network                  Trace request    Dependency graph
+       - [73]     Metrics,events     Statistical   Correlation of causality graph Monitoring data     Causality graph
+    LOUD [64]          KPIs          Statistical   Correlation of causality graph   Trace request     Causality graph
+ CauseInfer [18]     Metrics       Graph Theory DFS on causality graph               PC algorithm     Causality graph
+ Microscope [51]     Metrics       Graph Theory Reverse DFS on causality             PC algorithm     Causality graph
+                                                   graphs
+CloudRanger [106]    Metrics       Graph Theory Random walk on causality             PC algorithm     Causality graph
+                                                   graph
+  MS-Rank [59]       Metrics       Graph Theory Random walk on causality             PC algorithm     Causality graph
+                                                   graph
+  AutoMAP [60]       Metrics       Graph Theory Random walk on causality             PC algorithm     Causality graph
+                                                   graph
+ MicroCause [67]     Metrics       Graph Theory Random walk on causality             PC algorithm     Causality graph
+                                                   graph and path
+                                                   condition time series
+     CAR [46]        Metrics       Graph Theory random walk on causality              FPG-Miner       Causality graph
+                                                   graph
+  CORAL [102]        Metrics       Graph Theory Random walk on causality Customized method Causality graph
+                                                   graph
+  REASON [103]       Metrics       Graph Theory Random walk on causality                 GNN          Causality graph
+                                                   graph
+    CausIL [14]      Metrics              -       -                               Customized method Causality graph
+       - [94]     Multiple factors Graph Theory Random walk on dependency Customized method Knowledge graph
+                                                   graph
+   OpsKG [130]       Metrics       Graph Theory MicroRCA                                 NLP         Knowledge graph
+analysis and location, and alarm prediction. And a random walk fault path lookup approach in the root cause localization
+stage. OpsKG adopts the MicroRCA [112] method into OpsKG to implement RCA, which, in essence, still utilizes random
+walk.
+
+3.2     Trace-based Root Cause Analysis Techniques
+Trace-based RCA employs traces to pinpoint the fundamental reasons behind issues by scrutinizing the sequence of
+events that preceded the occurrence of the problem. Different with metric-based RCA, trace-based RCA centers on
+traces instead of metrics or logs. Since traces naturally exhibit invocation relationships, trace-based techniques are
+inherently associated with dependency or topology graphs. However, these dependency graphs, which may encompass
+temporal or regular trace dependencies, may not possess the completeness of a comprehensive dependency graph.
+Among dependency graph-based methods, statistical analysis and classification on traces are primarily employed. Table
+4 illustrates investigated root cause analysis approaches of traces.
+
+3.2.1 Correlation Analysis. Non-graphical methods are not frequently used in trace RCA. [41] leverages alarm clustering
+techniques to support the analysis process by identifying and eliminating the most predominant and persistent root
+causes of alarms. X-ray [6] employs dynamic flow analysis to associate events with potential root causes, prioritized by
+probability. The aggregate cost for each root cause is calculated by summing the product of individual event costs and
+their likelihood of being caused by a specific root cause.
+  Dependency graph constructed from monitoring data may exhibit incompleteness, as not all potential interactions
+among architectural elements are necessarily represented by edges in the graph [35, 65]. Drawing from reconstruction
+of architecture models from monitoring data and the subsequent evaluation of anomaly detectors, the caller-callee
+relationships, along with their respective anomaly scores, can be discerned. [65] introduces the anomaly correlator,
+RanCorr, a set of rules designed to scrutinize calling dependencies among software components within the constructed
+graph. The correlation analysis is facilitated by implementing a rule set founded on general assumptions about
+propagation. Ultimately, the visualization of potentially correlated anomalies serves to bolster decision-making. [13]
+utilize a heuristic approach to compare suspicious traces with predefined normative patterns, which relies on graph
+properties of sequential patterns, flagging anomalies when deviations exceed the 95% statistical confidence limits. They
+employ a regression-based relative importance analysis, which assesses the explained variance of the total response
+time in relation to the latency of individual transitions within a trace. TraceRCA [48] employs frequent pattern mining
+techniques to narrow down the search space, and ranks microservices with less normal traces passing through. [54]
+performs anomaly entity node analysis and propagation chain analysis by traversing the graph along anomalous service
+call edges. Candidate root causes are then ranked based on the absolute value of the Pearson correlation coefficient.
+trACE [9] pinpoints the root cause within a microservices architecture by exploiting its hierarchical deployment
+structure. It analyzes dependencies correlation between anomalous Pods and services to infer the causes of service
+anomalies. While this method excels at identifying root causes at both the node and service levels, it does not directly
+reveal the triggers behind these failures.
+  REPTRACE [78] employs categorizing trace similarity for RCA. They construct a dependency graph based on
+read/write and parent/child process dependencies, tracing back from inconsistent artifacts to identify the responsible
+processes. To address the challenges posed by noisy dependencies and uncertain parent/child relationships, REPTRACE
+focuses on system calls that produce differing outputs across builds and computes the similarity of runtime values to
+establish relevant dependencies. GMTA [34] employs a graph representation to visualize trace data in microservice
+systems, which allow operators to manually determine the possible root causes. GMTA supports a wide range of
+analytical applications, including visualizing service dependencies, guiding architectural decisions, analyzing service
+behavior changes, detecting performance issues, and enhancing the efficiency of problem identification.
+  Dependencies path analysis microservices is another correlation analysis method [56, 93, 128]. [93] computes
+potential dependencies among anomaly elements using a correlation model, identifying the critical path leading to the
+detected fault through this correlation model. TraceAnomaly [56] employs a variational autoencoder (VAE) to identify
+anomalies within traces, utilizes the three-sigma rule to determine anomaly intervals, and defines the root cause as
+the longest continuous path encompassing these anomalous intervals. Similar to TraceAnomaly, CRISP [128] uses an
+anomaly detection framework but encodes only the critical paths into vectors generated through Critical Path Analysis
+(CPA). CRISP’s tracing facility captures the sequence of operations and interactions among system components, using
+this data to construct a dependency graph. This graph illustrates the relationships between microservices or system
+elements, allowing CRISP to pinpoint the most influential critical paths for system performance. Through the analysis
+of these paths, CRISP detects anomalies and bottlenecks, aiding in the diagnosis and resolution of issues in intricate
+software systems.
+  Researchers utilize random walks for path analysis in dependency graph identifying the underlying causes of issues.
+MonitorRank [42] advocates that a basic call graph might not accurately represent the true dependency relationships. By
+harnessing both historical and real-time data from various sensors, the system utilizes a specially designed random walk
+algorithm alongside a sensor dependency graph. TraceRank [121] also gathers service invocation data in a microservice
+setting to assemble a service dependency graph. A PageRank-inspired random walk algorithm is then employed to
+accurately identify the primary culprits behind any issues.
+
+3.2.2 Trace Classification. Another category for trace RCA is trace classification. Pinpoint [17] adopts data mining
+techniques to cluster client requests based on their successes and failures, correlating them with the components
+that served them. This correlation aids in pinpointing which components are most probably malfunctioning. MEPFL,
+similarly harnesses machine learning to predict potential errors, fault locations, and types. This method selects relevant
+features, preprocesses data, and trains models using Random Forests, K-Nearest Neighbors, and Multi-Layer Perceptron
+for within a microservices architecture [134]. [16] proposes the use of a supervised learning model, specifically Deep
+Neural Networks (DNNs), to implement a classifier. This classifier is trained on both normal and faulty datasets to learn
+patterns associated with both normal and abnormal behaviors, thereby aiding in fault localization. On the other hand,
+[68] categorizes requests based on call sequences, identify abnormal requests through principal component analysis, and
+then single out anomalous methods using the Mann-Whitney hypothesis test. They asses the behavioral similarities of
+all replicated instances of the anomalous methods with the Jensen-Shannon divergence and select those with differing
+behaviors as the ultimate culprits of performance anomalies.
+  Spectrum-based analysis is also utilized for trace classification. MicroRank [119] utilizes clues extracted from both
+normal and abnormal traces to pinpoint the root causes of latency issues. Its PageRank Scorer module employs abnormal
+and normal trace data, distinguishing the significance of various traces through advanced spectrum techniques. Spectrum
+method computes a ranking list, leveraging the weighted spectrum data from the PageRank Scorer to identify the root
+causes. Utilizing weighted spectrum analysis, TraceStream [133] generates a vector representation for each trace by
+extracting key structural and temporal features. Leveraging these representations, traces exhibiting similar behaviors
+are continuously grouped into normal and anomalous clusters by calculating the centrality of each candidate node
+and ranking service nodes based on centrality-derived spectrum scores. Sleuth [32] leverages a graph neural network
+                               Table 4. Investigated root cause analysis approaches of traces
+
+
+     Method         Data source RCA category           RCA method                 Graph construction   Graph category
+      - [41]          Traces       Heuristic      Alarms clustering                  -               Non-graph
+     X-ray [6]        Traces       Statistical    Probability analysis               -               Non-graph
+      - [35]          Traces       Statistical    Correlation analysis Invocation relationship Dependency graph
+    TBAC [65]         Traces       Statistical    Correlation analysis Invocation relationship Dependency graph
+Realtime RCA [13]     Traces       Statistical    Regression-based rel- Invocation relationship Dependency graph
+                                                  ative analysis
+  TraceRCA [48]      Traces      Statistical      Pattern mining with Invocation relationship Dependency graph
+                                                  less normal traces
+                                                  passing through
+       - [68]      Traces,logs Statistical        Jensen-Shannon          Invocation relationship Dependency graph
+                                                  divergence analysis
+  Microhecl [54]     Traces      Graph Theory BFS on dependency Deployment structure Dependency graph
+                                                  graphs
+     trACE [9]       Traces      Statistical      Correlation Analysis Deployment structure Dependency graph
+    GWAD [85]     Traces,events Statistical       Jaccard’s similarity Greedy workflow graph Dependency graph
+                                                  trace classification
+ REPTRACE [78]       Traces      Statistical      Sequential patterns Invocation relationship Dependency graph
+                                                  similarity compari-
+                                                  sion
+    GMTA [34]        Traces      Graph Theory Visual trace compari- Invocation relationship Dependency graph
+                                                  son
+       - [93]        Traces      Statistical      Path correlation anal- Invocation relationship Dependency graph
+                                                  ysis
+   CRISP [128]       Traces      Graph Theory Critical path analysis Invocation relationship Dependency graph
+MonitorRank [42] Metrics, traces Graph Theory Random walk on de- Invocation relationship Dependency graph
+                                                  pendance graphs
+ TraceRank [121]     Traces      Graph Theory Random walk on de- Invocation relationship Dependency graph
+                                                  pendency graph
+   Pinpoint [17]     Traces      Machine learning Clustering              Invocation relationship Dependency graph
+   MEPFL [134]       Traces      Machine learning Random forest, k-NN, Invocation relationship Dependency graph
+                                                  Multi-Layer Percep-
+                                                  tron for classification
+       - [16]        Traces      Deep learning    DNN for classifica- Invocation relationship Dependency graph
+                                                  tion
+ MircoRank [119]     Traces      Machine learning Spectrum analysis       Invocation relationship Dependency graph
+TraceStream [133]    Traces      Machine learning Spectrum analysis       Invocation relationship Dependency graph
+    Sleuth [32]      Traces      Deep learning    GNN                     Invocation relationship Dependency graph
+TraceAnomaly [56]    Traces      Deep learning Autoencoder                Invocation relationship Dependency graph
+  LSTM-AD [70]       Traces      Deep learning    Long       short-term Invocation relationship Dependency graph
+                                                  memory (LSTM) VAE
+     Sage [31]       Traces      Deep learning    Graphical variational Causal Bayesian Networks Dependency graph
+                                                  autoencoder correla-
+                                                  tion analysis
+ TraceVAE [114]      Traces      Deep learning    dual-variable graph Invocation relationship Dependency graph
+                                                  VAE
+(GNN) to capture the causal impact of each span in a trace, and trace clustering using a trace distance metric to reduce
+the amount of traces required for root cause localization.
+  Autoencoders are also extensively employed in trace root cause analysis, where they are used to learn efficient coding
+of the input data, enabling the identification of underlying patterns and anomalies that contribute to the occurrence
+of errors or faults within a system. LSTM-AD [70] extracts operation sequences and latency time series from traces,
+modeling the temporal features using a multi-modal Long Short-term Memory (LSTM) VAE. Uniquely, this method
+maximizes node anomaly scores instead of summing them up. TraceAnomaly [56] employs a variational autoencoder
+(VAE) to identify anomalies within traces. It utilizes the three-sigma rule to determine anomaly intervals, and defines
+the root cause as the longest continuous path encompassing these anomalous intervals. Sage [31] constructs a visual
+representation of these complex dependencies utilizing Causal Bayesian Networks, presenting a clear and structured
+method to decipher the intricate relationships within the microservice architecture. Sage employs counterfactuals
+via a graphical Variational Autoencoder to simulate hypothetical scenarios and evaluate their potential impact on
+the cloud service’s QoS. Sage not only identifies the underlying issues but also takes proactive steps to restore and
+maintain optimal QoS levels in cloud services. TraceVAE [114] introduces an innovative dual-variable graph variational
+autoencoder, targeting two types of anomalies commonly found in traces: structural and time-consumption anomalies.
+TraceVAE encodes the trace structure and utilizes the negative log-likelihood (NLL) as a quantifiable measure of the
+anomaly score. NLL signifies how improbable it is for that trace to align with the model’s learned distribution.
+
+
+3.3   Log-based Root Cause Analysis Techniques
+Log based RCA begins with the acquisition of log data from the system, followed by preprocessing steps such as
+log parsing, formatting, and noise reduction. Log analysis techniques are applied to detect anomalies within the
+logs, common techniques including anomaly detection, correlation analysis, pattern mining, and machine learning
+methods. These techniques specifically involve identifying abnormal patterns in logs, analyzing correlations and causal
+relationships between log events, mining frequent patterns or behaviors in logs, and classifying and clustering logs. With
+the assistance of system context information (such as system topology, configuration, metadata, etc.) and knowledge
+graphs, contextual relationships are integrated. Subsequently, RCA methods are employed to locate the root cause
+of issues within the logs. Here, RCA methods are categorized into the following types: rule-based RCA, statistical
+RCA, graph-based RCA, and machine learning-assisted RCA. Table 5 demonstrates the investigated root cause analysis
+approaches of logs.
+
+
+3.3.1 Correlation Analysis. Rule-based RCA relies on predefined rules and patterns to identify the root cause of a
+problem. These methods work well in clear, rule-defined scenarios, but may require significant human involvement and
+maintenance when dealing with complex, dynamically changing IT environment issues. [23, 29] propose a rule-based
+approach for failures through event logs analysis. [29] clusters frequent event sequences into event groups and extract
+failure rules based on events of the same types. [50, 74] both adopt association rule mining (ARM) to automate RCA.
+Lin2020fast incorporate a new rule refinement algorithm to reduce the number of redundant explanations in the
+result set. They use the Apriori and FP-Growth, association rule learning, to find item-sets in structured logs that
+are strongly linked to association failures. Built upon this work, LogRule [74] introduces new compression and rule
+selection techniques, by removing the need for manual tuning of metric thresholds, and by introducing the use of
+operators designed specifically for each data types, efficiently preserving semantic information.
+  Correlation analysis-based methods leverage statistical correlation to identify and analyze relationships between log
+entries, events in system logs and faults metrics to pinpoint the root causes of failures. Pinpointing the underlying
+causes of a given failure from extensive logs, [22] reconstructs event sequences and establish connections among events
+and [96] identifies log entries, both of them employs statistical directly correlation analysis. [58] involves selecting
+features from structured logs related to execution time, data locality of each task, memory usage, and garbage collection
+of each node. By analyzing weighted features, they determine the probability of various root causes.To identify root
+causes, [62] analyzes process on event logs, variations in trace durations, event timings, and path frequency. [43]
+leverages Istio’s default log count computes an indicator, representing the structure of the HTTP response body and
+logged as an additional field, to identify application errors. It tallies items like maps or lists in JSON format extracted
+from the HTTP response body, serving as the indicator for error identification. In methods of correlation analysis, [105]
+applies correlation metrics to analyze log data following log anomaly detection with DeepLog algorithm.
+  In the realm of correlation analysis methods, path-based analyses also exist. These approaches are particularly
+useful when examining the causal pathways that link various factors and outcomes in a complex system [40, 123, 132].
+SherLog reports pathways connecting the longest subsequence of logging messages involving the error message. In
+cases where multiple paths link the same sequence of Logging Points, SherLog compares these paths and initially
+reports the common records along these paths as the Must-path before presenting the rest [123]. LogSed mines a
+time-weighted control flow graph (TCFG) to represent healthy execution flows in cloud components. By analyzing
+deviations from this TCFG, LogSed automatically raises anomaly alerts. [132] introduces a distance-based approach
+calculating distance-based score from call trees.
+  In the chronological sequence of events, some scholars posit that the antecedent event is the prospective root cause.
+[63] perform the short-term time series analysis and convert logs into multivariate time series data by counting error
+logs within specific time bins for affected services. They employ the personalized PageRank to provide a ranked order
+of potentially faulty nodes. In contrast to approaches that correlate the performance of various service instances or
+logged events to prioritize root causes based on their likelihood of causing observed failures, without elucidating how
+these failures propagate to other service instances, [91] offers a fresh perspective. They present a declarative root cause
+analysis technique capable of determining the potential cascading failures that may have precipitated an observed
+failure, specifically, identifying the service instances that could have failed initially.
+
+3.3.2 Log Classification. Log classification represents a principal method for root cause analysis in the domain of
+system log analysis, distinct from correlation-based approaches. It involves categorizing log entries into specific classes
+or types, often with a focus on differentiating normal system behavior from anomalous events that may indicate issues
+or failures. This classification can be based on various techniques, SAT-solver derives from Artificial Intelligence theories
+of action and diagnosis to identify the most relevant log entries for the given query [124]. [8, 10, 26, 36, 115] introduce
+machine learning approaches in log classification RCA. Pariket converts the event log into a sequential dataset with
+window-based and Markovian techniques and employ decision tree classifiers to extract rules elucidating the root
+causes [36]. DeCaf utilizes random forest to mine predicates from the logs that correlate with regressions [8]. Logistic
+regression, naïve Bayes, decision trees, and random forests are introduced for comprehensive issue categorization
+RCA Bot [10]. The extraction of relevant features or patterns and the application of clustering techniques are integral
+to the functionalities LogDC, LogLens, and HWLogAnalysis [26, 95, 97, 115]. These methods enable the systematic
+organization of log data by identifying and grouping similar entries, which facilitates the detection of anomalies and
+the subsequent root cause analysis. LADRA [108] employs the General Regression Neural Network (GRNN) to pinpoint
+                              Table 5. Investigated root cause analysis approaches of logs
+
+
+      Method        Data source RCA category RCA method                               Graph construction Graph category
+      - [23]        Logs,events     Rule-based   -                                        -           Non-graph
+      - [29]        Logs,events     Rule-based   -                                        -           Non-graph
+      - [50]           Logs         Rule-based   Association rule mining                  -           Non-graph
+   LogRule [74]     Logs, events    Rule-based   Association rule mining                  -           Non-graph
+    Fdiag [22]      Logs,events     Statistical   Log entries statistical correla-        -           Non-graph
+                                                  tion analysis
+    LOGAN [96]          Logs        Statistical   Log entries correlation analy-          -           Non-graph
+                                                  sis
+       - [58]           Logs        Statistical  Weighted features analysis               -           Non-graph
+       - [62]        Logs,events    Statistical   Event log correlation analysis          -           Non-graph
+       - [43]           Logs        Statistical   Indicator correlation analysis          -           Non-graph
+      - [105]           Logs        Statistical  Applying correlation metrics             -           Non-graph
+                                                  to analyze log data
+   SherLog [123]        Logs        Statistical   Path correlation analysis               -           Non-graph
+    LogSed [40]         Logs        Statistical   Path analysis                    Transaction log Dependency graph
+      - [132]           Logs        Statistical   Distance-based correlation Transaction log          Call graph
+                                                  analysis
+       - [63]           Logs        Statistical  Time series correlation analy- Granger causality Dependency graph
+                                                  sis
+       - [91]           Logs        Statistical   Declarative correlation analy-          -           Non-graph
+                                                  sis
+      - [124]           Logs       AI theories SAT Solver                                 -           Non-graph
+    Pariket [36]     Logs,events Machine learningDecision tree classification             -           Non-graph
+    LogDC [115]         Logs     Machine learningLog features clustering                  -           Non-graph
+   LogLens [26]         Logs     Machine learningSimilarity distance Clustering           -           Non-graph
+     DeCaf [8]          Logs     Machine learningRandom forest correlation                -           Non-graph
+                                                  analysis
+   RCA Bot [10]         Logs     Machine learningLogistic regression, naïve               -           Non-graph
+                                                  Bayes, decision trees, and
+                                                  random forests classfication
+       - [95]        Logs,events    Statistical   Log attributes classfication            -           Non-graph
+HWLogAnalysis [97] Logs,events      Statistical  Two-dimensional frequent pat-            -           Non-graph
+                                                  tern mining
+   LADRA [108]          Logs     Machine learningGeneral regression neural net-           -           Non-graph
+                                                 work likelihood analysis
+       - [39]           Logs        Statistical   Repair knowledge model corre-           -           Non-graph
+                                                  lation analysis
+     SBLD [79]       Logs,events Machine learningSpectrum analysis                        -           Non-graph
+  Log-Cluster [27]      Logs     Machine learningLog sequences clustering                 -           Non-graph
+LogFaultFlagger [52]    Logs     Machine learningTF-IDF+KNN log classfication             -           Non-graph
+        - [4]           Logs     Machine learningMarkov decision model                    -           Non-graph
+       - [47]           Logs           NLP       Similarities analysis                    -           Non-graph
+   SoftNER [87]         Logs      Deep learning BiLSTM+CRF+Attention                    NLP        Knowledge graph
+                                                  Mechanism
+       - [81]        traces,logs Deep Learning Graphical neural model                   NLP        Knowledge Graph
+   AutoTSG [88]         Logs     Machine learningMeta-learning algorithms                 -           Non-graph
+the root causes of abnormal tasks. The likelihood of reported root causes is then presented to users based on weighted
+factors determined by the GRNN. Other methods seek failures similar logs or events correlated with failures, Markov
+decision model and Spectrum algorithms are used to pinpoint suspicious root cause [39, 79].
+  Knowledge mining is a sophisticated technique used for extracting patterns, correlations, and causal relationships in
+log RCA. [27] employs natural language processing to assess similarities between new and historical issues logged.
+LogFaultFlagger [4] adopts a modified term frequency-inverse document frequency (TF-IDF) to identify the most
+relevant log lines related to past product failures and develops a specialized version of KNN to identify the faults.
+Log-Cluster [52] constructs an initial knowledge base through clustering log sequences align with the knowledge
+base. Similarly, [47] builds Knowledge Model (KM) to pinpoint root causes. Distinct from conventional methods that
+automatically detect root causes from given logs, they identify root cause metric by robust correlation analysis with
+data augmentation.
+  Unlike previous works in incident management, which concentrate on complexities of incident triage, the construction
+of knowledge graphs leverages the graphical structure to collectively infer the root cause. By named-entity recognition
+(NER), relations entities mining from incidents, SoftNER [87] facilitates the automatic construction of knowledge graphs.
+Incorporating an attention mechanism that takes advantage of both semantic context and data types to extract named
+entities, SoftNER performs root cause localization. Similarly, [81] builds a global Causal Knowledge Graph(CKG) to
+locate underlying the incidents.
+
+3.4   multi-Modal based Root Cause Analysis Techniques
+In the realm of complex software systems, diagnosing performance issues and identifying their underlying causes can
+be an arduous task. Methods relying on a single data source, such as metrics, traces, or logs, are insufficient, which
+may provide a narrow perspective and hinder a comprehensive understanding of the system’s behavior [44, 120]. This
+insufficiency is generated by each microservice individually at a local level, which violates the close dependency among
+microservices. To overcome this limitation, different with previous data-driven RCA methods relying on data from a
+single modality, researchers have explored multi-model root cause analysis. This approach integrates heterogeneous
+data sources, including metrics, traces, and logs, to offer a holistic and multi-faceted view of the system’s performance.
+  In heterogeneous data sources, [38, 131] perform RCA based on the time series of events. Pdiagnose [38] captures
+suspicious microservices and corresponding logs for logs and traces, and determines root causes through voting
+abnormal time series [38]. MULAN [131] leverages a log-tailored language model to facilitate log representation
+learning, converting raw log sequences into time-series data uses a contrastive learning-based approach to extract
+modality- invariant and modality-specific representations within a shared latent space, and introduces a novel key
+performance indicator-aware attention mechanism for assessing modality reliability and co-learning a final causal
+graph. MULAN employs random walk with restart to simulate system fault propagation and identify potential root
+causes.
+  Multi-model data source increases the complexity of RCA. By constructing O&M knowledge graph or Causal
+Knowledge Graph (CKG), knowledge from multiple data sources will be integrated for further RCA [55, 77, 81].
+Optimized PC Algorithm based on the Knowledge Graph is used to construct a directed acyclic graph (DAG) Causality
+Graph, and breadth-first search (BFS) is employed to search for the root cause [77]. From a knowledge base MicroCBR
+constructs spatial-temporal knowledge graph, and troubleshoots through case-based hierarchical reasoning [55]. SoTA
+neural NLP techniques are used to extract targeted knowledge from past incidents and they build a CKG, which is used
+to collectively infer the root cause through link prediction and graphical neural model methods [81].
+                            Table 6. Investigated root cause analysis approaches of multi-Model
+
+
+      Method       Data source            RCA category      RCA method                 Graph construction   Graph category
+ Pdiagnose [38] Metrics, traces, logs       Statistical     Vote-based            -                   Non-graph
+     - [77]     Metrics, traces, logs     Graph Theory      BFS                    Optimized PC al- Knowledge graph
+                                                                                   gorithm based on
+                                                                                   Knowledge Graph
+ MicroCBR [55] Metrics, logs, traces,     Statistical       Similarity comparison DBSCAN clustering Knowledge graph
+                 commands
+     - [81]      Traces, logs           Deep Learning Graphical neural model NLP                     Knowledge Graph
+CloudRCA [127] KPIs, logs, traces Machine learning Bayesian network             PC algorithm         Dependency graph
+ MMRCA [110] Metrics,          traces,    Statistical   Personalized Granger Topology reduction Dependency graph
+                 topology, configu-                     Causality
+                 rations
+   Eadro [44]    Traces, logs, KPIs       Statistical   Culprit’s probabilities Invocation relation- Dependency graph
+                                                        similarity              ship
+DiagFusion [126] Metrics, traces, logs Deep learning GNN                        Invocation relation- Dependency graph
+                                                                                ship
+  Nezha [120] Metrics, traces, logs       Statistical   Pattern Miner and Personalized               Dependency graph
+                                                        ranker                  method
+ GROOT [104] Metrics,            logs, Graph Theory Variant PageRank            Tracing and log Causality graph
+                 events                                                         analysis
+ MULAN [131] Metrics, logs             Machine learning Random walk             Personalized          Causality graph
+                                                                                method
+
+
+
+  To make full use of heterogeneous multi-modal data, researchers capture dependencies from KPIs, topology, and
+logs. Both [104, 120] capture dependencies from events, GROOT [104] collects all supported events for each service and
+constructs the causal links between events. Personalized PC algorithm and Granger Causality are also used for graph
+construction [110, 127]. In CloudRCA, a Hierarchical Bayesian Network (KHBN) model, informed by knowledge, aids
+in inferring root causes on the constructed graph [127]. After heterogeneous multi-modal data are transferred into an
+(events) dependency graph, Nezha compares event patterns in the fault-free phase with those in the fault-affected phase
+to localize root causes in an interpretable manner [120]. DiagFusion employs a graph neural network to identify the
+root cause instance and ascertain the failure type within the dependency graph [126]. Eadro ranks the microservices
+based on their likelihood of being the source of the problem [44].
+
+3.5   LLMs’ Role in Enhancing RCA
+The recent emergence and remarkable performance of large language models (LLMs) in handling intricate tasks indicate
+a potential pathway for improving root cause analysis. Cloud providers and researchers have employed advanced
+AI-based solutions LLMs to aid SREs in identifying the root causes of cloud incidents. [1] suggests fine-tuning large
+language models (LLMs) using domain-specific datasets, aiming to generate potential root causes of an incident solely
+based on the title and summary information available during the incident’s creation. RCACopilot [19] expands upon
+this work and add retrieval augmentation and diagnostic collection tools to the LLM-based root cause analysis pipeline.
+They design custom workflows for different types of incidents that trigger data collection procedures, which are then
+aggregated to predict a root cause category for the incident and help SREs with root cause analysis. RCACopilot relies on
+predefined handlers that must be engineered by hand. Considering the black-box nature of many LLM based methods,
+[125] advocates fine-tuning or temperature-scaling-based approaches are inapplicable. [125] introduces an innovative
+confidence estimation framework leveraging retrieval-augmented large language models. It assesses confidence in
+predicted root causes through two scoring phases, evaluating the model’s "grounded-ness" in reference data and rating
+predictions based on historical references, followed by an optimization step to combine these scores. Besides, ADARMA
+[84] employs LLM based RCA for probabilistic reasoning, historical data, and correlation patterns to identify the likely
+root cause. [83] uses semantic, lexical, and correctness metrics in zero-shot and few-shot scenarios. In-context examples
+can serve as an alternative to fine-tuning for domain adaptation, but for agent-based RCA, crafting entire reasoning
+trajectories can be challenging [80]. This is because agents require sophisticated prompting and typically also require
+fine-tuning [118]. [20, 80, 107] explore LLM agents for root cause analysis. They all solve the problem of dynamic
+data collection based on ReAct agent [118] to overcome the limitations of dynamically collect additional diagnostic
+information such as incident related metrics, logs or traces.
+
+4     EVALUATION OF RCA
+4.1    Effectiveness and Efficiency
+When evaluating root cause analysis methods, effectiveness and efficiency serve as the primary criteria. MTTD (Mean
+Time to Diagnose) and MTTR play crucial roles in assessing the efficiency of these methods.
+
+
+                                           Table 7. Key Metrics of RCA Evaluation
+
+
+                              General metrics                       Metrics
+                                Effectiveness   Top 𝑛 Accuracy, MAR, Precision, Recall, F1
+                                 Efficiency          Training time, Localization time
+
+
+
+    (1) Effectiveness refers to the ability of the RCA system to accurately identify the true root causes of problems,
+which is prerequisite for interpretability. To assess the efficacy of associated methodologies, several key performance
+indicators are utilized:
+    — Top 𝑛 Accuracy (A@K) denotes the likelihood that the correct outcome is included within the top K (K=1, 2, 3, . . . )
+suggestions provided by the fault localization technique.
+    — Mean Average Rank (MAR, shown in Equation 1) calculates the average position at which the true root causes
+are ranked across all instances of failure. This metric reflects the average number of recommendations that need to
+be reviewed in order to accurately diagnose a failure. Mean first rank (MFR) refers to the mean of the first root cause
+microservice rank in each fault.
+                                                                𝑁
+                                                            1 ∑︁
+                                                   MAR =          rank𝑖                                                 (1)
+                                                            𝑁 𝑖=1
+    — Besides, metrics like precision, recall, and F1 score are also often used to measure RCA algorithm’s effectiveness.
+Precision (Equation 2) is the ratio of the number of correctly identified root causes to the total number of potential root
+causes proposed by the RCA system. This metric measures the proportion of true positive results (correctly identified
+root causes) in all positive results identified by the RCA method. It reflects the degree to which the system generates
+false positives in identifying root causes. TP represents the number of correctly identified root causes, and FP represents
+the number of incorrectly identified non-root causes.
+
+                                                      Precision = TP/(TP+FP)                                                 (2)
+
+   — Recall (Equation 3) measures the proportion of true positive results in all actual positive cases (all actual root
+causes). It reflects the ability of the RCA system to identify all relevant root causes. A high recall rate indicates that the
+system is capable of capturing the majority of the actual root causes. FN represents the number of actual root causes
+that the system failed to identify.
+                                                        Recall = TP/(TP+FN)                                                  (3)
+   — The F1 (Equation 4) score is the harmonic mean of precision and recall, providing a single metric that takes into
+account both false positives and false negatives.
+
+                                            F1 = 2 × ( Precision×Recall/Precision+Recall)                                    (4)
+
+   (2) Efficiency is a crucial metric that reflects the time and resources required by the online system to identify root
+causes. Efficiency typically encompasses two aspects for model-based approaches, training time and localization time.
+   — Training time refers to the amount of time needed for an RCA model to learn and build a fault diagnosis model
+from training data. The formula for calculation is as follows: 𝑇𝑡𝑟𝑎𝑖𝑛 = 𝑇end time of training − 𝑇start time of training , 𝑇𝑡𝑟𝑎𝑖𝑛
+represents the training time.
+   — Localization time refers to the time it takes for an RCA system to output the root causes after detecting anomaly.
+𝑇𝑙𝑜𝑐𝑎𝑙𝑖𝑧𝑒 can be formulated as follows: 𝑇𝑙𝑜𝑐𝑎𝑙𝑖𝑧𝑒 = 𝑇end time of localization − 𝑇start time of localization
+   In practical applications, especially in the RCA of large language models, the assessment of Efficiency may also
+include metrics of resource consumption such as GPU, memory required, processor utilization, and energy consumption
+to fully evaluate the system’s efficiency. For RCA systems that need real-time or near-real-time processing, localization
+time is particularly critical for MTTR, while training time is also not to be overlooked for continuously evolving systems.
+Thus, when assessing the efficiency of RCA methods, it is necessary to consider both time and resources dimensions
+comprehensively.
+
+4.2   Interpretability and Generalizability
+The interpretability of RCA refers to the ability of humans to understand and explain the decision-making process
+underlying the algorithm’s outputs. In the context of complex system failures, where RCA is instrumental in identifying
+the root causes of incidents, interpretability is not just a desirable feature but often a necessary one. Engineers require
+clear and transparent reasoning to trust and effectively utilize the results of automated RCA methods. Explanations,
+given as potential failure cascades originating from an identified root cause, would enable intervention not only on the
+service that initially failed but also on those that failed in a cascading effect [90]. In recent years, as advancements in
+algorithmic efficiency and accuracy have been achieved, an increasing number of researchers [15, 49, 50, 120] have
+emphasized the importance of interpretability, with some even developing algorithms with interpretability as a primary
+objective.
+   Interpretability evaluation involves examining how well the algorithm’s logic, reasoning steps, and conclusions can
+be understood and followed by human analysts. [50] involves two filters for refining the findings in a production dataset:
+Filter 1 discards an item-set if there’s a subset with similar or higher lift, indicating that shorter rules are preferred as
+they are considered more interesting. Filter 2 removes an item-set if there exists a superset with higher lift and similar
+support, suggesting that longer item-sets are kept only if they offer significantly more information. These techniques
+aim to balance the trade-off between the length of the rules (number of items) and their statistical significance (lift and
+support), enhancing the interpretability of the results. [49] involves a global interpretation approach using decision
+trees to provide understandable rules for identifying network-related issues, as well as a local interpretation technique
+that finds similar past failures to help engineers understand and address current network failures. [120] designs an
+interpretable fine-grained framework to address the interpretability of RCA.
+    Generalizability refers to the model’s ability to process other dataset, that is, the model’s capability to accurately
+predict or correctly handle data it has not seen before based on the knowledge learned from the training set. The
+generalizability of root cause analysis algorithms, beyond the algorithm itself, is affected by the architectural differences
+across various cloud environments, which also impacts the cross-platform compatibility and portability of AIOps
+algorithms. AIOps is not rented out as a capability in public clouds like other cloud products, largely due to the
+significant differences in underlying architectures, which in turn places higher demands on the generalizability of
+generic root cause analysis methods. Additionally, in a microservices environment, services and applications may
+continuously change and update. Therefore, a root cause analysis method with strong generalizability can maintain its
+performance across different environments, conditions, or datasets, which is particularly important for microservices
+architectures. [49] evaluates the generalizability by comparing the performance of previously seen (the ground truths
+are faulty in some historical failures) and unseen failures.
+
+
+
+5     CHALLENGES & FUTURE TRENDS
+5.1    Challenges
+Root Cause Analysis is a crucial methodology in identifying and rectifying faults that can occur within complex
+microservice environments. With the increasing adoption of microservices, effective RCA has become essential for
+maintaining the reliability, scalability, and performance of these distributed systems. Conventional RCA approaches,
+which depend on manual examination of data sources like logs and traces, tend to be arduous, susceptible to errors,
+and pose difficulties for engineers. By leveraging comprehensive data analysis from various sources and employing
+machine learning and other advanced AI techniques, RCA enables the automated identification of root causes, thereby
+accelerating resolution processes and reducing MTTR. Advanced RCA diagnostic methodologies are essential for both
+improving immediate response to faults and long-term system resilience.
+    Challenge in data control. RCA methods are full of challenges in data collection, quality and completeness. Traces and
+System logs can be voluminous and complex, containing vast amounts of information, which often contain noise and
+irrelevant information that can obfuscate the analysis. Distinguishing meaningful patterns from random fluctuations or
+irrelevant data is crucial for accurate RCA. Logs often contain limited contextual information, making it difficult to
+interpret and correlate log events with specific system components and behaviors. For graph-based methods, building a
+relational graph requires high-quality data with sufficient granularity. Incomplete, noisy, or biased data can lead to
+incorrect relationships or paths in RCA process. Graph construction can introduce ambiguities and identifying the
+actual root cause based on this graph can still be ambiguous. Methods that address this ambiguity determining the
+directionality and strength of relationships in the constructed graph requires careful consideration and validation.
+Besides, systems are constantly evolving with new updating, configurations, and interactions. Especially those based
+on microservices, can have dynamic topologies that change frequently. Keeping the relational graph up-to-date with
+the dynamic evolving system architectures, configurations, and operational changes is challenging. As the number of
+system components and interactions grows, the size of the graph can become unwieldy, leading to scalability issues in
+both graph construction and analysis.
+  In view of the complexity of service relationship and the integrity of data, the RCA method of single dimension
+may be insufficient in practice. By integrating diverse data sources, including key performance indicators (KPIs), logs,
+traces, network topologies, and configurations, multi-modal RCA enables a comprehensive comprehension of system
+behaviors and dependencies. However, amalgamating heterogeneous data types into a cohesive framework poses a
+substantial challenge, primarily due to disparities in data formats, granularity, and temporal attributes.
+  Challenge in RCA. For most data driven methods, effectively analyzing and correlating data to identify root causes
+remains a significant challenge. Graph-based RCA requires sophisticated algorithms to infer causality incorporating
+expert knowledge and automated approach. Distinguishing relationships between correlation and causation, and
+distinguishing causal relationships from temporal relationships are both inherently crucial in causal inference. In
+practice, traces may be incomplete or contain inaccuracies. These limitations can impact the accuracy and reliability of
+trace-based RCA. Effectively filtering and analyzing relevant logs to identify root causes remains a significant challenge.
+Incorporating additional context from system topology, configuration, and metadata can enhance RCA. Many failures
+involve complex causal chains and interactions between multiple components or services. Capturing these intricate
+failure patterns and identifying root causes accurately remains a challenge. Besides, systems evolve over time, with new
+components, dependencies, and behaviors emerging. RCA methods need to be able to adapt to system changes and
+identify new root causes effectively.
+  Despite the growing prevalence of AI-driven assistants in the root cause analysis process, the effectiveness in assisting
+on-call engineers is constrained by low accuracy due to the intrinsic difficulty of the task, a propensity for LLM-based
+approaches to hallucinate, and difficulties in distinguishing these well-disguised hallucinations. LLM agents are critical
+in collecting multi-modal data sources. LLM based finetuning requires various modal of complex unstructured or
+semi-structured data, uncompleted data might miss useful signals to reach conclusive diagnosis details. Finetuning is
+costly and may require a huge volume of training samples. Additionally, finetuning models are prone to generate more
+hallucinated results over time as its continuously updating a finetuned GPT model with evolving nature and scope of
+incidents.
+
+5.2   Future Trends
+To meet the demands of modern systems and enable faster identification and resolution of breakdown, developing
+methods for real-time analysis will enable faster response times to incidents, minimizing MTTR. While metrics, traces,
+or logs provide valuable insights into root causes, sole data source RCA may not always be sufficient on their own.
+Causal inference should constitute a comprehensive end-to-end system that encompasses both the system infrastructure
+and the complexity of requests, in order to address the majority of fault scenarios. Future research should explore
+the integration with multi-scopes. For example, trace-based RCA can be enhanced by integrating it with other RCA
+methods, such as metric-based RCA and log analysis. Incorporating additional contextual information from system
+topology, configuration, and metadata into RCA techniques can provide a more comprehensive understanding of system
+behavior and failure patterns.
+  Besides, fault understanding, incremental learning, and scalable analysis should offer a more holistic analysis of
+system failures. Advancements in AI and automation are anticipated to yield tools capable of verifying the dependability
+of constructed relational graphs, minimizing spurious correlations, enabling the automated and incremental construction
+of real-time graphs that adaptively evolve with system changes over time, thereby diminishing the necessity for manual
+intervention. From a system-level fault localization standpoint, multi-modal RCA embodies the prevailing trend in
+RCA. The advancement of unified models capable of handling multiple data types will prove increasingly significant
+in streamlining the analysis process and offering a comprehensive system perspective. The combined use of multiple
+techniques can provide a more holistic view of the system and improve the accuracy and effectiveness of RCA.
+  Additionally, future research should focus on developing techniques that can provide detailed explanations and
+insights into the root causes identified, building user trust and enabling effective issue resolution. For example,
+explainable AI make the RCA process more transparent and understandable, allowing users to comprehend the logic
+behind the identified root causes. Advancements in AIOps have introduced new trends in RCA for microservices, large
+language model’s operations involve the use of powerful computational resources and algorithms by incorporating
+multidimensional dataset and end-to-end problem localization. These trends represent a shift towards more automated
+data-driven approaches to RCA.
+
+
+ACKNOWLEDGMENTS
+This work is supported by the Natural Science Foundation of China (Grant No. U21A20488). We thank the Big Data
+Computing Center of Southeast University for providing the facility support on the numerical calculations in this paper.
+
+
+REFERENCES
+ [1] Toufique Ahmed, Supriyo Ghosh, Chetan Bansal, Thomas Zimmermann, Xuchao Zhang, and Saravan Rajmohan. 2023. Recommending Root-Cause
+     and Mitigation Steps for Cloud Incidents using Large Language Models. arXiv preprint arXiv:2301.03797 (2023).
+ [2] Aliyun. 2022. Service Outage in Zone C of the China (Hong Kong) Region.
+ [3] Aliyun. 2023. Aliyun Cloud Product Console Service Anomaly.
+ [4] Anunay Amar and Peter C Rigby. 2019. Mining historical test logs to predict bugs and localize faults in the test logs. In 2019 IEEE/ACM 41st
+     International Conference on Software Engineering (ICSE). IEEE, 140–151.
+ [5] Amazon. 2021. Summary of the AWS Service Event in the Northern Virginia (US-EAST-1) Region.
+ [6] Mona Attariyan, Michael Chow, and Jason Flinn. 2012. X-ray: automating { Root-Cause } diagnosis of performance anomalies in production
+     software. In 10th USENIX Symposium on Operating Systems Design and Implementation (OSDI 12). 307–320.
+ [7] baidu baike. 2023. 11·27 Didi Outage Incident.
+ [8] Chetan Bansal, Sundararajan Renganathan, Ashima Asudani, Olivier Midy, and Mathru Janakiraman. 2019. DeCaf: Diagnosing and Triaging
+     Performance Issues in Large-Scale Cloud Services. (2019).
+ [9] Anukampa Behera, Chhabi Rani Panigrahi, Sitesh Behera, Rohit Patel, and Sourav Bera. 2023. trACE-Anomaly Correlation Engine for Tracing the
+     Root Cause on Cloud Based Microservice Architecture. Computación y Sistemas 27, 3 (2023), 791–800.
+[10] Tapan Behera and Kumud Tripathi. 2023. Root Cause Analysis Bot using Machine Learning Techniques. Authorea Preprints (2023).
+[11] Bilibili. 2021. On July 13, 2021, we collapsed in this way.
+[12] Álvaro Brandón, Marc Solé, Alberto Huélamo, David Solans, María S Pérez, and Victor Muntés-Mulero. 2020. Graph-based root cause analysis for
+     service-oriented and microservice architectures. Journal of Systems and Software 159 (2020), 110432.
+[13] Zhengong Cai, Wei Li, Wanyi Zhu, Lu Liu, and Bowei Yang. 2019. A real-time trace-level root-cause diagnosis system in alibaba datacenters. IEEE
+     Access 7 (2019), 142692–142702.
+[14] Sarthak Chakraborty, Shaddy Garg, Shubham Agarwal, Ayush Chauhan, and Shiv Kumar Saini. 2023. Causil: Causal graph for instance level
+     microservice data. In Proceedings of the ACM Web Conference 2023. 2905–2915.
+[15] Chaoyu Chen, Hang Yu, Zhichao Lei, Jianguo Li, Shaokang Ren, Tingkai Zhang, Silin Hu, Jianchao Wang, and Wenhui Shi. 2023. BALANCE:
+     Bayesian Linear Attribution for Root Cause Localization. Proceedings of the ACM on Management of Data 1, 1 (2023), 1–26.
+[16] Hao Chen, Kegang Wei, An Li, Tao Wang, and Wenbo Zhang. 2021. Trace-based intelligent fault diagnosis for microservices with deep learning. In
+     2021 IEEE 45th Annual Computers, Software, and Applications Conference (COMPSAC). IEEE, 884–893.
+[17] Mike Y Chen, Emre Kiciman, Eugene Fratkin, Armando Fox, and Eric Brewer. 2002. Pinpoint: Problem determination in large, dynamic internet
+     services. In Proceedings International Conference on Dependable Systems and Networks. IEEE, 595–604.
+[18] Pengfei Chen, Yong Qi, Pengfei Zheng, and Di Hou. 2014. Causeinfer: Automatic and distributed performance diagnosis with hierarchical causality
+     graph in large distributed systems. In IEEE INFOCOM 2014-IEEE Conference on Computer Communications. IEEE, 1887–1895.
+[19] Yinfang Chen, Huaibing Xie, Minghua Ma, Yu Kang, Xin Gao, Liu Shi, Yunjie Cao, Xuedong Gao, Hao Fan, Ming Wen, et al. 2023. Empowering
+     practical root cause analysis by large language models for cloud incidents. arXiv preprint arXiv:2305.15778 (2023).
+[20] Yinfang Chen, Huaibing Xie, Minghua Ma, Yu Kang, Xin Gao, Liu Shi, Yunjie Cao, Xuedong Gao, Hao Fan, Ming Wen, et al. 2024. Automatic Root
+     Cause Analysis via Large Language Models for Cloud Incidents. (2024).
+[21] Qian Cheng, Doyen Sahoo, Amrita Saha, Wenzhuo Yang, Chenghao Liu, Gerald Woo, Manpreet Singh, Silvio Saverese, and Steven CH Hoi. 2023.
+     Ai for it operations (aiops) on cloud platforms: Reviews, opportunities and challenges. arXiv preprint arXiv:2304.04661 (2023).
+[22] Edward Chuah, Shyh-hao Kuo, Paul Hiew, William-Chandra Tjhi, Gary Lee, John Hammond, Marek T Michalewicz, Terence Hung, and James C
+     Browne. 2010. Diagnosing the root-causes of failures from cluster log files. In 2010 International Conference on High Performance Computing. IEEE,
+     1–10.
+[23] Marcello Cinque, Domenico Cotroneo, and Antonio Pecchia. 2012. Event logs for the analysis of software failures: A rule-based approach. IEEE
+     Transactions on Software Engineering 39, 6 (2012), 806–821.
+[24] Tencent Cloud. 2024. Tencent Cloud Situation Report of the April 8th Outage.
+[25] CNN. 2023. Twitter hit with one of the biggest outages since Elon Musk took over.
+[26] Biplob Debnath, Mohiuddin Solaimani, Muhammad Ali Gulzar Gulzar, Nipun Arora, Cristian Lumezanu, Jianwu Xu, Bo Zong, Hui Zhang, Guofei
+     Jiang, and Latifur Khan. 2018. Loglens: A real-time log analysis system. In 2018 IEEE 38th international conference on distributed computing systems
+     (ICDCS). IEEE, 1052–1062.
+[27] Rui Ding, Qiang Fu, Jian Guang Lou, Qingwei Lin, Dongmei Zhang, and Tao Xie. 2014. Mining historical issue repositories to heal large-scale
+     online service systems. In 2014 44th Annual IEEE/IFIP International Conference on Dependable Systems and Networks. IEEE, 311–322.
+[28] ENOW. 2023. Microsoft Outlook Suffers Major Outage.
+[29] Xiaoyu Fu, Rui Ren, Sally A McKee, Jianfeng Zhan, and Ninghui Sun. 2014. Digging deeper into cluster system logs for failure prediction and root
+     cause diagnosis. In 2014 IEEE International Conference on Cluster Computing (CLUSTER). IEEE, 103–112.
+[30] FudanSELab. 2024. FudanSELab/train-ticket. https://github.com/FudanSELab/train-ticket Accessed: 2024-5-26.
+[31] Yu Gan, Mingyu Liang, Sundar Dev, David Lo, and Christina Delimitrou. 2021. Sage: practical and scalable ML-driven performance debugging in
+     microservices. In Proceedings of the 26th ACM International Conference on Architectural Support for Programming Languages and Operating Systems.
+     135–151.
+[32] Yu Gan, Guiyang Liu, Xin Zhang, Qi Zhou, Jiesheng Wu, and Jiangwei Jiang. 2023. Sleuth: A Trace-Based Root Cause Analysis System for
+     Large-Scale Microservices with Graph Neural Networks. In Proceedings of the 28th ACM International Conference on Architectural Support for
+     Programming Languages and Operating Systems, Volume 4. 324–337.
+[33] Janos Gertler. 2017. Fault detection and diagnosis in engineering systems. CRC press.
+[34] Xiaofeng Guo, Xin Peng, Hanzhang Wang, Wanxue Li, Huai Jiang, Dan Ding, Tao Xie, and Liangfei Su. 2020. Graph-based trace analysis for
+     microservice architecture understanding and problem diagnosis. In Proceedings of the 28th ACM Joint Meeting on European Software Engineering
+     Conference and Symposium on the Foundations of Software Engineering. 1387–1397.
+[35] Manish Gupta, Anindya Neogi, Manoj K. Agarwal, and Gautam Kar. 2003. Discovering Dynamic Dependencies in Enterprise Environments for
+     Problem Determination. In IEEE International Workshop on Self-managing Distributed Systems.
+[36] Nisha Gupta, Kritika Anand, and Ashish Sureka. 2015. Pariket: Mining business process logs for root cause analysis of anomalous incidents. In
+     Databases in Networked Information Systems: 10th International Workshop, DNIS 2015, Aizu-Wakamatsu, Japan, March 23-25, 2015. Proceedings 10.
+     Springer, 244–263.
+[37] helidon-sockshop. 2024. helidon-sockshop/sockshop. https://github.com/helidon-sockshop/sockshop Accessed: 2024-5-26.
+[38] Chuanjia Hou, Tong Jia, Yifan Wu, Ying Li, and Jing Han. 2021. Diagnosing performance issues in microservices with heterogeneous data source. In
+     2021 IEEE Intl Conf on Parallel & Distributed Processing with Applications, Big Data & Cloud Computing, Sustainable Computing & Communications,
+     Social Computing & Networking (ISPA/BDCloud/SocialCom/SustainCom). IEEE, 493–500.
+[39] Hiroki Ikeuchi, Akio Watanabe, Takehiro Kawata, and Ryoichi Kawahara. 2018. Root-cause diagnosis using logs generated by user actions. In 2018
+     IEEE Global Communications Conference (GLOBECOM). IEEE, 1–7.
+[40] Tong Jia, Lin Yang, Pengfei Chen, Ying Li, Fanjing Meng, and Jingmin Xu. 2017. Logsed: Anomaly diagnosis through mining time-weighted control
+     flow graph in logs. In 2017 IEEE 10th International Conference on Cloud Computing (CLOUD). IEEE, 447–455.
+[41] Klaus Julisch. 2003. Clustering intrusion detection alarms to support root cause analysis. ACM transactions on information and system security
+     (TISSEC) 6, 4 (2003), 443–471.
+[42] Myunghwan Kim, Roshan Sumbaly, and Sam Shah. 2013. Root cause detection in a service-oriented architecture. ACM SIGMETRICS Performance
+     Evaluation Review 41, 1 (2013), 93–104.
+[43] Tomoyuki Koyama and Takayuki Kushida. 2023. Log message with JSON item count for root cause analysis in microservices. In 2023 6th Conference
+     on Cloud and Internet of Things (CIoT). IEEE, 55–61.
+[44] Cheryl Lee, Tianyi Yang, Zhuangbin Chen, Yuxin Su, and Michael R Lyu. 2023. Eadro: An end-to-end troubleshooting framework for microservices
+     on multi-source data. In 2023 IEEE/ACM 45th International Conference on Software Engineering (ICSE). IEEE, 1750–1762.
+[45] Mingjie Li, Zeyan Li, Kanglin Yin, Xiaohui Nie, Wenchi Zhang, Kaixin Sui, and Dan Pei. 2022. Causal inference-based root cause analysis for
+     online service systems with intervention recognition. In Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and Data Mining.
+     3230–3240.
+[46] Mingjie Li, Minghua Ma, Xiaohui Nie, Kanglin Yin, Li Cao, Xidao Wen, Zhiyun Yuan, Duogang Wu, Guoying Li, Wei Liu, et al. 2022. Mining
+     Fluctuation Propagation Graph Among Time Series with Active Learning. In International Conference on Database and Expert Systems Applications.
+     Springer, 220–233.
+[47] Xue Li, Alan Bundy, Ruiqi Zhu, Fangrong Wang, Stefano Mauceri, Lei Xu, and Jeff Z Pan. 2022. ABC in Root Cause Analysis: Discovering Missing
+     Information and Repairing System Failures. In International Conference on Machine Learning, Optimization, and Data Science. Springer, 346–359.
+[48] Zeyan Li, Junjie Chen, Rui Jiao, Nengwen Zhao, Zhijun Wang, Shuwei Zhang, Yanjun Wu, Long Jiang, Leiqin Yan, Zikai Wang, et al. 2021. Practical
+     root cause localization for microservice systems via trace analysis. In 2021 IEEE/ACM 29th International Symposium on Quality of Service (IWQOS).
+     IEEE, 1–10.
+[49] Zeyan Li, Nengwen Zhao, Mingjie Li, Xianglin Lu, Lixin Wang, Dongdong Chang, Xiaohui Nie, Li Cao, Wenchi Zhang, Kaixin Sui, et al. 2022.
+     Actionable and interpretable fault localization for recurring failures in online service systems. In Proceedings of the 30th ACM Joint European
+     Software Engineering Conference and Symposium on the Foundations of Software Engineering. 996–1008.
+[50] Fred Lin, Keyur Muzumdar, Nikolay Pavlovich Laptev, Mihai-Valentin Curelea, Seunghak Lee, and Sriram Sankar. 2020. Fast dimensional analysis
+     for root cause investigation in a large-scale service environment. Proceedings of the ACM on Measurement and Analysis of Computing Systems 4, 2
+     (2020), 1–23.
+[51] JinJin Lin, Pengfei Chen, and Zibin Zheng. 2018. Microscope: Pinpoint performance issues with causal graphs in micro-service environments. In
+     Service-Oriented Computing: 16th International Conference, ICSOC 2018, Hangzhou, China, November 12-15, 2018, Proceedings 16. Springer, 3–20.
+[52] Qingwei Lin, Hongyu Zhang, Jian-Guang Lou, Yu Zhang, and Xuewei Chen. 2016. Log clustering based problem identification for online service
+     systems. In Proceedings of the 38th International Conference on Software Engineering Companion. 102–111.
+[53] Weilan Lin, Meng Ma, Disheng Pan, and Ping Wang. 2018. Facgraph: Frequent anomaly correlation graph mining for root cause diagnose in
+     micro-service architecture. In 2018 IEEE 37th International Performance Computing and Communications Conference (IPCCC). IEEE, 1–8.
+[54] Dewei Liu, Chuan He, Xin Peng, Fan Lin, Chenxi Zhang, Shengfang Gong, Ziang Li, Jiayu Ou, and Zheshun Wu. 2021. Microhecl: High-efficient
+     root cause localization in large-scale microservice systems. In 2021 IEEE/ACM 43rd International Conference on Software Engineering: Software
+     Engineering in Practice (ICSE-SEIP). IEEE, 338–347.
+[55] Fengrui Liu, Yang Wang, Zhenyu Li, Rui Ren, Hongtao Guan, Xian Yu, Xiaofan Chen, and Gaogang Xie. 2022. MicroCBR: Case-Based Reasoning
+     on Spatio-temporal Fault Knowledge Graph for Microservices Troubleshooting. In International Conference on Case-Based Reasoning. Springer,
+     224–239.
+[56] Ping Liu, Haowen Xu, Qianyu Ouyang, Rui Jiao, Zhekang Chen, Shenglin Zhang, Jiahai Yang, Linlin Mo, Jice Zeng, Wenman Xue, et al. 2020.
+     Unsupervised detection of microservice trace anomalies through service-level deep bayesian networks. In 2020 IEEE 31st International Symposium
+     on Software Reliability Engineering (ISSRE). IEEE, 48–58.
+[57] Lseino. 2024. lseino/onlineboutique. https://github.com/lseino/onlineboutique Accessed: 2024-05-26.
+[58] Siyang Lu, BingBing Rao, Xiang Wei, Byungchul Tak, Long Wang, and Liqiang Wang. 2017. Log-based abnormal task detection and root cause
+     analysis for spark. In 2017 IEEE International Conference on Web Services (ICWS). IEEE, 389–396.
+[59] Meng Ma, Weilan Lin, Disheng Pan, and Ping Wang. 2019. Ms-rank: Multi-metric and self-adaptive root cause diagnosis for microservice
+     applications. In 2019 IEEE International Conference on Web Services (ICWS). IEEE, 60–67.
+[60] Meng Ma, Jingmin Xu, Yuan Wang, Pengfei Chen, Zonghua Zhang, and Ping Wang. 2020. Automap: Diagnose your microservice-based web
+     applications automatically. In Proceedings of The Web Conference 2020. 246–258.
+[61] Minghua Ma, Zheng Yin, Shenglin Zhang, Sheng Wang, Christopher Zheng, Xinhao Jiang, Hanwen Hu, Cheng Luo, Yilin Li, Nengjun Qiu, et al.
+     2020. Diagnosing root causes of intermittent slow queries in cloud databases. Proceedings of the VLDB Endowment 13, 8 (2020), 1176–1189.
+[62] Jonas Maeyens, Annemie Vorstermans, and Mathias Verbeke. 2020. Process mining on machine event logs for profiling abnormal behaviour and
+     root cause analysis. Annals of Telecommunications 75, 9 (2020), 563–572.
+[63] Atri Mandal, Qing Wang, and Amit Paradkar. 2021. Localization of Operational Faults in Cloud Applications by Mining Causal Dependencies in
+     Logs Using Golden Signals. In Service-Oriented Computing–ICSOC 2020 Workshops: AIOps, CFTIC, STRAPS, AI-PA, AI-IOTS, and Satellite Events,
+     Dubai, United Arab Emirates, December 14–17, 2020, Proceedings, Vol. 12632. Springer Nature, 137.
+[64] Leonardo Mariani, Cristina Monni, Mauro Pezzé, Oliviero Riganelli, and Rui Xin. 2018. Localizing faults in cloud systems. In 2018 IEEE 11th
+     International Conference on Software Testing, Verification and Validation (ICST). IEEE, 262–273.
+[65] Nina Marwede, Matthias Rohr, André van Hoorn, and Wilhelm Hasselbring. 2009. Automatic failure diagnosis support in distributed large-scale
+     software systems based on timing behavior anomaly correlation. In 2009 13th European Conference on Software Maintenance and Reengineering.
+     IEEE, 47–58.
+[66] Mashable. 2023. ChatGPT was down. What we know about the major outage.
+[67] Yuan Meng, Shenglin Zhang, Yongqian Sun, Ruru Zhang, Zhilong Hu, Yiyin Zhang, Chenyang Jia, Zhaogang Wang, and Dan Pei. 2020. Localizing
+     failure root causes in a microservice through causality inference. In 2020 IEEE/ACM 28th International Symposium on Quality of Service (IWQoS).
+     IEEE, 1–10.
+[68] HaiBo Mi, HuaiMin Wang, YangFan Zhou, Michael R Lyu, and Hua Cai. 2012. Localizing root causes of performance anomalies in cloud computing
+     systems by analyzing request trace logs. Science China Information Sciences 55 (2012), 2757–2773.
+[69] Ministry of Industry and Information Technology of China (Miit). 2023. Tencent Guangzhou Availability Zone Fault Incident.
+[70] Sasho Nedelkoski, Jorge Cardoso, and Odej Kao. 2019. Anomaly detection from system tracing data using multimodal deep learning. In 2019 IEEE
+     12th International Conference on Cloud Computing (CLOUD). IEEE, 179–186.
+[71] Hiep Nguyen, Zhiming Shen, Yongmin Tan, and Xiaohui Gu. 2013. Fchain: Toward black-box online fault localization for cloud systems. In 2013
+     IEEE 33rd International Conference on Distributed Computing Systems. IEEE, 21–30.
+[72] Hiep Nguyen, Yongmin Tan, and Xiaohui Gu. 2011. Pal: Propagation-aware a nomaly l ocalization for cloud hosted distributed applications. In
+     Managing Large-scale Systems via the Analysis of System Logs and the Application of Machine Learning Techniques. 1–8.
+[73] Xiaohui Nie, Youjian Zhao, Kaixin Sui, Dan Pei, Yu Chen, and Xianping Qu. 2016. Mining causality graph for automatic web-based service
+     diagnosis. In 2016 IEEE 35th International Performance Computing and Communications Conference (IPCCC). IEEE, 1–8.
+[74] Paolo Notaro, Soroush Haeri, Jorge Cardoso, and Michael Gerndt. 2023. LogRule: Efficient structured log mining for root cause analysis. IEEE
+     Transactions on Network and Service Management (2023).
+[75] OpenAI. 2024. Incidents of OpenAI.
+[76] opensource-socialnetwork. 2024. opensource-socialnetwork/opensource-socialnetwork.                 https://github.com/opensource-socialnetwork/
+     opensource-socialnetwork Accessed: 2024-05-26.
+[77] Juan Qiu, Qingfeng Du, Kanglin Yin, Shuang-Li Zhang, and Chongshu Qian. 2020. A causality mining and knowledge graph based method of root
+     cause diagnosis for performance anomaly in cloud applications. Applied Sciences 10, 6 (2020), 2166.
+[78] Zhilei Ren, Changlin Liu, Xusheng Xiao, He Jiang, and Tao Xie. 2019. Root cause localization for unreproducible builds via causality analysis over
+     system call tracing. In 2019 34th IEEE/ACM International Conference on Automated Software Engineering (ASE). IEEE, 527–538.
+[79] Carl Martin Rosenberg and Leon Moonen. 2020. Spectrum-based log diagnosis. In Proceedings of the 14th ACM/IEEE International Symposium on
+     Empirical Software Engineering and Measurement (ESEM). 1–12.
+[80] Devjeet Roy, Xuchao Zhang, Rashi Bhave, Chetan Bansal, Pedro Las-Casas, Rodrigo Fonseca, and Saravan Rajmohan. 2024. Exploring LLM-based
+     Agents for Root Cause Analysis. arXiv preprint arXiv:2403.04123 (2024).
+[81] Amrita Saha and Steven CH Hoi. 2022. Mining root cause knowledge from cloud service incident investigations for AIOps. In Proceedings of the
+     44th International Conference on Software Engineering: Software Engineering in Practice. 197–206.
+[82] Areeg Samir and Claus Pahl. 2019. Dla: Detecting and localizing anomalies in containerized microservice architectures using markov models. In
+     2019 7th International Conference on Future Internet of Things and Cloud (FiCloud). IEEE, 205–213.
+[83] Komal Sarda. 2023. Leveraging Large Language Models for Auto-remediation in Microservices Architecture. In 2023 IEEE International Conference
+     on Autonomic Computing and Self-Organizing Systems Companion (ACSOS-C). IEEE, 16–18.
+[84] Komal Sarda, Zakeya Namrud, Raphael Rouf, Harit Ahuja, Mohammadreza Rasolroveicy, Marin Litoiu, Larisa Shwartz, and Ian Watts. 2023.
+     Adarma auto-detection and auto-remediation of microservice anomalies by leveraging large language models. In Proceedings of the 33rd Annual
+     International Conference on Computer Science and Software Engineering. 200–205.
+[85] Wiliam Setiawan, Yohen Thounaojam, and Apurva Narayan. 2020. Gwad: Greedy workflow graph anomaly detection framework for system traces.
+     In 2020 IEEE International Conference on systems, man, and Cybernetics (SMC). IEEE, 2790–2796.
+[86] Huasong Shan, Yuan Chen, Haifeng Liu, Yunpeng Zhang, Xiao Xiao, Xiaofeng He, Min Li, and Wei Ding. 2019. 𝜀 -diagnosis: Unsupervised and
+     real-time diagnosis of small-window long-tail latency in large-scale microservice platforms. In The World Wide Web Conference. 3215–3222.
+[87] Manish Shetty, Chetan Bansal, Sumit Kumar, Nikitha Rao, and Nachiappan Nagappan. 2022. SoftNER: Mining knowledge graphs from cloud
+     incidents. Empirical Software Engineering 27, 4 (2022), 93.
+[88] Manish Shetty, Chetan Bansal, Sai Pramod Upadhyayula, Arjun Radhakrishna, and Anurag Gupta. 2022. AutoTSG: learning and synthesis for
+     incident troubleshooting. In Proceedings of the 30th ACM Joint European Software Engineering Conference and Symposium on the Foundations of
+     Software Engineering. 1477–1488.
+[89] Julien Siebert. 2023. Applications of statistical causal inference in software engineering. Information and Software Technology (2023), 107198.
+[90] Jacopo Soldani and Antonio Brogi. 2022. Anomaly detection and failure root cause analysis in (micro) service-based cloud applications: A survey.
+     ACM Computing Surveys (CSUR) 55, 3 (2022), 1–39.
+[91] Jacopo Soldani, Stefano Forti, and Antonio Brogi. 2022. Failure root cause analysis for microservices, explained. In IFIP International Conference on
+     Distributed Applications and Interoperable Systems. Springer, 74–91.
+[92] Marc Solé, Victor Muntés-Mulero, Annie Ibrahim Rana, and Giovani Estrada. 2017. Survey on models and techniques for root-cause analysis.
+     arXiv preprint arXiv:1701.08546 (2017).
+[93] Mbarka Soualhia and Fetahi Wuhib. 2022. Automated traces-based anomaly detection and root cause analysis in cloud platforms. In 2022 IEEE
+     International Conference on Cloud Engineering (IC2E). IEEE, 253–260.
+[94] Yindong Sun, Longjun Zhao, Zhen Wang, Dandan Cui, Yang Yang, and Zhipeng Gao. 2021. Fault Root Rank Algorithm Based on Random Walk
+     Mechanism in Fault Knowledge Graph. In 2021 IEEE International Symposium on Broadband Multimedia Systems and Broadcasting (BMSB). IEEE,
+     1–6.
+[95] Suriadi Suriadi, Chun Ouyang, Wil MP van der Aalst, and Arthur HM ter Hofstede. 2013. Root cause analysis with enriched process logs. In Business
+     Process Management Workshops: BPM 2012 International Workshops, Tallinn, Estonia, September 3, 2012. Revised Papers 10. Springer, 174–186.
+[96] Byung Chul Tak, Shu Tao, Lin Yang, Chao Zhu, and Yaoping Ruan. 2016. Logan: Problem diagnosis in the cloud using log-based reference models.
+     In 2016 IEEE International Conference on Cloud Engineering (IC2E). IEEE, 62–67.
+[97] Tun-Zi Tan, Xing-Chen Zhang, Sui-Xiang Gao, Wen-Guo Yang, Yue-Zhong Song, and Cheng-Yong Lin. 2017. HWLog Analysis: A Tool for Routers’
+     Syslog Anomaly Detection and Root Causes Diagnosis. In Artificial Intelligence Science and Technology: Proceedings of the 2016 International
+     Conference (AIST2016). World Scientific, 799–806.
+ [98] Jörg Thalheim, Antonio Rodrigues, Istemi Ekin Akkus, Pramod Bhatotia, Ruichuan Chen, Bimal Viswanath, Lei Jiao, and Christof Fetzer. 2017.
+      Sieve: Actionable insights from monitored metrics in distributed systems. In Proceedings of the 18th ACM/IFIP/USENIX Middleware Conference.
+      14–27.
+ [99] Theregister. 2023. Google Drive misplaces months’ worth of customer files.
+[100] Thurrott. 2024. Microsoft Bing Outage is Impacting Copilot, DuckDuckGo, And Other Services.
+[101] UniSuper. 2024. A joint statement from UniSuper CEO Peter Chun, and Google Cloud CEO, Thomas Kurian.
+[102] Dongjie Wang, Zhengzhang Chen, Yanjie Fu, Yanchi Liu, and Haifeng Chen. 2023. Incremental causal graph learning for online root cause analysis.
+      In Proceedings of the 29th ACM SIGKDD Conference on Knowledge Discovery and Data Mining. 2269–2278.
+[103] Dongjie Wang, Zhengzhang Chen, Jingchao Ni, Liang Tong, Zheng Wang, Yanjie Fu, and Haifeng Chen. 2023. Hierarchical graph neural networks
+      for causal discovery and root cause localization. arXiv preprint arXiv:2302.01987 (2023).
+[104] Hanzhang Wang, Zhengkai Wu, Huai Jiang, Yichao Huang, Jiamu Wang, Selcuk Kopru, and Tao Xie. 2021. Groot: An event-graph-based approach
+      for root cause analysis in industrial settings. In 2021 36th IEEE/ACM International Conference on Automated Software Engineering (ASE). IEEE,
+      419–429.
+[105] Lingzhi Wang, Nengwen Zhao, Junjie Chen, Pinnong Li, Wenchi Zhang, and Kaixin Sui. 2020. Root-cause metric location for microservice systems
+      via log anomaly detection. In 2020 IEEE international conference on web services (ICWS). IEEE, 142–150.
+[106] Ping Wang, Jingmin Xu, Meng Ma, Weilan Lin, Disheng Pan, Yuan Wang, and Pengfei Chen. 2018. Cloudranger: Root cause identification for cloud
+      native systems. In 2018 18th IEEE/ACM International Symposium on Cluster, Cloud and Grid Computing (CCGRID). IEEE, 492–502.
+[107] Zefan Wang, Zichuan Liu, Yingying Zhang, Aoxiao Zhong, Lunting Fan, Lingfei Wu, and Qingsong Wen. 2023. RCAgent: Cloud Root Cause
+      Analysis by Autonomous Agents with Tool-Augmented Large Language Models. arXiv preprint arXiv:2310.16340 (2023).
+[108] Liqiang Wanga. 2018. LADRA: Log-Based Abnormal Task Detection and Root-Cause Analysis in Big Data Processing with Spark. (2018).
+[109] Jianping Weng, Jessie Hui Wang, Jiahai Yang, and Yang Yang. 2018. Root cause analysis of anomalies of multitier services in public clouds.
+      IEEE/ACM Transactions on Networking 26, 4 (2018), 1646–1659.
+[110] Gary White, Jaroslaw Diuwe, Erika Fonseca, and Owen O’Brien. 2021. MMRCA: multimodal root cause analysis. In International Conference on
+      Service-Oriented Computing. Springer, 177–189.
+[111] Li Wu, Jasmin Bogatinovski, Sasho Nedelkoski, Johan Tordsson, and Odej Kao. 2020. Performance diagnosis in cloud microservices using deep
+      learning. In International Conference on Service-Oriented Computing. Springer, 85–96.
+[112] Li Wu, Johan Tordsson, Erik Elmroth, and Odej Kao. 2020. Microrca: Root cause localization of performance issues in microservices. In NOMS
+      2020-2020 IEEE/IFIP Network Operations and Management Symposium. IEEE, 1–9.
+[113] Liqiao Xia, Pai Zheng, Xinyu Li, Robert X Gao, and Lihui Wang. 2022. Toward cognitive predictive maintenance: A survey of graph-based
+      approaches. Journal of Manufacturing Systems 64 (2022), 107–120.
+[114] Zhe Xie, Haowen Xu, Wenxiao Chen, Wanxue Li, Huai Jiang, Liangfei Su, Hanzhang Wang, and Dan Pei. 2023. Unsupervised Anomaly Detection
+      on Microservice Traces through Graph VAE. In Proceedings of the ACM Web Conference 2023. 2874–2884.
+[115] Jingmin Xu, Pengfei Chen, Lin Yang, Fanjing Meng, and Ping Wang. 2017. Logdc: Problem diagnosis for declartively-deployed cloud applications
+      with log. In 2017 IEEE 14th International Conference on e-Business Engineering (ICEBE). IEEE, 282–287.
+[116] Yong Xu, Xu Zhang, Chuan Luo, Si Qin, Rohit Pandey, Chao Du, Qingwei Lin, Yingnong Dang, and Andrew Zhou. 2021. CARE: Infusing causal
+      aware thinking to root cause analysis in cloud system. In Proceedings of the 1st Workshop on High Availability and Observability of Cloud Systems.
+      1–3.
+[117] Xueqiu. 2023. Vipshop Nansha Data Center Failure.
+[118] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan, and Yuan Cao. 2022. React: Synergizing reasoning and acting in
+      language models. arXiv preprint arXiv:2210.03629 (2022).
+[119] Guangba Yu, Pengfei Chen, Hongyang Chen, Zijie Guan, Zicheng Huang, Linxiao Jing, Tianjun Weng, Xinmeng Sun, and Xiaoyun Li. 2021.
+      MicroRank: End-to-End Latency Issue Localization with Extended Spectrum Analysis in Microservice Environments. In WWW ’21: The Web
+      Conference 2021.
+[120] Guangba Yu, Pengfei Chen, Yufeng Li, Hongyang Chen, Xiaoyun Li, and Zibin Zheng. 2023. Nezha: Interpretable Fine-Grained Root Causes
+      Analysis for Microservices on Multi-modal Observability Data. In Proceedings of the 31st ACM Joint European Software Engineering Conference and
+      Symposium on the Foundations of Software Engineering. 553–565.
+[121] Guangba Yu, Zicheng Huang, and Pengfei Chen. 2023. TraceRank: Abnormal service localization with dis-aggregated end-to-end tracing data in
+      cloud native systems. Journal of Software: Evolution and Process 35, 10 (2023), e2413.
+[122] Qingyang Yu, Changhua Pei, Bowen Hao, Mingjie Li, Zeyan Li, Shenglin Zhang, Xianglin Lu, Rui Wang, Jiaqi Li, Zhenyu Wu, et al. 2023.
+      CMDiagnostor: An Ambiguity-Aware Root Cause Localization Approach Based on Call Metric Data. In Proceedings of the ACM Web Conference
+      2023. 2937–2947.
+[123] Ding Yuan, Haohui Mai, Weiwei Xiong, Lin Tan, Yuanyuan Zhou, and Shankar Pasupathy. 2010. Sherlog: error diagnosis by connecting clues from
+      run-time logs. In Proceedings of the fifteenth International Conference on Architectural support for programming languages and operating systems.
+      143–154.
+[124] Hamzeh Zawawy, Kostas Kontogiannis, and John Mylopoulos. 2010. Log filtering and interpretation for root cause analysis. In 2010 IEEE
+      International Conference on Software Maintenance. IEEE, 1–5.
+[125] Dylan Zhang, Xuchao Zhang, Chetan Bansal, Pedro Las-Casas, Rodrigo Fonseca, and Saravan Rajmohan. 2023. PACE: Prompting and Augmentation
+      for Calibrated Confidence Estimation with GPT-4 in Cloud Incident Root Cause Analysis. arXiv preprint arXiv:2309.05833 (2023).
+[126] Shenglin Zhang, Pengxiang Jin, Zihan Lin, Yongqian Sun, Bicheng Zhang, Sibo Xia, Zhengdan Li, Zhenyu Zhong, Minghua Ma, Wa Jin, et al. 2023.
+      Robust failure diagnosis of microservice system through multimodal data. IEEE Transactions on Services Computing (2023).
+[127] Yingying Zhang, Zhengxiong Guan, Huajie Qian, Leili Xu, Hengbo Liu, Qingsong Wen, Liang Sun, Junwei Jiang, Lunting Fan, and Min Ke. 2021.
+      CloudRCA: A root cause analysis framework for cloud computing platforms. In Proceedings of the 30th ACM International Conference on Information
+      & Knowledge Management. 4373–4382.
+[128] Zhizhou Zhang, Murali Krishna Ramanathan, Prithvi Raj, Abhishek Parwal, Timothy Sherwood, and Milind Chabbi. 2022. { CRISP } : Critical Path
+      Analysis of { Large-Scale } Microservice Architectures. In 2022 USENIX Annual Technical Conference (USENIX ATC 22). 655–672.
+[129] Nengwen Zhao, Junjie Chen, Xiao Peng, Honglin Wang, Xinya Wu, Yuanzong Zhang, Zikai Chen, Xiangzhong Zheng, Xiaohui Nie, Gang Wang,
+      et al. 2020. Understanding and handling alert storm for online service systems. In Proceedings of the ACM/IEEE 42nd International Conference on
+      Software Engineering: Software Engineering in Practice. 162–171.
+[130] Yibing Zhao, Yongkun Zheng, Haoran Luo, Dengrong Wei, Chun Liu, and Kang Chen. 2023. Design and Implement of AIOps System Based on
+      Knowledge Graph. In 2023 5th International Conference on Electronics and Communication, Network and Computer Technology (ECNCT). IEEE,
+      285–288.
+[131] Lecheng Zheng, Zhengzhang Chen, Jingrui He, and Haifeng Chen. 2024. Multi-modal Causal Structure Learning and Root Cause Analysis. arXiv
+      preprint arXiv:2402.02357 (2024).
+[132] Junzan Zhou, Shanping Li, et al. 2015. Distance based root cause analysis and change impact analysis of performance regressions. Mathematical
+      Problems in Engineering 2015 (2015).
+[133] Tong Zhou, Chenxi Zhang, Xin Peng, Zhenghui Yan, Pairui Li, Jianming Liang, Haibing Zheng, Wujie Zheng, and Yuetang Deng. 2023. TraceStream:
+      Anomalous Service Localization based on Trace Stream Clustering with Online Feedback. In 2023 IEEE 34th International Symposium on Software
+      Reliability Engineering (ISSRE). IEEE, 601–611.
+[134] Xiang Zhou, Xin Peng, Tao Xie, Jun Sun, Chao Ji, Dewei Liu, Qilin Xiang, and Chuan He. 2019. Latent error prediction and fault localization for
+      microservice applications by learning from system trace logs. In Proceedings of the 2019 27th ACM Joint Meeting on European Software Engineering
+      Conference and Symposium on the Foundations of Software Engineering. 683–694.
+
+
+Received 2 July 2024; revised xxx xxx xxx; accepted xxx xxx xxx
+

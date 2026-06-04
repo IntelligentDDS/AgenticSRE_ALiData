@@ -1,0 +1,68 @@
+# ──────────────────────────────────────────────
+# AgenticSRE Domain Profile — Kubernetes
+# ──────────────────────────────────────────────
+
+domain_name: kubernetes
+
+agent_context_hints:
+  metric_agent: >
+    You are analyzing a Kubernetes cluster. Focus on pod-level resource metrics
+    (CPU, memory, network I/O), node-level capacity, and service-level latency (p50/p95/p99).
+    Key PromQL patterns: container_cpu_usage_seconds_total, container_memory_working_set_bytes,
+    kube_pod_status_phase, kube_node_status_condition.
+  log_agent: >
+    You are analyzing Kubernetes application logs. Look for OOMKilled, CrashLoopBackOff,
+    ImagePullBackOff, connection refused, timeout, and stack traces in container logs.
+    Check kube-system component logs (kubelet, kube-proxy, coredns) for infrastructure issues.
+  trace_agent: >
+    You are analyzing distributed traces in a Kubernetes microservice environment.
+    Focus on inter-service call latency, error propagation paths, and upstream/downstream
+    dependency failures. Check for circuit breaker activations and retry storms.
+  event_agent: >
+    You are analyzing Kubernetes events. Focus on Warning-type events: FailedScheduling,
+    Unhealthy (liveness/readiness probe failures), BackOff (CrashLoopBackOff, ImagePullBackOff),
+    FailedMount, NodeNotReady, Evicted, OOMKilling.
+  correlation_agent: >
+    You are correlating signals from a Kubernetes environment. Consider that pod restarts
+    may be caused by OOMKill (check memory metrics), node pressure (check node conditions),
+    or application bugs (check logs + traces together).
+  hypothesis_agent: >
+    You are generating root cause hypotheses for a Kubernetes incident. Common fault patterns
+    include: resource exhaustion (CPU/memory limits), configuration drift, image issues,
+    network policies blocking traffic, PV/PVC binding failures, and cascading service failures.
+
+log_error_keywords:
+  - "OOMKilled"
+  - "CrashLoopBackOff"
+  - "ImagePullBackOff"
+  - "Error"
+  - "FATAL"
+  - "panic"
+  - "connection refused"
+  - "timeout"
+  - "deadline exceeded"
+  - "permission denied"
+  - "FailedScheduling"
+  - "Unhealthy"
+  - "BackOff"
+  - "Evicted"
+  - "NodeNotReady"
+
+event_patterns:
+  - "Warning"
+  - "FailedScheduling"
+  - "Unhealthy"
+  - "BackOff"
+  - "FailedMount"
+  - "NodeNotReady"
+  - "Evicted"
+  - "OOMKilling"
+
+thresholds:
+  cpu_high: 0.85
+  memory_high: 0.90
+  pod_restart_count: 3
+  error_rate_high: 0.05
+  latency_p99_ms: 2000
+  disk_usage_high: 0.85
+  node_pressure: 0.95

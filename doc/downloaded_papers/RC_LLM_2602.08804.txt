@@ -1,0 +1,591 @@
+                                                 Root Cause Analysis Method Based on Large
+                                                 Language Models with Residual Connection
+                                                                 Structures
+                                                         1st Liming Zhou                                        2nd Ailing Liu                             3rd Hongwei Liu
+                                              dept. name of organization (of Aff.)               dept. name of organization (of Aff.)           dept. name of organization (of Aff.)
+                                                 name of organization (of Aff.)                     name of organization (of Aff.)                 name of organization (of Aff.)
+                                                        Beijing, China                                     Beijing, China                                 Beijing, China
+                                                    email address or ORCID                             email address or ORCID                         email address or ORCID
+
+                                                     4th Min He*                                      5th Heng Zhang                           6th Given Name Surname
+
+
+
+
+arXiv:2602.08804v1 [cs.AI] 9 Feb 2026
+                                        dept. name of organization (of Aff.)              dept. name of organization (of Aff.)            dept. name of organization (of Aff.)
+                                           name of organization (of Aff.)                    name of organization (of Aff.)                  name of organization (of Aff.)
+                                                  Beijing, China                                     City, Country                                   City, Country
+                                              email address or ORCID                            email address or ORCID                          email address or ORCID
+
+
+
+
+                                           Abstract—Root cause localization remain challenging in com-
+                                        plex and large-scale microservice architectures. The complex
+                                        fault propagation among microservices and the high dimensional-
+                                        ity of telemetry data, including metrics, logs, and traces, limit the
+                                        effectiveness of existing root cause analysis (RCA) methods. In
+                                        this paper, a residual-connection-based RCA method using large
+                                        language model (LLM), named RC-LLM, is proposed. A residual-
+                                        like hierarchical fusion structure is designed to integrate multi-
+                                        source telemetry data, while the contextual reasoning capability
+                                        of large language models is leveraged to model temporal and
+                                        cross-microservice causal dependencies. Experimental results on
+                                        CCF-AIOps microservice datasets demonstrate that RC-LLM
+                                        achieves strong accuracy and efficiency in root cause analysis.
+
+                                          Index Terms—Root Cause Analysis, Residual Connection, Mi-
+                                        croservices Architecture , Large Language Model
+                                                                                                                          Fig. 1. Root Cause Analysis for Microservice-based Systems.
+                                                                 I. I NTRODUCTION
+                                           With the widespread adoption of cloud computing and
+                                                                                                                     are inadequate for microservice environments characterized by
+                                        DevOps practices, modern enterprise software systems are
+                                                                                                                     high concurrency, large-scale heterogeneous telemetry data, in-
+                                        increasingly transformed into microservice architectures [1].
+                                                                                                                     cluding metrics, logs, and traces, and dynamically evolving de-
+                                        In such architectures, monolithic applications are decomposed
+                                                                                                                     pendencies. Delayed fault localization often leads to prolonged
+                                        into loosely coupled and independently deployable services,
+                                                                                                                     service outages, increased mean time to repair (MTTR), and
+                                        which significantly improves development agility, scalability,
+                                                                                                                     significant business impact. Therefore, the development of an
+                                        and resource utilization. However, the distributed nature of
+                                                                                                                     intelligent RCA approach capable of automatically and effi-
+                                        microservices introduces substantial operational complexity. In
+                                                                                                                     ciently identifying the root cause from noisy data is essential
+                                        large-scale systems composed of hundreds of services, failures
+                                                                                                                     for ensuring the reliability of microservice systems.
+                                        are no longer isolated within individual services but can
+                                                                                                                        To address the above challenges, a residual-connection-
+                                        propagate rapidly through complex call chains and message
+                                                                                                                     based RCA method using LLM, named RC-LLM, is proposed.
+                                        queues, resulting in intricate fault propagation paths.
+                                                                                                                     In this method, the RCA task is formulated as a deep temporal
+                                           When performance degradation or system failures occur,
+                                                                                                                     causal reasoning problem and is addressed by leveraging the
+                                        rapid and accurate root cause analysis (RCA) becomes a
+                                                                                                                     strong sequence modeling capability of LLMs. To effectively
+                                        critical challenge for operators. Traditional RCA approaches
+                                                                                                                     integrate heterogeneous telemetry data and improve informa-
+                                        based on manual expertise, log inspection, or predefined rules
+                                                                                                                     tion flow, a multi-source integration strategy with residual
+                                          https://www.aiops.cn/gitlab/aiops-live-benchmark/aiopschallenge2025        connection structures is designed.
+   The main contributions of this paper are summarized as            et al. [8] proposed a graph-based anomaly detection system
+follows:                                                             for distributed IoT microservices that adaptively updates the
+(1) We proposed A residual-connection-based RCA method               communication model to capture temporal changes in de-
+     for microservice architectures, named RC-LLM. Multi-            ployments. After anomalies are detected, fault localization is
+     source telemetry data are integrated to address the lim-        typically conducted through graph traversal or causal inference
+     itations of existing approaches in modeling complex fault       on the constructed graphs. Despite their effectiveness, these
+     propagation.                                                    approaches heavily rely on the completeness and accuracy of
+(2) A multi-source integration strategy with residual connec-        dependency graphs and often fail to capture implicit fault prop-
+     tion structures is designed for organizing traces, metrics,     agation caused by resource contention or shared component
+     and logs as structured inputs for LLM reasoning. This           failures beyond explicit call relationships.
+     design promotes effective information preservation and
+                                                                     B. Machine Learning-Based RCA Methods
+     reuse across data sources, facilitating the modeling of
+     long-range and cross-service dependencies in microservice          In recent years, with the rapid growth of telemetry data
+     systems.                                                        (metrics, logs, and traces) and advances in computing capa-
+(3) Extensive experiments conducted on a realistic microser-         bilities, machine learning techniques have been widely adopted
+     vice system data demonstrate that RC-LLM achieves               for automated RCA to overcome the limitations of traditional
+     strong accuracy and efficiency in root cause analysis.          approaches. Many studies focus on metric-based or log-based
+                                                                     anomaly methods, in which anomaly detection and correlation
+                     II. R ELATED W ORK                              analysis are performed on the corresponding data sources.
+   Root cause analysis in microservice architectures, similar to     Wang et al. [9] proposed an event-graph-based RCA method
+the evolution of other computer science tasks, can be broadly        that constructs real-time causality graphs using heterogeneous
+categorized into three stages: (A) rule-based and expert-driven      events derived from metrics and logs as nodes, and infers
+methods; (B) machine learning-based methods; and (C) LLM-            causal relationships in industrial microservice systems by
+based approaches that leverage powerful sequential feature           incorporating domain-specific rules and heuristics. Addition-
+encoding and contextual reasoning capabilities to address            ally, trace-based methods for RCA have been increasingly
+complex challenges in AIOps [2].                                     explored. Liu et al. [10] proposed an unsupervised trace
+                                                                     anomaly detection system for microservices, in which service-
+A. Rule-Based and Expert-Driven RCA Methods                          level vectors are constructed to encode execution paths and
+   Early RCA approaches primarily relied on operational ex-          response times, and Bayesian networks are employed to learn
+pertise, predefined rules, and structured data analysis. These       normal patterns. Meng et al. [11] introduced an anomaly
+methods include threshold-based approaches, in which anoma-          detection approach that constructs a baseline of normal traces
+lies are detected using static rules or thresholds and root causes   and measures trace similarity using tree edit distance to detect
+are inferred by matching predefined failure signatures, such as      structural anomalies, while principal component analysis is
+alerts triggered by CPU utilization, latency, or error rate met-     applied to identify anomalous components with significant
+rics. Nguyen et al. [3] proposed a non-intrusive anomaly lo-         delay variations.
+calization system that detects critical change points in system-        Neural network-based methods such as temporal models
+level metrics and sorts them temporally to infer anomaly prop-       (e.g., LSTM [12], GRU [13]), and autoencoders (e.g., Trans-
+agation patterns. Marvasti et al. [4] introduced a data-driven       former [14], BERT [15]), have also been widely adopted for
+anomaly event correlation approach that models temporal co-          RCA. Yang et al. [16] proposed a root cause localization
+occurrence relationships among historical anomaly events to          method based on mutual information and LSTM, in which
+enable root cause and extreme event identification. However,         performance metric deviations and real-time call differences
+in microservice environments with numerous services and              are combined to construct service dependency graphs, and
+continuously evolving dependencies, maintaining a complete           fault localization is performed using a PageRank-based infer-
+and accurate rule set becomes impractical, and static rules          ence strategy. Zhang et al. [17] proposed a fault localization
+exhibit limited adaptability to dynamic system behaviors.            method that integrates system logs and monitoring metrics.
+   Dependency-graph-based approaches have also been exten-           This method utilizes Transformer models to capture sequence
+sively studied. In these methods, service dependency graphs          features from the merged log and monitoring metric data to
+or causality graphs are constructed based on inter-service call      detect anomalies in microservices. Despite their effectiveness,
+relationships. Brandón et al. [5] built a directed dependency       these methods often overlook the structured and relational
+graph and performed anomaly propagation analysis to localize         information inherent in log and trace data.
+root causes in microservice systems. Xin et al. [6] employed            In addition, graph neural networks (GNNs) [18] have been
+gradient-based causal structure learning to generate weighted        widely explored for microservice RCA due to their ability
+causal graphs and applied a PageRank-based inference strat-          to model graph-structured data. Li et al. [19] constructed a
+egy to identify faulty components. Wu et al. [7] inferred            Failure Dependency Graph (FDG) with candidate failure units
+fine-grained root causes by modeling anomaly propagation             (groups of indicative metrics on components) as nodes and
+among metrics using dependency and causality graphs. Aubet           apply Graph Attention Networks (GAT) to capture dependen-
+cies and unit-level features on the graph, thereby achieving                                                    Output
+
+localization of recurring failures. The Sleuth [20] employs                        Fault Explanation    Root Cause Component        Reasoning Trace
+
+GNNs to model the causal influences across temporal in-
+tervals in trace data, and clusters traces using a distance-                                               LLM Reasoning
+
+based metric, thereby effectively reducing the number of                                  Prompt Construction           Output Format Constraint
+
+traces needed for RCA. Yen et al. [21] combined GNNs with
+graph structure learning (GSL), leveraging GSL models to                                               Information Integration
+infer latent dependencies from data with a large numbers of
+nodes and generate information-rich graph representations for
+GNNs to identify root causes. Nevertheless, existing GNN-               Trace Analysis                     Metric Analysis                          Log Analysis
+based methods still face challenges in handling the dynamic             Call Trace Tree                  Numerical Anomaly                           Time Slice
+nature of microservice architectures and heterogeneous data              Construction                     Change Detection                          Partitioning
+
+integration across metrics, logs, and traces. These challenges          Leaf-node Error
+                                                                                                                             APM                   Keyword Search
+                                                                         Localization                  Infra     Other
+are particularly pronounced in deep GNNs, where effective
+multi-hop neighbor aggregation without feature degradation
+remains difficult.
+                                                                             UTC Time Conversion       Component Aggregation          Sorting and Bucketing
+C. LLM-Based RCA Methods
+                                                                                                                Input
+   Large Language models (LLMs), particularly those based on
+                                                                                                 Log            Trace            Metric
+the Transformer architecture [22, 23, 24, 25], have achieved
+notable success in natural language processing and have re-
+cently been extended to the AIOps domain [26]. Their primary                                  Fig. 2. Architecture of RC-LLM.
+strengths lie in contextual understanding, pattern recognition,
+and sequence modeling capabilities.                                  a comprehensive analysis and understanding of underlying
+   LLMs have been applied to the analysis of unstructured            telemetry data. Moreover, hallucination phenomena and er-
+log data for tasks such as log anomaly detection [27], event         ror propagation in large language models frequently lead to
+clustering [28], and failure summarization [29]. By tokenizing       inaccurate root cause localization results [36].
+data sequences and processing them with LLMs, normal log
+                                                                        Motivated by these limitations and inspired by ResNet’s
+or metric patterns can be learned, enabling the identification
+                                                                     ability to fuse multi-level representations through residual
+of anomalous patterns. Compared with traditional template-
+                                                                     connections [37], this work investigates the use of residual-
+matching or statistical methods, these approaches are more
+                                                                     connection-enhanced architectures for integrating heteroge-
+robust and flexible.
+                                                                     neous telemetry data and supporting more fine-grained root
+   More recent studies have explored the reasoning capabilities
+                                                                     cause localization in microservice systems.
+of LLMs for fault location and question answering. Han et al.
+[30] proposed a hybrid RCA framework that combines a
+lightweight classifier with an LLM, where the classifier per-                                          III. M ETHOD
+forms preliminary fault identification and is iteratively refined
+using LLM-generated feedback. Sarda et al. [31] introduced              The proposed RC-LLM method for RCA consists of five
+an LLM-driven framework for cloud-native systems that inte-          layers: data input, data preprocessing, data analysis, data
+grates logs, metrics, traces, and alerts, where alert information    integration and LLM reasoning, as illustrated in Fig. 2.
+is incorporated to enhance contextual learning for automatic            First, at the data input layer, log, trace, and metric data
+identification of incident root cause categories. In addition, the   are loaded from Parquet files using PyArrow. At the data
+emergence of retrieval-augmented generation (RAG) [32] and           preprocessing layer, all data are converted to unified UTC
+agent-based frameworks [33] has further accelerated the appli-       timestamps, aggregated by component, bucketed at an hourly
+cation of LLMs in intelligent operations. Ren [34] proposed          granularity, and temporally ordered. Next, at the data anal-
+an LLM-based multi-agent system for root cause reasoning             ysis layer, customized modules perform anomaly detection
+that incorporates Monte Carlo Tree Search and a knowledge-           and feature extraction on metrics, traces, and logs, enabling
+based reward mechanism. Roy et al. [35] conducted the first          multi-dimensional data alignment and noise reduction. The
+empirical evaluation of an LLM-based ReAct agent for root            resulting structured anomaly information is then provided to
+cause analysis in cloud incident management, demonstrating           the LLM at the reasoning layer, where prompt construction
+that comparable performance to RAG and chain-of-thought              and format constraints are employed for root cause reasoning.
+approaches can be achieved under zero-shot and out-of-domain         Finally, the model outputs are parsed into structured JSON
+settings, while fewer factual errors are produced.                   results, including the identified root cause component, failure
+   Despite their promise, such methods primarily focus on            description, and reasoning path, thereby completing the end-
+high-level reasoning and summary generation, and rely on             to-end root cause localization process. The details of each
+intelligent agent tools or knowledge bases, often lacking            layer are described in the following sections.
+A. Data Input                                                                                  TABLE I
+                                                                                    E XAMPLE OF A C ALL C HAIN T REE .
+   As Parquet is a column-oriented binary storage format
+with efficient compression and encoding, it enables high-             Call Chain Tree Constructed Using Anytree
+performance reading and processing of large-scale data. There-        frontend-0
+fore, PyArrow is employed at this layer to efficiently ingest op-
+                                                                              frontend-0
+erational telemetry data. Specifically, Parquet files containing
+log, trace, and metric data are loaded using PyArrow, which                   recommendationservice-1
+fully exploits optimized columnar data access. This data input
+step can be abstractly formulated as follows:                                         productcatalogservice-1
+
+                                                                              cartservice-0
+        D = Dtrace , Dmetric , Dlog = LoadP A (Ps )
+           
+                                                             (1)                      redis-cart-0                  #Faulty Node
+
+   In the equation (1), D denotes the complete telemetry
+dataset, while Dtrace , Dmetric , and Dlog represents the trace,    C. Data Analysis
+metric, and log subsets, respectively. PS denotes the Parquet          The data analysis layer serves as the core stage for data con-
+files of each telemetry type and LoadP A (·) represents the         vergence and anomaly extraction. Fault-relevant information is
+PyArrow-based loading operation.                                    identified from large-scale preprocessed data to suppress noise
+   This step ensures high data throughput and stable in-            and improve the efficiency and accuracy of large language
+put performance when handling massive monitoring datasets,          model reasoning, while reducing context token consumption.
+thereby providing a reliable data foundation for subsequent         At this stage, customized analysis tools are applied to trace,
+preprocessing and analysis.                                         log, and metric data.
+                                                                       1) Trace Analysis: In the trace analysis stage, an itera-
+B. Data Preprocessing                                               tive hierarchical construction algorithm is employed to build
+                                                                    complete service–pod call trees using the Anytree library, as
+   The data preprocessing stage aims to standardize and clean       shown in Table 1. By traversing the trees and analyzing gRPC
+multi-source telemetry data to support subsequent analysis and      status codes, anomalous leaf nodes and critical invocation
+model reasoning. Log, trace, and metric data are first converted    segments are efficiently identified and extracted. The trace
+to unified UTC timestamps using NumPy and Pandas, thereby           analysis process can be abstracted as follows:
+ensuring temporal consistency and eliminating time-zone dis-
+                                                                                                            ′
+crepancies.                                                                            Atrace = Ftrace (Dtrace )                   (5)
+   Subsequently, data are aggregated and bucketed according to                                ′
+
+data type and system component. Specifically, telemetry data           In the equation (5), Dtrace denotes the preprocessed trace
+originating from the same service or pod are grouped together,      data, and Ftrace (·) represents the hierarchical trace analysis
+and different monitoring metrics under the same component,          function. Table I presents an example of a call tree constructed
+such as CPU and memory usage, are further bucketed. After           using the Anytree library, in which bold italic pods denote
+aggregation and bucketing, all data are temporally ordered to       leaf nodes. The call tree explicitly represents inter-service
+form aligned time series. The data preprocessing procedure          invocation relationships and supports precise identification of
+can be abstractly formulated as follow:                             faulty services and invocations, thereby providing reliable cues
+                                                                    for subsequent root cause localization.
+                                                                       2) Metric Analysis: The metric analysis part focuses on
+                  Dutc = Futc-conversion (D)                 (2)    identifying anomalous indicators associated with fault time
+                                                                    windows. A combination of statistical thresholding and trend
+                                                                    analysis is applied to detect service-level anomalies. Key
+                Dagg = Fcomp-aggregation (Dutc )             (3)    performance metrics, including CPU utilization, memory us-
+                                                                    age, request-response time (RRT), request-response pairing
+                                                                    deviations, client error rate, server error rate, and timeout
+                     ′                                              counts, are analyzed to capture abnormal service behavior. In
+                   D = Fsort-bucket (Dagg )                  (4)
+                                                                    addition, the PELT (Pruned Exact Linear Time) algorithm for
+                                                                    change point detection is applied to these metrics to identify
+   In the above equations, Futc-conversion , Fcomp-aggregation
+                                                                    abrupt numerical changes across consecutive time intervals.
+and Fsort-bucket denote the operations of UTC time conver-
+                                                                    The metric analysis process can be abstracted as follows:
+sion, component aggregation, sorting and bucketing, respec-
+         ′
+tively. D represent the final preprocessed, temporally aligned                                                  ′
+                                                                                     Ametric = Fmetric (Dmetric )                  (6)
+time-series data. These steps enable standardized, structured,
+                                                                                                  ′
+and temporally coherent data representations, providing high-          In the above equation, Dmetric denotes the preprocessed
+quality inputs for anomaly extraction and LLM reasoning.            trace data, and Fmetric (·) denotes the metric analysis function
+          Fig. 3. Sudden Numerical Anomaly of CPU Usage.                            Fig. 5. Request-response mismatch Anomaly.
+
+
+                                                                   D. Data Integration
+                                                                      After multi-dimensional anomalies are identified at the data
+                                                                   analysis layer, the extracted data are not directly concatenated.
+                                                                   Instead, a hierarchical integration mechanism inspired by
+                                                                   residual connections is adopted to fuse multi-source informa-
+                                                                   tion and construct a compact yet highly informative evidence
+                                                                   context for LLM reasoning. The overall workflow is illustrated
+                                                                   in Fig. 6.
+
+
+                                                                                                 Information Integration
+             Fig. 4. Sudden Numerical Anomaly of RRT.
+
+
+that detects abnormal indicators using statistical thresholding,      Trace Analysis                Metric Analysis              Log Analysis
+trend analysis, and change point detection.                           Call Trace Tree             Numerical Anomaly               Time Slice
+   Figs. 3 to 5 present representative examples of abrupt              Construction                Change Detection              Partitioning
+
+numerical anomalies observed in different performance met-            Leaf-node Error
+                                                                                                Infra    Other        APM     Keyword Search
+                                                                       Localization
+rics, including CPU usage stress anomalies, sudden spikes in
+request-response time (RRT), and mismatches between request
+and response volumes. These anomalies reflect distinct types                 Fig. 6. Data Integration Based on a Residual Structure.
+of abnormal behavior during fault periods. When significant
+                                                                      The integration process is initiated with trace data as the
+fluctuations or outliers are detected, the corresponding compo-
+                                                                   primary anchor. When an erroneous component is detected in
+nents and their associated metrics are identified and extracted,
+                                                                   the call chain, it is selected as the focal point for subsequent
+enabling the selection of services or pod nodes with potential
+                                                                   analysis.
+performance issues and providing quantitative evidence for
+                                                                      Next, metric data corresponding to the identified component
+large language model reasoning.
+   3) Log Analysis: In the log analysis stage, anomalous log       are examined with priority. Key indicators, such as request-
+entries are first extracted from log data. Predefined pattern-     response time (RRT), error rate, and CPU utilization, are
+matching keywords are applied to filter log records containing     evaluated within the fault time window to determine whether
+error-related information. Representative keywords include         abnormal fluctuations are also observed. This step enables
+Error, Timeout, Exception, Failed, and common HTTP status          quantitative cross-validation of trace-level anomalies and pro-
+codes (e.g., 400, 404, and 500). Log anomaly extraction is         vides multi-dimensional evidence.
+abstracted as a fault-related information filtering process.          Subsequently, log data generated by the same component are
+                                                                   inspected to extract anomalous entries, including error logs,
+                                       ′
+                      Alog = Flog (Dlog )                    (7)   exception stacks, or specific failure patterns. By associating
+                                                                   these logs with trace and metric information, detailed textual
+                            ′
+   In the equation (7), Dlog denotes the preprocessed log          descriptions of the failure are provided, facilitating a deeper
+data, and Flog (·) filters fault-related log entries based on      understanding of the fault context.
+predefined error patterns and keywords. This filtering process        Finally, when anomalies related to the same component
+substantially reduces the volume of log data, enabling the LLM     are available across trace, metric, and log data, they are
+to focus on fault-relevant information rather than redundant log   jointly integrated to form a complete and highly reliable
+entries.                                                           evidence chain for LLM inference. In cases where certain
+                                                               TABLE II
+                                           S TATISTICS OF DATASET USED IN OUR EXPERIMENTS .
+
+             Data                                    Included Information                                     Records
+             Trace                     spanID, traceID, references, process, duration, tags                 121,996,403
+             Metric    CPU usage, memory usage, disk read bytes, network transmit, request, rrt, timeout     18,815,081
+              Log           message, detailed textual information generated during system operation         128,481,689
+
+
+data modalities are missing (e.g., unavailable metric data),         presented to demonstrate progressive improvements in per-
+all accessible anomalous information is flexibly integrated.         formance. Finally, representative case studies are analyzed to
+Whether composed of multi-source or single-source data, the          illustrate the effectiveness of the approach in identifying root
+resulting data packages are supplied to the LLM for unified          causes from multi-dimensional telemetry data.
+reasoning, ensuring effective root cause localization under
+varying data completeness conditions. The data integration           A. Dataset
+process can be abstractly formulated as follows:                        The experimental evaluation is conducted on the public
+                                                                     dataset released for the CCF AIOPS 2025 Root Cause Analysis
+           Eintegrated = Atrace ⊕ Ametric ⊕ Alog               (8)   Challenge. The dataset is constructed and extended based
+                                                                     on HipsterShop, an open-source microservice system pro-
+   In the equation (8), Eintegrated denotes the integrated           vided by Google, and is designed to simulate the dynamics
+context data. ⊕ denotes a hierarchical residual-based fusion         and complexity of real-world microservice systems, thereby
+operation that preserves dominant fault signals while allowing       providing a representative experimental environment for root
+flexible incorporation of available modalities. Through this         cause analysis. The statistics of trace, metric, and log data in
+strategy-driven integration of trace, metric, and log analysis       the dataset are summarized in Table II.
+results, fault-relevant information is effectively distilled from       The microservice system adopts a dynamically deployed
+large-scale monitoring data. Noise is substantially reduced, and     architecture consisting of 10 core business microservices and
+high-quality inputs are provided for LLM inference, thereby          8 virtual machines (VMs). Each core microservice is deployed
+improving both the efficiency and accuracy of root cause             with three Pods, resulting in a total of 30 Pods that are
+localization.                                                        dynamically scheduled across the 8 VMs by Kubernetes. In
+E. LLM Reasoning                                                     addition, a TiDB database cluster is integrated into the system,
+                                                                     including the core services tidb-tidb, tidb-pd, and tidb-tikv,
+   To ensure interpretability and reliability of the diagnos-
+                                                                     each deployed with a single Pod on the VMs. To construct
+tic results, structured output constraints are enforced using
+                                                                     diverse and realistic failure scenarios, the dataset incorporates
+the PromptTemplate and StructuredOutputParser tools from
+                                                                     a fine-grained fault injection mechanism that supports three
+LangChain [38]. These tools constrain the JSON format and
+                                                                     levels of faults: service-level, pod-level, and node-level. The
+reasoning structure of both LLM inputs and outputs. The LLM
+                                                                     dataset contains 400 fault cases, in which the model is required
+is required to produce outputs containing three predefined
+                                                                     to identify the corresponding root cause within a given time
+fields: the root cause component, the fault explanation, and the
+                                                                     window.
+reasoning trace. The constrained LLM reasoning and output
+                                                                        It is worth noting that the RCA task in this study differs
+generation process can be abstractly expressed as follows:
+                                                                     from conventional operational RCA settings. In practical mon-
+                                                                     itoring systems, RCA is typically triggered by explicit alarms
+           O = {Cr , Fe , Rt } = LLM (Eintegrated )            (9)
+                                                                     that provide an initial anchor for fault tracing, whereas the
+   In the equation (9), O denotes the structured output gen-         dataset used in this work does not include predefined alarm
+erated by the LLM, Cr denotes the identified root cause              locations or hints. Consequently, potential faulty components
+component, Fe denotes the fault explanation in natural lan-          must be inferred solely from observed telemetry characteristics
+guage, and Rt denotes the reasoning trace that explicitly            and heuristic rules, without relying on prior alarm anchors.
+records the inference process from observed anomalies to the         This setting substantially increases the difficulty of root cause
+final conclusion, thereby improving result interpretability and      localization, as the method is required to first identify com-
+traceability. These structured outputs are directly used as the      ponents involved in fault propagation before reasoning about
+final results for root cause localization.                           the root cause.
+                      IV. E XPERIMENT                                B. Experimental Details
+   This chapter aims to comprehensively validate the proposed           The methods are evaluated using Accuracy and average
+approach through empirical evaluation and case studies. First,       reasoning steps to assess the effectiveness and efficiency of
+the datasets used in the experiments are introduced. Next,           root cause localization, respectively. Accuracy measures the
+the iterative optimization process of the proposed method is         correctness of identifying the true root cause component, while
+                                                              TABLE III
+                                               I TERATIVE E VOLUTION OF THE M ETHOD .
+
+       Strategy                                         Description                                     Accuracy(%)     Avg Steps
+       Original                 Log, Metric, and Trace data are directly fed into the LLM.                 23.75           6.2
+                          Abnormal APM components are extracted, and their corresponding Trace
+      Early-stage                                                                                          28.50           4.7
+                                         and Log data are fed into the LLM.
+                          Abnormal gRPC components are extracted from the Trace data, and their
+   Intermediate-stage                                                                                      41.75           4.3
+                                corresponding APM and Log data are fed into the LLM.
+                        From Trace to Metric to Log, residual fusion is performed at each level, and
+   Final (RC-LLM)                                                                                          48.25           3.4
+                                     the fused representations are fed into the LLM.
+
+
+the average number of reasoning steps reflects the reasoning          on parent-child relationships. Associated APM metrics and log
+efficiency of the methods.                                            data were then incorporated for LLM reasoning. This strategy
+   Although RAG and external knowledge bases are known                further increased the accuracy to 41.75%, demonstrating the
+to improve performance in many tasks, they introduce addi-            effectiveness of trace-based analysis for root cause localiza-
+tional dependencies on the completeness and quality of the            tion. Nevertheless, certain failure cases were observed without
+constructed knowledge base. To better highlight the inherent          abnormal gRPC status codes, indicating incomplete coverage
+capability and architectural advantages of the methods, no            of this strategy.
+retrieval enhancement based on external knowledge bases is               4) Final: To address failures with normal gRPC status
+incorporated in the experiments.                                      codes, the intermediate strategy was further enhanced by
+   Furthermore, after a comprehensive evaluation of token con-        integrating metric-based anomaly detection. Service or pod
+sumption, inference quality, and response latency, DeepSeek-          components exhibiting significant metric anomalies or abrupt
+V3 (671B) [25]was selected as the core reasoning engine.              metric changes were selected from APM data and residually
+   For experimental fairness and consistency, all reasoning           fused with log entries containing error-related keywords (e.g.,
+relies solely on observed telemetry data without incorporat-          Error, Exception). The fused multi-source information was
+ing external knowledge retrieval, and the same DeepSeek-              then provided to the LLM for reasoning, enabling effective
+V3 (671B) model is used throughout all experiments. The               diagnosis in scenarios where trace-based signals were insuf-
+implementation is developed in Python and executed in a               ficient. This final strategy achieved an accuracy of 48.25%,
+Linux-based environment.                                              demonstrating a substantial improvement over all previous
+                                                                      stages and validating the effectiveness of the proposed RC-
+C. Method Iteration and Analysis
+                                                                      LLM framework.
+   The RC-LLM framework was developed through four suc-
+cessive iterations. The key modifications and accuracy of each        D. Case Study
+iteration are summarized in Table III and described below.               To further evaluate the proposed method, a representative
+   1) Original: Log, Trace, and Metric data within the fault          case from the dataset is analyzed to illustrate the diagnostic
+time window were minimally processed and directly fed into            process and reasoning behavior of the model. The detailed
+the LLM for reasoning. This naive strategy achieved an accu-          analysis results are presented in Table IV.
+racy of 23.75%. Experimental results revealed clear limitations          As shown in Table IV, the proposed method correctly lo-
+of this naive approach, including context-length overflow, low        calizes the root cause component, demonstrating the effective
+accuracy, and high response latency.                                  coordination of the designed techniques. In the TraceAnalysis
+   2) Early-stage: Abnormal service or pod components were            step of the reasoning trace, three anomalous cartservice pods
+first identified based on anomalous APM metrics within the            are first identified based on abnormal gRPC status codes,
+fault window, and the corresponding trace and log data were           enabling accurate localization of faulty leaf nodes in the call
+subsequently supplied to the LLM for reasoning. This strategy         chain. Subsequently, in the MetricAnalysis step, a significant
+improved the localization accuracy to 28.50%, showing a               spike in request-response time (RRT) of 97246 ms is detected
+moderate gain over the original approach. However, the results        for cartservice, as illustrated in Fig. 7, further corroborating
+indicated that components exhibiting metric anomalies were            the presence of service-level performance degradation. In the
+not necessarily the root causes, highlighting the need for            LogSearch step, 40 error-related log entries are extracted,
+additional evidence sources to improve localization accuracy.         and abnormal error ratios in APM metrics are additionally
+   3) Intermediate-stage: The metric-driven component selec-          confirmed. All observations are consistent with the ground
+tion was abandoned, and trace call chains were instead adopted        truth.
+as the primary analysis entry point. Nodes with abnormal                 These observations are integrated into a coherent reason-
+gRPC status codes were identified, and candidate root compo-          ing chain—pod errors → RRT spike → error logs—which
+nents, as well as fault propagation paths, were inferred based        supports reliable root cause localization. The final output
+                                                                TABLE IV
+                                                 A C ASE S TUDY OF ROOT C AUSE A NALYSIS .
+
+        Question          A fault occurred from 2025-06-05T18:10:05Z to 2025-06-05T18:34:05Z. Please identify the root cause.
+                          component: cartservice
+     Ground Truth         fault description: [”pods crash”, ”pods terminated unexpectedly”, ”container exit”, ”pods failure”]
+                          key metrics:[”client error”,”client error ratio”,”error”,”error ratiopod processes”, ”request”, ”response”,”RRT”]
+                          component: cartservice
+                          reason: response timeout with RRT spike to 97k ms
+                          reasoning trace:[
+          Ours            ”step”:1,”action”: ”TraceAnalysis(Tracedata)”, ”observation”: ”3 cartservice pods showing errors”
+                          ”step”:2,”action”:”MetricsAnalysis(cartservice)”,”observation”:”RRT spike to 97246ms at fault time”
+                          ”step”:3,”action”: ”LogSearch(cartservice)”, ”observation”: ”40 errors detected at faultpeak”
+                          ”step”:4,”action”: ”AnalyzeAPM(cartservice)”, ”observation”: ”23.12% error ratio at 18:10”]
+
+                                                                        of root cause localization accuracy and inference efficiency.
+                                                                        Moreover, case studies indicate that the proposed approach
+                                                                        is capable of constructing coherent reasoning chains and
+                                                                        delivering interpretable diagnostic results across diverse failure
+                                                                        scenarios.
+
+                                                                                                   R EFERENCES
+                                                                         [1] A. Balalaie, A. Heydarnoori, and P. Jamshidi, “Microser-
+                                                                             vices architecture enables devops: Migration to a cloud-
+                                                                             native architecture,” Ieee Software, vol. 33, no. 3, pp.
+                                                                             42–52, 2016.
+                                                                         [2] L. Zhang, T. Jia, M. Jia, Y. Wu, A. Liu, Y. Yang, Z. Wu,
+            Fig. 7. A Sudden Numerical Anomaly of RRT.                       X. Hu, P. Yu, and Y. Li, “A survey of aiops in the era of
+                                                                             large language models,” ACM Computing Surveys, 2025.
+correctly reports the root cause component in the predefined             [3] H. Nguyen, Y. Tan, and X. Gu, “Pal: P ropagation-
+JSON format. It is worth noting that each service in the                     aware a nomaly l ocalization for cloud hosted distributed
+system is composed of three pods. In this case, anomalies                    applications,” in Managing large-scale systems via the
+are simultaneously detected across all three cartservice pods,               analysis of system logs and the application of machine
+indicating that the failure is not an isolated pod-level issue               learning techniques, 2011, pp. 1–8.
+but a service-level fault. The proposed method captures this             [4] M. A. Marvasti, A. V. Poghosyan, A. N. Harutyunyan,
+multi-pod anomaly pattern and leverages inter-pod correlation                and N. M. Grigoryan, “An anomaly event correlation
+to infer the service-level nature of the failure, thereby enabling           engine: Identifying root causes, bottlenecks, and black
+accurate root cause identification.                                          swans in it environments,” VMware Technical Journal,
+   In some cases, the proposed method exhibits reduced ac-                   vol. 2, no. 1, pp. 35–45, 2013.
+curacy at the node-level root cause localization. Although               [5] Á. Brandón, M. Solé, A. Huélamo, D. Solans, M. S.
+service-level and pod-level faults can be reliably identified                Pérez, and V. Muntés-Mulero, “Graph-based root cause
+through the integration of Trace and Metric information,                     analysis for service-oriented and microservice architec-
+insufficient fine-grained metric discrimination and limited log-             tures,” Journal of Systems and Software, vol. 159, p.
+level semantic evidence hinder precise differentiation among                 110432, 2020.
+multiple replicas of the same service, resulting in coarse-              [6] R. Xin, P. Chen, and Z. Zhao, “Causalrca: Causal infer-
+grained reasoning and node-level misidentification.                          ence based precise fine-grained root cause localization
+                                                                             for microservice applications,” Journal of Systems and
+                       V. C ONCLUSION                                        Software, vol. 203, p. 111724, 2023.
+   In this paper, a residual-connection-based LLM approach,              [7] L. Wu, J. Tordsson, J. Bogatinovski, E. Elmroth, and
+termed RC-LLM, is proposed for root cause analysis in large-                 O. Kao, “Microdiag: Fine-grained performance diagnosis
+scale microservice systems. Root cause analysis is reformu-                  for microservice systems,” in 2021 IEEE/ACM Inter-
+lated as a temporal causal reasoning problem, in which Trace,                national Workshop on Cloud Intelligence (CloudIntelli-
+Metric, and Log data are hierarchically integrated through                   gence). IEEE, 2021, pp. 31–36.
+a residual fusion mechanism. This design preserves critical              [8] F.-X. Aubet, M.-O. Pahl, S. Liebald, and M. R.
+fault signals while suppressing noise introduced by fault                    Norouzian, “Graph-based anomaly detection for iot mi-
+propagation. Experimental results on the CCF AIOps dataset                   croservices,” Measurements, vol. 120, no. 140, p. 160,
+show that RC-LLM achieves strong performance in terms                        2018.
+ [9] H. Wang, Z. Wu, H. Jiang, Y. Huang, J. Wang, S. Kopru,            large-scale microservices with graph neural networks,” in
+     and T. Xie, “Groot: An event-graph-based approach                 Proceedings of the 28th ACM International Conference
+     for root cause analysis in industrial settings,” in 2021          on Architectural Support for Programming Languages
+     36th IEEE/ACM International Conference on Automated               and Operating Systems, Volume 4, 2023, pp. 324–337.
+     Software Engineering (ASE). IEEE, 2021, pp. 419–429.         [21] C.-C. Yen, W. Sun, H. Purmehdi, W. Park, K. R. Desh-
+[10] P. Liu, H. Xu, Q. Ouyang, R. Jiao, Z. Chen, S. Zhang,             mukh, N. Thakrar, O. Nassef, and A. Jacobs, “Graph neu-
+     J. Yang, L. Mo, J. Zeng, W. Xue et al., “Unsuper-                 ral network based root cause analysis using multivariate
+     vised detection of microservice trace anomalies through           time-series kpis for wireless networks.” in NOMS, vol.
+     service-level deep bayesian networks,” in 2020 IEEE               2022, 2022, pp. 1–7.
+     31st International Symposium on Software Reliability         [22] J. Achiam, S. Adler, S. Agarwal, L. Ahmad, I. Akkaya,
+     Engineering (ISSRE). IEEE, 2020, pp. 48–58.                       F. L. Aleman, D. Almeida, J. Altenschmidt, S. Altman,
+[11] L. Meng, F. Ji, Y. Sun, and T. Wang, “Detecting anoma-            S. Anadkat et al., “Gpt-4 technical report,” arXiv preprint
+     lies in microservices with execution trace comparison,”           arXiv:2303.08774, 2023.
+     Future Generation Computer Systems, vol. 116, pp. 291–       [23] J. Bai, S. Bai, Y. Chu, Z. Cui, K. Dang, X. Deng, Y. Fan,
+     301, 2021.                                                        W. Ge, Y. Han, F. Huang et al., “Qwen technical report,”
+[12] S. Hochreiter and J. Schmidhuber, “Long short-term                arXiv preprint arXiv:2309.16609, 2023.
+     memory,” Neural computation, vol. 9, no. 8, pp. 1735–        [24] G. Team, R. Anil, S. Borgeaud, J.-B. Alayrac, J. Yu,
+     1780, 1997.                                                       R. Soricut, J. Schalkwyk, A. M. Dai, A. Hauth, K. Mil-
+[13] J. Chung, C. Gulcehre, K. Cho, and Y. Bengio, “Em-                lican et al., “Gemini: a family of highly capable multi-
+     pirical evaluation of gated recurrent neural networks             modal models,” arXiv preprint arXiv:2312.11805, 2023.
+     on sequence modeling,” arXiv preprint arXiv:1412.3555,       [25] A. Liu, B. Feng, B. Xue, B. Wang, B. Wu, C. Lu,
+     2014.                                                             C. Zhao, C. Deng, C. Zhang, C. Ruan et al., “Deepseek-
+[14] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit,                  v3 technical report,” arXiv preprint arXiv:2412.19437,
+     L. Jones, A. N. Gomez, Ł. Kaiser, and I. Polosukhin,              2024.
+     “Attention is all you need,” Advances in neural informa-     [26] Y. Wu, Z. Li, J. M. Zhang, M. Papadakis, M. Harman,
+     tion processing systems, vol. 30, 2017.                           and Y. Liu, “Large language models in fault localisation,”
+[15] J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova,                 arXiv preprint arXiv:2308.15276, 2023.
+     “Bert: Pre-training of deep bidirectional transformers for   [27] Z. Zhang, S. Li, L. Zhang, J. Ye, C. Hu, and L. Yan,
+     language understanding,” in Proceedings of the 2019               “Llm-lade: Large language model-based log anomaly
+     conference of the North American chapter of the asso-             detection with explanation,” Knowledge-Based Systems,
+     ciation for computational linguistics: human language             vol. 326, p. 114064, 2025.
+     technologies, volume 1 (long and short papers), 2019,        [28] B. Zhu, G. Xiong, M. Yuan, Z. Shen, F. Zhu, S. Chen,
+     pp. 4171–4186.                                                    X. Dong, S. Liu, and J. Chen, “Cluster-llm: Adaptive
+[16] L. Yang, J. Li, K. Shi, S. Yang, Q. Yang, and J. Sun, “Mi-        real-time time-series anomaly detection using llms,” in
+     cromilts: Fault location for microservices based mutual           2025 IEEE International Annual Conference on Complex
+     information and lstm autoencoder,” in 2022 23rd Asia-             Systems and Intelligent Science (CSIS-IAC).          IEEE,
+     Pacific Network Operations and Management Symposium               2025, pp. 665–671.
+     (APNOMS). IEEE, 2022, pp. 1–6.                               [29] A. Kumar, S. Haiduc, P. P. Das, and P. P. Chakrabarti,
+[17] Q. Zhang, T. Jia, Z. Wu, Q. Wu, L. Jia, D. Li, Y. Tao, and        “Llms as evaluators: A novel approach to evaluate bug
+     Y. Xiao, “Fault localization for microservice applications        report summarization,” arXiv preprint arXiv:2409.00630,
+     with system logs and monitoring metrics,” in 2022 7th             2024.
+     International Conference on Cloud Computing and Big          [30] Y. Han, Q. Du, Y. Huang, J. Wu, F. Tian, and C. He, “The
+     Data Analytics (ICCCBDA). IEEE, 2022, pp. 149–154.                potential of one-shot failure root cause analysis: Collab-
+[18] F. Scarselli, M. Gori, A. C. Tsoi, M. Hagenbuchner, and           oration of the large language model and small classifier,”
+     G. Monfardini, “The graph neural network model,” IEEE             in Proceedings of the 39th IEEE/ACM International
+     transactions on neural networks, vol. 20, no. 1, pp. 61–          Conference on Automated Software Engineering, 2024,
+     80, 2008.                                                         pp. 931–943.
+[19] Z. Li, N. Zhao, M. Li, X. Lu, L. Wang, D. Chang,             [31] K. Sarda, Z. Namrud, I. Watts, L. Shwartz, S. Nagar,
+     X. Nie, L. Cao, W. Zhang, K. Sui et al., “Actionable and          P. Mohapatra, and M. Litoiu, “Augmenting automatic
+     interpretable fault localization for recurring failures in        root-cause identification with incident alerts using llm,”
+     online service systems,” in Proceedings of the 30th ACM           in 2024 34th International Conference on Collabora-
+     Joint European Software Engineering Conference and                tive Advances in Software and COmputiNg (CASCON).
+     Symposium on the Foundations of Software Engineering,             IEEE, 2024, pp. 1–10.
+     2022, pp. 996–1008.                                          [32] Y. Gao, Y. Xiong, X. Gao, K. Jia, J. Pan, Y. Bi, Y. Dai,
+[20] Y. Gan, G. Liu, X. Zhang, Q. Zhou, J. Wu, and J. Jiang,           J. Sun, H. Wang, and H. Wang, “Retrieval-augmented
+     “Sleuth: A trace-based root cause analysis system for             generation for large language models: A survey,” arXiv
+     preprint arXiv:2312.10997, vol. 2, no. 1, 2023.
+[33] L. Wang, C. Ma, X. Feng, Z. Zhang, H. Yang, J. Zhang,
+     Z. Chen, J. Tang, X. Chen, Y. Lin et al., “A survey
+     on large language model based autonomous agents,”
+     Frontiers of Computer Science, vol. 18, no. 6, p. 186345,
+     2024.
+[34] R. Ren, “The multi-agent fault localization system based
+     on monte carlo tree search approach,” arXiv preprint
+     arXiv:2507.22800, 2025.
+[35] D. Roy, X. Zhang, R. Bhave, C. Bansal, P. Las-Casas,
+     R. Fonseca, and S. Rajmohan, “Exploring llm-based
+     agents for root cause analysis,” in Companion proceed-
+     ings of the 32nd ACM international conference on the
+     foundations of software engineering, 2024, pp. 208–219.
+[36] A. Cornacchia, I. Alabdulaal, I. Saghier, A. Mirdad,
+     O. Fayoumi, and M. Canini, “Between promise and
+     pain: The reality of automating failure analysis in mi-
+     croservices with llms,” in Proceedings of the 16th ACM
+     SIGOPS Asia-Pacific Workshop on Systems, 2025, pp.
+     155–167.
+[37] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual
+     learning for image recognition,” in Proceedings of the
+     IEEE conference on computer vision and pattern recog-
+     nition, 2016, pp. 770–778.
+[38] V. Mavroudis, “Langchain v0. 3,” 2024.
+

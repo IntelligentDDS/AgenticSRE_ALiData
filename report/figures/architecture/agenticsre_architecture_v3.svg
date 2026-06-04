@@ -1,0 +1,333 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1220" viewBox="0 0 1920 1220">
+  <defs>
+    <linearGradient id="pageBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="52%" stop-color="#f7fafc"/>
+      <stop offset="100%" stop-color="#eef8f4"/>
+    </linearGradient>
+    <linearGradient id="coreBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f4c5c"/>
+      <stop offset="55%" stop-color="#14746f"/>
+      <stop offset="100%" stop-color="#1b8a78"/>
+    </linearGradient>
+    <linearGradient id="topbar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#164e63"/>
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.14"/>
+    </filter>
+    <filter id="soft" x="-12%" y="-12%" width="124%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#334155" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrowData" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#0f766e"/>
+    </marker>
+    <marker id="arrowCtrl" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#1d4ed8"/>
+    </marker>
+    <marker id="arrowLearn" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#c2410c"/>
+    </marker>
+    <style>
+      .title { font: 700 42px "Arial", "Noto Sans CJK SC", sans-serif; fill: #0f172a; letter-spacing: 0; }
+      .subtitle { font: 400 19px "Arial", "Noto Sans CJK SC", sans-serif; fill: #475569; }
+      .section-title { font: 700 22px "Arial", "Noto Sans CJK SC", sans-serif; fill: #0f172a; }
+      .section-note { font: 400 14px "Arial", "Noto Sans CJK SC", sans-serif; fill: #64748b; }
+      .label { font: 700 16px "Arial", "Noto Sans CJK SC", sans-serif; fill: #0f172a; }
+      .body { font: 400 13.5px "Arial", "Noto Sans CJK SC", sans-serif; fill: #475569; }
+      .tiny { font: 400 11.5px "Arial", "Noto Sans CJK SC", sans-serif; fill: #64748b; }
+      .white-title { font: 700 23px "Arial", "Noto Sans CJK SC", sans-serif; fill: #ffffff; }
+      .white-label { font: 700 15px "Arial", "Noto Sans CJK SC", sans-serif; fill: #ffffff; }
+      .white { font: 400 13.5px "Arial", "Noto Sans CJK SC", sans-serif; fill: #e6fffb; }
+      .pill-text { font: 700 12.5px "Arial", "Noto Sans CJK SC", sans-serif; fill: #0f172a; }
+      .panel { fill: #ffffff; stroke: #cbdde8; stroke-width: 1.3; filter: url(#shadow); }
+      .box { fill: #ffffff; stroke: #d8e5ee; stroke-width: 1.1; filter: url(#soft); }
+      .box-flat { fill: #ffffff; stroke: #d8e5ee; stroke-width: 1.1; }
+      .muted { fill: #f8fafc; stroke: #dbe7ef; stroke-width: 1; }
+      .chip-green { fill: #ecfeff; stroke: #67e8f9; stroke-width: 1; }
+      .chip-blue { fill: #eff6ff; stroke: #bfdbfe; stroke-width: 1; }
+      .chip-orange { fill: #fff7ed; stroke: #fed7aa; stroke-width: 1; }
+      .chip-purple { fill: #f5f3ff; stroke: #ddd6fe; stroke-width: 1; }
+      .data { fill: none; stroke: #0f766e; stroke-width: 3; marker-end: url(#arrowData); }
+      .ctrl { fill: none; stroke: #1d4ed8; stroke-width: 2.4; marker-end: url(#arrowCtrl); }
+      .learn { fill: none; stroke: #c2410c; stroke-width: 2.4; stroke-dasharray: 8 7; marker-end: url(#arrowLearn); }
+      .subtle { fill: none; stroke: #94a3b8; stroke-width: 1.2; }
+    </style>
+  </defs>
+
+  <rect width="1920" height="1220" fill="url(#pageBg)"/>
+  <rect x="40" y="34" width="1840" height="1152" rx="26" fill="#ffffff" opacity="0.60" stroke="#dbeafe"/>
+
+  <!-- Header -->
+  <text x="80" y="92" class="title">AgenticSRE 多智能体智能运维系统架构（细化版）</text>
+  <text x="80" y="124" class="subtitle">面向通算 K8s 与智算 vLLM 场景，形成“实时观测 → 协作诊断 → 质量验证 → 人机反馈 → 安全修复 → 持续演化”的闭环</text>
+  <g transform="translate(1350 54)">
+    <rect x="0" y="0" width="470" height="82" rx="17" fill="url(#topbar)" filter="url(#soft)"/>
+    <text x="24" y="32" class="white-title">运行闭环</text>
+    <text x="24" y="58" class="white">发现 → 假设 → 规划 → 调查 → 推理 → 验证 → 学习 → 修复</text>
+  </g>
+
+  <!-- Access layer -->
+  <g transform="translate(80 165)">
+    <rect class="panel" x="0" y="0" width="1760" height="94" rx="18"/>
+    <text x="26" y="36" class="section-title">接入与交互层</text>
+    <text x="26" y="64" class="section-note">FastAPI Dashboard · REST API · SSE · MCP Server</text>
+    <g transform="translate(500 21)">
+      <rect class="chip-blue" x="0" y="0" width="190" height="52" rx="13"/>
+      <text x="24" y="22" class="label">Web Console</text>
+      <text x="24" y="40" class="tiny">指标、Trace、RCA、HITL</text>
+      <rect class="chip-blue" x="215" y="0" width="190" height="52" rx="13"/>
+      <text x="239" y="22" class="label">RCA 实时流</text>
+      <text x="239" y="40" class="tiny">phase / event / result</text>
+      <rect class="chip-blue" x="430" y="0" width="190" height="52" rx="13"/>
+      <text x="454" y="22" class="label">实验控制台</text>
+      <text x="454" y="40" class="tiny">通算 / 智算 dry-run</text>
+      <rect class="chip-blue" x="645" y="0" width="190" height="52" rx="13"/>
+      <text x="669" y="22" class="label">治理报表</text>
+      <text x="669" y="40" class="tiny">记忆、演化、复审</text>
+    </g>
+  </g>
+
+  <!-- Left column: environments -->
+  <g transform="translate(80 305)">
+    <rect class="panel" x="0" y="0" width="360" height="620" rx="18"/>
+    <text x="24" y="38" class="section-title">被管环境与实验场</text>
+    <text x="24" y="64" class="section-note">真实负载、可复现故障、验收场景</text>
+
+    <g transform="translate(24 92)">
+      <rect class="box" x="0" y="0" width="312" height="128" rx="14"/>
+      <rect x="18" y="22" width="48" height="48" rx="12" fill="#e0f2fe"/>
+      <path d="M30 46 h24 M42 34 v24 M31 36 l22 22 M53 36 l-22 22" stroke="#0369a1" stroke-width="4" stroke-linecap="round"/>
+      <text x="82" y="30" class="label">通算 K8s 集群</text>
+      <text x="82" y="54" class="body">Social Network / AIOpsLab</text>
+      <text x="82" y="78" class="body">资源、网络、级联、灰度故障</text>
+      <text x="82" y="102" class="tiny">17 个通算故障实验场景</text>
+    </g>
+
+    <g transform="translate(24 244)">
+      <rect class="box" x="0" y="0" width="312" height="144" rx="14"/>
+      <rect x="18" y="22" width="48" height="48" rx="12" fill="#fef3c7"/>
+      <path d="M30 43 h24 M30 56 h24 M37 33 h11 a10 10 0 0 1 0 20 h-11z" fill="none" stroke="#b45309" stroke-width="4" stroke-linecap="round"/>
+      <text x="82" y="30" class="label">智算 vLLM 推理场</text>
+      <text x="82" y="54" class="body">T4 节点 / 多节点推理服务</text>
+      <text x="82" y="78" class="body">软件、驱动、网络、OS 分层</text>
+      <text x="82" y="102" class="tiny">27 个智算故障场景</text>
+      <text x="82" y="122" class="tiny">凭据运行时注入，默认 dry-run</text>
+    </g>
+
+    <g transform="translate(24 412)">
+      <rect class="box" x="0" y="0" width="312" height="144" rx="14"/>
+      <text x="24" y="32" class="label">实验与评测数据</text>
+      <text x="24" y="60" class="body">故障注入、背景流量、清理脚本</text>
+      <text x="24" y="86" class="body">RCAJudge / 对比评测 / 端到端评分</text>
+      <text x="24" y="112" class="body">复杂故障、暂态故障、干扰信号</text>
+    </g>
+  </g>
+
+  <!-- Observability and tools -->
+  <g transform="translate(500 305)">
+    <rect class="panel" x="0" y="0" width="390" height="620" rx="18"/>
+    <text x="24" y="38" class="section-title">观测与工具层</text>
+    <text x="24" y="64" class="section-note">Tool Registry 统一封装，多源证据并行获取</text>
+
+    <g transform="translate(24 92)">
+      <rect class="box-flat" x="0" y="0" width="342" height="72" rx="12"/>
+      <circle cx="34" cy="36" r="20" fill="#dcfce7"/>
+      <path d="M24 38 l8 8 l18 -22" fill="none" stroke="#15803d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="68" y="30" class="label">Prometheus</text>
+      <text x="68" y="54" class="body">指标、告警、资源/业务时序</text>
+    </g>
+    <g transform="translate(24 178)">
+      <rect class="box-flat" x="0" y="0" width="342" height="72" rx="12"/>
+      <circle cx="34" cy="36" r="20" fill="#fee2e2"/>
+      <path d="M23 28 h22 M23 37 h28 M23 46 h18" stroke="#b91c1c" stroke-width="4" stroke-linecap="round"/>
+      <text x="68" y="30" class="label">Logs / Elasticsearch</text>
+      <text x="68" y="54" class="body">错误日志、异常栈、服务上下文</text>
+    </g>
+    <g transform="translate(24 264)">
+      <rect class="box-flat" x="0" y="0" width="342" height="72" rx="12"/>
+      <circle cx="34" cy="36" r="20" fill="#e0e7ff"/>
+      <path d="M22 45 c20 -28 31 28 50 0" fill="none" stroke="#4f46e5" stroke-width="4" stroke-linecap="round"/>
+      <text x="68" y="30" class="label">Jaeger Trace</text>
+      <text x="68" y="54" class="body">慢 span、依赖路径、级联定位</text>
+    </g>
+    <g transform="translate(24 350)">
+      <rect class="box-flat" x="0" y="0" width="342" height="72" rx="12"/>
+      <circle cx="34" cy="36" r="20" fill="#f0fdfa"/>
+      <path d="M22 48 h25 l-9 -12 h22 l-10 -14" fill="none" stroke="#0f766e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="68" y="30" class="label">Kubernetes</text>
+      <text x="68" y="54" class="body">Pod、节点、事件、变更与操作</text>
+    </g>
+    <g transform="translate(24 436)">
+      <rect class="box-flat" x="0" y="0" width="342" height="72" rx="12"/>
+      <circle cx="34" cy="36" r="20" fill="#fae8ff"/>
+      <path d="M22 48 l16 -24 l12 18 l10 -10 l12 16" fill="none" stroke="#a21caf" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="68" y="30" class="label">Anomaly / Graph RCA</text>
+      <text x="68" y="54" class="body">异常检测、拓扑关联、根因定位</text>
+    </g>
+    <g transform="translate(24 532)">
+      <rect class="chip-orange" x="0" y="0" width="342" height="58" rx="13"/>
+      <text x="24" y="24" class="label">ActionStack</text>
+      <text x="24" y="44" class="body">操作记录、审批执行、回滚保护</text>
+    </g>
+  </g>
+
+  <!-- Core orchestration -->
+  <g transform="translate(950 305)">
+    <rect x="0" y="0" width="500" height="620" rx="22" fill="url(#coreBg)" filter="url(#shadow)"/>
+    <text x="30" y="42" class="white-title">编排核心与诊断闭环</text>
+    <text x="30" y="68" class="white">RCAEngine · Pipeline · Daemon · Session · CollaborationOptimizer</text>
+
+    <g transform="translate(30 96)">
+      <rect x="0" y="0" width="440" height="72" rx="14" fill="#ffffff" opacity="0.15" stroke="#99f6e4"/>
+      <text x="20" y="28" class="white-label">协作策略选择</text>
+      <text x="20" y="52" class="white">plan-execute · memory-augmented · ReAct · debate/reflection</text>
+    </g>
+
+    <g transform="translate(30 190)">
+      <rect x="0" y="0" width="440" height="112" rx="14" fill="#ffffff" opacity="0.96"/>
+      <text x="20" y="30" class="label">五阶段 Pipeline</text>
+      <g transform="translate(20 52)">
+        <rect class="chip-green" x="0" y="0" width="72" height="34" rx="17"/><text class="pill-text" x="22" y="22">发现</text>
+        <rect class="chip-green" x="82" y="0" width="72" height="34" rx="17"/><text class="pill-text" x="104" y="22">假设</text>
+        <rect class="chip-green" x="164" y="0" width="72" height="34" rx="17"/><text class="pill-text" x="186" y="22">规划</text>
+        <rect class="chip-green" x="246" y="0" width="72" height="34" rx="17"/><text class="pill-text" x="268" y="22">调查</text>
+        <rect class="chip-green" x="328" y="0" width="72" height="34" rx="17"/><text class="pill-text" x="350" y="22">推理</text>
+      </g>
+      <text x="20" y="96" class="tiny">每个阶段通过 SSE 暴露状态、证据与中间结论</text>
+    </g>
+
+    <g transform="translate(30 324)">
+      <rect x="0" y="0" width="440" height="142" rx="14" fill="#ffffff" opacity="0.96"/>
+      <text x="20" y="30" class="label">质量验证与二次取证</text>
+      <rect class="chip-purple" x="20" y="50" width="126" height="34" rx="11"/><text class="pill-text" x="40" y="72">RCAJudge</text>
+      <rect class="chip-purple" x="158" y="50" width="126" height="34" rx="11"/><text class="pill-text" x="178" y="72">Critic 反思</text>
+      <rect class="chip-purple" x="296" y="50" width="126" height="34" rx="11"/><text class="pill-text" x="316" y="72">类型校准</text>
+      <rect class="chip-green" x="20" y="94" width="194" height="34" rx="11"/><text class="pill-text" x="48" y="116">Diagnosis Closure</text>
+      <rect class="chip-green" x="226" y="94" width="196" height="34" rx="11"/><text class="pill-text" x="252" y="116">Targeted Agents</text>
+    </g>
+
+    <g transform="translate(30 488)">
+      <rect x="0" y="0" width="440" height="92" rx="14" fill="#ffffff" opacity="0.15" stroke="#99f6e4"/>
+      <text x="20" y="31" class="white-label">输出</text>
+      <text x="20" y="55" class="white">结构化 RCA 报告、证据链、置信度、修复建议、复审原因</text>
+    </g>
+  </g>
+
+  <!-- Agent group -->
+  <g transform="translate(950 970)">
+    <rect class="panel" x="0" y="0" width="500" height="140" rx="18"/>
+    <text x="24" y="34" class="section-title">专用智能体群</text>
+    <text x="24" y="60" class="section-note">按证据域并行调查，结果进入相关性汇总与最终推理</text>
+    <g transform="translate(24 78)">
+      <rect class="chip-purple" x="0" y="0" width="104" height="34" rx="10"/><text class="pill-text" x="17" y="22">Alert</text>
+      <rect class="chip-purple" x="116" y="0" width="104" height="34" rx="10"/><text class="pill-text" x="132" y="22">Metric</text>
+      <rect class="chip-purple" x="232" y="0" width="104" height="34" rx="10"/><text class="pill-text" x="254" y="22">Log</text>
+      <rect class="chip-purple" x="348" y="0" width="104" height="34" rx="10"/><text class="pill-text" x="366" y="22">Trace</text>
+      <rect class="chip-green" x="0" y="44" width="104" height="34" rx="10"/><text class="pill-text" x="20" y="66">Event</text>
+      <rect class="chip-green" x="116" y="44" width="104" height="34" rx="10"/><text class="pill-text" x="132" y="66">Profiling</text>
+      <rect class="chip-green" x="232" y="44" width="104" height="34" rx="10"/><text class="pill-text" x="248" y="66">Planning</text>
+      <rect class="chip-green" x="348" y="44" width="104" height="34" rx="10"/><text class="pill-text" x="358" y="66">Correlation</text>
+    </g>
+  </g>
+
+  <!-- Memory and governance -->
+  <g transform="translate(1510 305)">
+    <rect class="panel" x="0" y="0" width="330" height="620" rx="18"/>
+    <text x="24" y="38" class="section-title">记忆、治理与演化层</text>
+    <text x="24" y="64" class="section-note">从一次诊断走向持续学习和可审计治理</text>
+
+    <g transform="translate(24 92)">
+      <rect class="box" x="0" y="0" width="282" height="82" rx="13"/>
+      <text x="20" y="28" class="label">FaultContextStore</text>
+      <text x="20" y="51" class="body">故障规则、历史案例、领域上下文</text>
+      <text x="20" y="70" class="tiny">ChromaDB + JSON fallback</text>
+    </g>
+    <g transform="translate(24 194)">
+      <rect class="box" x="0" y="0" width="282" height="82" rx="13"/>
+      <text x="20" y="28" class="label">ContextLearner</text>
+      <text x="20" y="51" class="body">从高质量 RCA 中抽取可复用规则</text>
+      <text x="20" y="70" class="tiny">质量门禁后进入知识库</text>
+    </g>
+    <g transform="translate(24 296)">
+      <rect class="box" x="0" y="0" width="282" height="82" rx="13"/>
+      <text x="20" y="28" class="label">HumanReviewStore</text>
+      <text x="20" y="51" class="body">专家确认、拒绝、纠错与复审队列</text>
+      <text x="20" y="70" class="tiny">低分或争议结果进入 HITL</text>
+    </g>
+    <g transform="translate(24 398)">
+      <rect class="box" x="0" y="0" width="282" height="82" rx="13"/>
+      <text x="20" y="28" class="label">EvolutionTracker</text>
+      <text x="20" y="51" class="body">演化快照、趋势、准确率提升验证</text>
+      <text x="20" y="70" class="tiny">记录策略、评分、延迟、反馈</text>
+    </g>
+    <g transform="translate(24 512)">
+      <rect class="chip-orange" x="0" y="0" width="282" height="66" rx="13"/>
+      <text x="20" y="28" class="label">治理原则</text>
+      <text x="20" y="50" class="body">可解释 · 可追溯 · 可审计 · 可回滚</text>
+    </g>
+  </g>
+
+  <!-- Remediation -->
+  <g transform="translate(80 970)">
+    <rect class="panel" x="0" y="0" width="810" height="140" rx="18"/>
+    <text x="24" y="34" class="section-title">安全修复与验证出口</text>
+    <text x="24" y="60" class="section-note">RemediationAgent 生成建议，人工审批后通过 ActionStack 执行并保留回滚路径</text>
+    <g transform="translate(24 80)">
+      <rect class="chip-orange" x="0" y="0" width="178" height="38" rx="12"/><text class="pill-text" x="28" y="24">修复建议</text>
+      <rect class="chip-orange" x="204" y="0" width="178" height="38" rx="12"/><text class="pill-text" x="232" y="24">人工审批</text>
+      <rect class="chip-orange" x="408" y="0" width="178" height="38" rx="12"/><text class="pill-text" x="436" y="24">受控执行</text>
+      <rect class="chip-orange" x="612" y="0" width="150" height="38" rx="12"/><text class="pill-text" x="642" y="24">回滚验证</text>
+    </g>
+  </g>
+
+  <!-- Orthogonal arrows, kept in gutters -->
+  <!-- Access to core -->
+  <path class="ctrl" d="M960 259 L960 285 L1200 285 L1200 305"/>
+  <!-- Environment to tools -->
+  <path class="data" d="M440 612 L470 612 L470 612 L500 612"/>
+  <!-- Tools to core -->
+  <path class="data" d="M890 612 L920 612 L920 612 L950 612"/>
+  <!-- Core to memory -->
+  <path class="data" d="M1450 612 L1480 612 L1480 612 L1510 612"/>
+  <!-- Tools to agents, routed through lower gutter -->
+  <path class="ctrl" d="M695 925 L695 950 L915 950 L915 1040 L950 1040"/>
+  <!-- Agents to core, routed on center line -->
+  <path class="data" d="M1200 970 L1200 948 L1200 925"/>
+  <!-- Core to remediation, routed beside the core to avoid the agent panel -->
+  <path class="ctrl" d="M950 820 L920 820 L920 930 L890 930 L890 1040"/>
+  <!-- Remediation back to environment -->
+  <path class="ctrl" d="M80 1040 L52 1040 L52 612 L80 612"/>
+  <!-- Memory feedback to core, top gutter -->
+  <path class="learn" d="M1510 360 L1475 360 L1475 282 L1280 282 L1280 305"/>
+  <!-- HITL/evolution feedback, routed in the right/bottom outer gutter -->
+  <path class="learn" d="M1675 925 L1675 1132 L1220 1132 L1220 1110"/>
+  <!-- Results to dashboard -->
+  <path class="ctrl" d="M1340 925 L1340 946 L1340 970"/>
+
+  <!-- Flow labels -->
+  <g transform="translate(454 586)">
+    <rect x="0" y="0" width="92" height="24" rx="12" fill="#ffffff" stroke="#99f6e4"/>
+    <text x="13" y="16" class="tiny">遥测信号</text>
+  </g>
+  <g transform="translate(902 586)">
+    <rect x="0" y="0" width="92" height="24" rx="12" fill="#ffffff" stroke="#99f6e4"/>
+    <text x="13" y="16" class="tiny">证据上下文</text>
+  </g>
+  <g transform="translate(1458 586)">
+    <rect x="0" y="0" width="92" height="24" rx="12" fill="#ffffff" stroke="#99f6e4"/>
+    <text x="13" y="16" class="tiny">诊断产物</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(80 1148)">
+    <line x1="0" y1="0" x2="42" y2="0" class="data"/>
+    <text x="56" y="5" class="tiny">数据 / 证据流</text>
+    <line x1="180" y1="0" x2="222" y2="0" class="ctrl"/>
+    <text x="236" y="5" class="tiny">控制 / 执行流</text>
+    <line x1="370" y1="0" x2="412" y2="0" class="learn"/>
+    <text x="426" y="5" class="tiny">反馈 / 演化流</text>
+  </g>
+  <text x="1280" y="1170" class="tiny">AgenticSRE architecture v3 · module boundaries and flows mapped from local codebase</text>
+</svg>

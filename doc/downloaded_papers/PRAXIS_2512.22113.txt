@@ -1,0 +1,1063 @@
+                                                       P RAXIS: Integrating Program Analysis with
+                                                          Observability for Root-Cause Analysis
+                                                                          Shengkun Cui† , Rahul Krishna‡ , Saurabh Jha‡ , Ravishankar K. Iyer†
+                                            † University of Illinois Urbana-Champaign, Urbana, IL 61801, USA ‡ IBM Research, Yorktown Heights, NY 10598, USA
+                                                                                  † {scui8, rkiyer}@illinois.edu ‡ {rkrsn, Saurabh.Jha}@ibm.com
+
+
+
+                                             Abstract—Unresolved production cloud incidents cost an av-                     2) An application of the hammock block program dependence
+                                          erage of over $2M per hour. This paper introduces P RAXIS,                        graph for agentic RCA, leveraging the hammock block’s
+                                          an orchestrator that manages and deploys an agentic workflow                      hierarchical nesting structure to analyze microservice code
+                                          for diagnosing code- and configuration-caused cloud incidents.
+                                                                                                                            at multi-granular levels seamlessly.
+
+
+
+
+arXiv:2512.22113v3 [cs.DC] 29 Apr 2026
+                                          P RAXIS employs an LLM-driven structured traversal over two
+                                          types of graph: (1) a service dependency graph (SDG) that                         3) Code-Cloud-RCA Benchmark, integrated into ITBench [10],
+                                          captures microservice-level dependencies; and (2) a hammock-                      consisting of 30 different scenarios, each incorporating a unique
+                                          block program dependence graph (PDG) that captures code-level                     software, configuration, deployment, or resource-related fault
+                                          dependencies for each microservice. Compared to state-of-the-                     observed in the real world [3]–[5], [11]–[14] and injected into
+                                          art ReAct baselines, P RAXIS improves RCA accuracy by up
+                                          to 6.3× while reducing token consumption by 5.3×. P RAXIS is                      a live Kubernetes cloud environment.
+                                          demonstrated on a set of 30 comprehensive real-world incidents                    4) A demonstration of P RAXIS’s agentic capabilities to perform
+                                          that is being compiled into an RCA benchmark.                                     cross SDG-PDG traversal to diagnose a challenging incident.
+                                             Index Terms—Cloud computing, agents, agentic approach, in-                        Results. We evaluated P RAXIS’s RCA effectiveness in terms
+                                          cident diagnosis, root-cause analysis, program analysis, reliability              of root cause accuracy and token consumptions across those 30
+                                                                                                                            scenarios. P RAXIS achieved a root-cause reasoning accuracy
+                                                                     I. I NTRODUCTION
+                                                                                                                            of 61.5% and a root-cause identification accuracy of 73.9%, an
+                                             Production cloud incidents cost an average of over $2M                         increase of 6.3× and 3.4×, respectively, over state-of-the-art
+                                          per hour [1], [2]. While operational mitigation actions such as                   ReAct baselines [15], [16]. In addition, P RAXIS reduced token
+                                          reboot, restart, scale-out, and rollback can resolve many such                    consumption by 5.3×, from 884.9k tokens to 166.5k tokens
+                                          incidents, approximately 24% are not resolved by operational                      per successful diagnosis, compared to the same baselines.
+                                          mitigation [3]. In those cases, engineers supported by tools must                    An important reason for P RAXIS’s effectiveness gain is its
+                                          perform root-cause analysis (RCA), a diagnostic process that                      ability to reduce the context space and focus microservice-
+                                          identifies the origin (i.e., root causes) of a failure. When RCA is               and code-level analysis on the regions most implicated by
+                                          ineffective, outages can be prolonged and highly disruptive [4]–                  an incident, guided by the underlying dependency structure.
+                                          [7].                                                                              Prior work [15]–[20] does not impose such a structure and
+                                             This paper introduces P RAXIS, an orchestrator that manages                    relies entirely on the LLM’s built-in autoregressive analysis
+                                          and deploys an agentic workflow for diagnosing code- and                          over unstructured, plain-text prompts, which is shown to be
+                                          configuration-caused cloud incidents. P RAXIS employs an                          less effective. P RAXIS instead explicitly constrains the LLM’s
+                                          LLM-driven structured traversal over two types of graph: (1)                      reasoning along graph-defined dependencies via LLM-driven
+                                          a service dependency graph (SDG) that captures microservice-                      graph traversal.
+                                          level dependencies; and (2) a hammock- block [8], [9] program
+                                          dependence graph (PDG) that captures code-level dependencies                                              II. T ERMINOLOGY
+                                          for each microservice. Together, these graphs efficiently encode
+                                          microservice- and code-level dependencies. By explicitly and                         Root cause analysis (RCA). Following the understanding
+                                          jointly imposing both microservices and code dependency                           espoused in [21], RCA is the diagnostic process that (1)
+                                          structures in the agentic RCA workflow, P RAXIS extends the                       identifies the microservice responsible for the incident and (2)
+                                          diagnosis beyond observability symptoms, making it capable                        the statement(s), function(s), or configuration(s) identifying the
+                                          of identifying and explaining root causes that lie in code                        origin of the incident, and (3) provides concise reasoning about
+                                          or configurations. We demonstrate the breadth of P RAXIS                          its propagation and manifestation to facilitate remediation.
+                                          using 30 real-world examples, integrated into a comprehensive                        Service dependency graph (SDG). The service dependency
+                                          benchmark that is open-sourced.                                                   graph of a cloud application is a directed graph with nodes rep-
+                                             Contribution. Our main contributions are as follows:                           resenting individual microservices and directed edges showing
+                                          1) P RAXIS, an agentic approach for cloud incident RCA with                       the dependency between them. In any given interval, the graph
+                                          structured, LLM-driven graph reasoning and traversal that                         represents the current dynamics among the microservices.
+                                          utilizes microservices and program dependency graphs.
+                                                                                                                              P RAXIS implementation and benchmark scenarios used in this paper are
+                                         © 2026 IEEE. Personal use of this material is permitted. Permission from           publicly available at https://doi.org/10.5281/zenodo.19163486.
+                                         IEEE must be obtained for all other uses, in any current or future media,
+                                         including reprinting/republishing this material for advertising or promotional
+                                         purposes, creating new collective works, for resale or redistribution to servers
+                                         or lists, or reuse of any copyrighted component of this work in other works.
+                                         Accepted to appear in The 56th Annual IEEE/IFIP International Conference
+                                         on Dependable Systems and Networks.
+   Program dependence graph (PDG). A directed graph that                  Together, the SDG and PDG capture relevant microservice-
+captures microservice program structure [22]; the nodes are            level and code-level dependencies for RCA. These graphs
+hammock blocks [8], [9] and the edges are data, control, and           serve as bases for RCA via LLM-driven graph traversal, first
+call dependencies.                                                     at the microservice level and subsequently at the code level,
+   Hammock block. A hammock block restructures unstruc-                to identify responsible microservices, faulty code sites, and/or
+tured code into a structured block corresponding to a single-          configurations that might explain the observed erroneous signals
+entry, single-exit (SESE) region in code [8], [9].                     (such as active alerts, error logs, traces, metrics, and events),
+   Observability. In microservices, observability is the ability       providing in-depth RCA down to the code level.
+to infer the distributed system’s internal state from its generated       Structure-aware agentic RCA. After being triggered by
+data (e.g., logs, metrics, events, and distributed traces), enabling   active golden-signal alert(s), P RAXIS presents the relevant data
+real-time insight through analysis.                                    (active alert(s) and error traces) to an LLM to identify and select
+   Code context. Code context refers to code-related informa-          microservices correlated with error signals in those data. The
+tion.                                                                  selected microservices become initial candidates for agentic
+                                                                       focus. Subsequently, the LLM investigates each microservice by
+                  III. A PPROACH OVERVIEW                              performing structure-aware reasoning through traversal of the
+   This section introduces P RAXIS, an orchestrator that manages       corresponding hammock blocks. P RAXIS uniquely constructs
+and deploys an agentic workflow for cloud incident RCA. At             the PDG using hammock blocks at different granularities
+the core of this approach is an LLM-driven structure traversal         spanning module, class, function, and statement levels, allowing
+over two types of graph: (1) an SDG that captures microservice-        the LLM to seamlessly move between levels as required to
+level dependencies (providing a high-level localization of faulty      optimize analysis efficiency and accuracy. Leveraging this
+microservices); and (2) a hammock-block PDG that captures              structure, the LLM iteratively traverses first the SDG and
+code-level dependencies for each microservice (allowing for            then the hammock-block PDG at the required level to narrow
+fine-grained RCA decisions that identify offending code paths          down the pool of potentially responsible microservices and
+and configurations responsible for the incident). P RAXIS’s            the corresponding fault sites in code or configuration, until it
+hammock-block PDG provides an efficient structural represen-           reaches a conclusive decision on the root cause.
+tation of a microservice program, enabling seamless analysis              Unlike prior agentic approaches that process code as
+of microservice code at different granularities. By integrating        monolithic text [16], [20] for RCA, P RAXIS provides an
+tools, observability data, and dependency graphs, P RAXIS              efficient approach for strategically traversing the SDG and
+delivers demonstratively accurate RCA for live cloud incidents,        the corresponding hammock blocks in PDG, analyzing local
+demonstrated on microservice-based Kubernetes applications.            code context alongside observability data. The graph traversal
+In summary, the core functionalities of P RAXIS’s workflow             constrains the LLM’s diagnosis to incident-relevant dependency
+include the following.                                                 paths and accumulates code insights that could explain the
+   Data gathering. Like prior agentic approaches [15]–[20],            observed error signals (e.g., alerts, error traces, error logs),
+[23], P RAXIS uses cloud monitoring tools [24]–[26] to actively        while filtering out irrelevant paths. Thus, instead of relying
+collect a set of automated and user-specified alerts referred to       solely on the LLM’s attention mechanism to implicitly infer
+as golden-signal alerts (e.g., error-rates or latencies exceeding      code structure and focus on context relevant to the incident,
+user-defined thresholds) and observability data consisting of          P RAXIS’s workflow explicitly imposes structure-aware, concise,
+cloud application and microservice logs, distributed traces of         and accurate diagnosis of the underlying incident. Based on the
+microservice calls, Kubernetes events, and application metrics.        observability data and the accumulated code insights, the LLM
+P RAXIS also actively retrieves microservice topology, as in [27],     classifies the microservice under investigation as P RIMARY
+[28], using a cloud topology monitoring platform [29], which is        FAILURE, S YMPTOM O NLY, or U NRELATED. Upon finishing
+used to build the SDG. In addition, P RAXIS uses microservice          its investigation of the current microservice, P RAXIS moves
+codebases for constructing PDG for microservices.                      on to investigate the other selected microservices and the
+   SDG and PDG construction. As the key differentiator                 dependees according to the SDG. Once all initially selected
+from prior work [16], [20], P RAXIS’s agentic workflow utilizes        microservices and their dependees have been investigated,
+two modalities of graphs. The first is a dynamically evolving          P RAXIS calls the LLM to consolidate the per-microservice
+service dependency graph [27], [28] for the cloud application,         investigation decision into a final RCA report detailing the
+with currently deployed microservices as nodes and inter-              fault’s origin, propagation, and impact.
+microservices dependencies as edges, generated via a real-                Cross-SDG-PDG traversal: a challenging scenario. A key
+time topology monitor [29]. The second is a hammock-                   innovation of our approach is the ability to handle incidents
+granularity PDG for each microservice node in the SDG, with            for which multiple microservices are identified as potential
+hammock blocks as nodes and control, data, and function-               root causes. In such cases, the LLM must traverse from the
+call dependencies as edges. This PDG is generated by static            first microservice into its specific hammock block within the
+program analysis tools [30], [31] and represents the software          PDG, and then transition to a second microservice, according
+dependency of a microservice application relevant to root-cause        to the SDG and its respective hammock blocks, to form a
+analysis.                                                              coherent and holistic RCA decision. P RAXIS facilitates this by
+Rec. SVC Hammock Block in PDG                            4 Agentic RCA Outputs                                         Phase 1: Data Gathering and
+                                                                                                                     Dependency Graphs Construction
+  logger.info(“Querying external product database.")   ReAct Baseline                                Cloud
+  while True:                                                                                  !   Incident
+   with socket.socket(socket.SOCK_STREAM) as s:        gRPC `UNAVAILABLE` errors                         Observability
+                                                                                                                                  Incident Context
+ 2 s.connect((productdb_addr, productdb _port))        (code 14) returned by                                 Data        Error     Error Traces: Frontend::GET [HTTP500] ->
+    response = json.loads(s.recv(1024))                                                                     (Tools:     Traces     RecommendationService.ListRecommendation
+                                                       `recommendation` service
+    additional_products = response.get("products")                                                      OpenTelemetry,             [gRPC13]->product-catalog.ListProducts [gRPC 0]
+    if len(additional_products) > 0:                   due to application-level failure.                    Jaeger)
+                                                                                                                                  Sustained Alert(s): Frontend: Request Error Rate
+      break                                                                                                 Alerts     Sustained
+                                                                                                                                  is above 0 (current value: 1.35).
+                                                                                                            (Tool:
+                                   3                                                                     Prometheus)     alert(s)
+
+              1                   External             PRAXIS                                                                                                   Payment
+Frontend                          Product DB           External productdb encountered                     Service         Closest to      Ingress                            Flagd
+                                                       store-corrupt and fell back to                   dependency      sustained alert       Frontend
+                                                                                                                                                                  Ad
+                                                                                                           graph
+                       Flagd                           empty product cache, causing                       (Tool:                                                 Reco.
+                                                                                                                                                                            Product
+                                                                                                                                                                            Catalog
+                                        Product-       `Recommendation Service` to stall                 Datadog)                            Service Dependency Graph
+        Recommendation                  catalog        in an infinite socket.recv loop,
+Service Dependency Graph                               introducing ~15s latency.                                                                    ListRec()
+                                                                                                        Microservice
+                                                                                                        codebases          Construct
+                                                                                                                                           Exp                    GetProdList()
+Fig. 1: Incident: Degraded external database returned empty                                                (Tool:
+                                                                                                         Tree-sitter,
+                                                                                                                                                    Try-catch
+                                                                                                                                                                            ListProd()
+responses, triggering a silent retry loop in the Recommendation                                            CLDK)                          Return                Exp
+
+                                                                                                                                           Program Dependence Graph of
+service that manifested solely as a high-latency alert associated                                                                            Recommendation Service
+with the Recommendation service, without explicit error logs
+                                                                                           Fig. 2: P RAXIS Phase 1: Data gathering and dependency graph
+or error traces. Cross-SDG-PDG traversal: (1) LLM selects
+                                                                                           construction.
+the Recommendation service for investigation based on the
+observed alert. (2) Investigation of the Recommendation service                            report (Figure 6) that provides (1) root-cause identification and
+reveals a silent retry loop with missing error logs. Code traversal                        (2) root-cause reasoning down to the responsible statements,
+shows that an unresponsive External Product Database triggers                              functions, or configurations.
+this loop. (3) Subsequent investigation shows a storage failure
+in the External Product DB as the root cause. (4) The ReAct                                A. Phase 1: Data Gathering
+agent baseline fails to pinpoint the precise root cause, whereas                              In Phase 1 (Figure 2) of the agentic RCA workflow, P RAXIS
+P RAXIS successfully isolates the root cause.                                              leverages cloud monitoring tools [24]–[26] to actively monitor
+                                                                                           alerts (e.g., error rates, latency). Upon detecting a sustained alert
+attaching the PDG of each microservice to the global SDG,                                  indicating a sustained SLO violation, it collects and aggregates
+ensuring that the LLM can perform these cross-layer traversals                             the relevant observability data to construct the incident context,
+when needed. We demonstrate the necessity of this unique                                   as detailed below.
+capability in Figure 1, using a challenging incident that the                              1) Alerts. Alerts signal service-level objective (SLO) violations,
+baseline ReAct agent failed to solve.                                                      including high latencies and elevated error rates. P RAXIS
+                                                                                           continuously polls the Prometheus API for any active sustained
+                       IV. P RAXIS : M ETHODOLOGY
+                                                                                           alerts; these alerts serve as the initial triggers for P RAXIS’s
+   This section details the methodology of P RAXIS, which                                  RCA workflow.
+employs an iterative reasoning process to perform RCA on                                   2) Distributed error traces. Distributed error traces, obtained
+cloud incidents. P RAXIS operates in the following phases:                                 via cloud-native observability tools (e.g., OpenTelemetry and
+Phase 1 (§IV-A, Figure 2): Data gathering and dependence                                   Jaeger), record runtime request latencies and propagations of
+graph construction. P RAXIS collects the incident context: error                           inter-service requests, explicitly highlighting error dependency
+traces from Jaeger [25], sustained alerts from Prometheus [24],                            paths across microservice boundaries for initial fault localiza-
+the SDG snapshot from the cloud topology monitoring plat-                                  tion.
+form [29], and the PDG, constructed using Tree-sitter [30] and                             3) Logs. Cloud application and microservices log entries
+CLDK [31], from the microservice source code.                                              and their associated error/warning patterns1 provide rich
+Phase 2 (§IV-B, Figure 3): Microservice candidate(s)                                       runtime context (e.g., information, warnings, errors, stack traces,
+selection. Using the incident context (i.e., error traces and                              exceptions), offering direct insight into the timing and nature
+sustained alerts), P RAXIS employs an LLM to identify initial                              of runtime executions, errors, and failures.
+root-cause candidate microservices.                                                        4) Events. Kubernetes events regarding deployment updates
+Phase 3 (§IV-C, Figures 4 and 5): RCA decision-making.                                     and lifecycle changes that affect the microservice or its
+P RAXIS directs an LLM to iteratively traverse the microser-                               resources (e.g., ReplicaSet scaling, container restarts) pro-
+vice’s PDG to construct program context and diagnose code                                  vide diagnostic context on deployment/resource configuration
+regions relevant to the incident, then assign an RCA judgment                              changes that could reveal the root cause.
+(P RIMARY FAILURE, S YMPTOM O NLY, or U NRELATED)                                          5) Metrics include aggregated error and warning counts derived
+before advancing to the next microservice as suggested by                                  from logs and events, alongside span and trace latency
+the SDG.                                                                                   measurements to quantify the severity of observed anomalies.
+Phase 4 (§IV-D, Figure 6): Final RCA summary. Upon               1 To avoid context overflow, only the K most recent entries are collected.
+completing all investigations, P RAXIS consolidates the LLM’s We set K = 40 for our evaluation, as empirical testing showed that increasing
+judgments and reasoning to generate a comprehensive RCA the value further does not significantly alter RCA accuracy.
+   P RAXIS aggregates sustained alerts and error traces into the                                          Phase 2: Microservice Candidates
+incident context, which serves as the initial description of the                                                     Selection
+cloud incident. Moreover, logs, metrics, and events will be                Incident Context
+                                                                                                                 LLM               Selected Microservice Candidate
+used in Phase 3 for per-microservice investigation.                       - Error Traces
+                                                                          - Sustained Alert(s)                                     Name: Recommendation,
+   Figure 2 illustrates an example incident context for a                                                      Initial Entity
+                                                                                                                 Selection
+                                                                                                                                   Kind: Service,
+                                                                                                                  Prompt           Reason for selection: Recommendation?s
+cloud incident in which the Frontend service is unable to                      Service                                             ListRecommendations server span shows
+                                                                          Dependency Graph
+recommend products: (1) a sustained Request Error Rate                                                                             fault: returning gRPC 13...while
+                                                                                      Payment
+                                                                                                               Microservice        product-catalog succeeds (gRPC 0),
+alert is observed in the Frontend service, and (2) the corre-                           Ad
+                                                                                                 Flagd
+                                                                                                               candidate(s)        matching the elevated error-rate alert and
+                                                                                                                                   propagated frontend/frontend-proxy
+sponding error traces reveal gRPC13 errors during calls to the             Frontend
+
+
+
+
+                                                                                       Reco.
+                                                                                                Product
+                                                                                                Catalog
+                                                                                                          Initializes
+                                                                                                                                   failures.
+                                                                                                                   Investigation
+Recommendation.ListRecommendation endpoint.                                                                          Narrative
+SDG & PDG P RAXIS’s agentic workflow utilizes two graphs:
+                                                                        Fig. 3: P RAXIS Phase 2: Initial microservice candidate(s)
+(1) a dynamically evolving SDG for the cloud application,
+                                                                        selection.
+representing the current microservices configuration that is
+being deployed and executed; and (2) a hammock-block PDG                snippets, and λE includes dependency type (control-flow, data-
+for each microservice node in the SDG, representing the                 flow, or caller-callee) and associated variable or function names.
+software dependency of a microservice program relevant to               A containment relation ≺ specifies when one hammock block
+root-cause analysis. Together, these graphs capture relevant            syntactically contains another, inducing a hierarchical structure
+microservice-level and code-level dependencies and serve as             over module-, class-, function-, and statement-level regions.
+bases for agentic RCA via LLM-driven graph traversal. P RAXIS           This hierarchy allows P RAXIS to traverse and reason about the
+constructs these graphs in Phase 1 after gathering data, as shown       program at the most informative granularity for RCA.
+in Figure 2.                                                               Provided with the microservice codebases, P RAXIS auto-
+       a) Service dependency graph (SDG): P RAXIS employs               matically generates the PDG for microservices as part of the
+a service dependency graph (SDG) to capture the currently               initialization process, using static program analysis tools: Tree-
+deployed microservices and their dependencies at the time of            sitter [30] for parsing hammock blocks and CLDK [31] for data,
+the incident. A SDG models the dependency structure of a cloud          call, and control relationship analysis. The PDGs generated
+application C = {e1 , . . . , en }, where each ei is a microservice     are stored as adjacency lists in JSON files. This ensures a
+or one of its associated resources (pod or ConfigMap) [27],             lightweight, language-agnostic universal format that facilitates
+[28]. It is defined as a directed graph GC = (V, Edepend , λV )         efficient storage, management, update, and query. During
+with V = C, where an edge (u, v) indicates that microservice            agentic RCA, P RAXIS loads the PDG for each microservice
+u depends on v (another microservice or one of its resources),          under investigation at runtime.
+and non-microservice nodes serve as leaves with no outgoing                Figure 2 shows a representative PDG of the Recommendation
+edges. Each node is annotated by λV to record its kind and              service from [32], comprising function- and statement-level
+name, completing the definition of the SDG. The SDG GC is               hammock blocks.3 Exp denotes expression statements (blocks
+constructed and maintained by a cloud topology monitor [29].            of contiguous, straight-line statements without branching),
+To capture the dynamic nature of the cloud environment, the             whereas other nodes represent branching logic (e.g., the
+graph is updated at predefined intervals. Consequently, P RAXIS         try-catch node). Function-level blocks are explicitly labeled
+retrieves the graph snapshot at the time of the alert to bootstrap      with function names (e.g., the GetProdList() node).
+the RCA process. Since the investigation can extend to non-
+microservice cloud components such as a pod or a configMap              B. Phase 2: Microservice Candidate(s) Selection
+associated with a microservice, we hereinafter refer to a node
+in the SDG as an entity. Figure 2 presents an example SDG2                 In Phase 2 (Figure 3), P RAXIS invokes an LLM to select
+of the cloud application [32] employed by our benchmark.                an initial set of cloud microservice candidates potentially
+       b) Program dependence graph (PDG): To perform fine-              responsible for the incident to start the investigation process
+grained diagnosis, P RAXIS augments each microservice node              using the SDG and the incident context from Phase 1. P RAXIS
+in the SDG with a program dependence graph (PDG) [22],                  prompts the LLM (denoted by M) with ψselect , conditioning
+enabling reasoning over code paths and potential fault sites.           the selection on the SDG GC = (V, E) and the incident context,
+For a microservice program P comprising a finite set                    which comprises active sustained alert(s) (A) and collected
+of single-entry–single-exit (SESE) hammock blocks B =                   error traces (T ). The LLM suggests a set of initial microservice
+{b1 , . . . , bn } [8], [9], the PDG is defined as a labeled directed   candidates (up to N 4 ) from nodes in GC , and outputs an initial
+graph GP = (V, E, λV , λE , ≺). Here, V = B, and edges                  investigation narrative I0 describing the observed alerts, traces,
+E = Ectl ∪ Edata ∪ Ecall capture control-, data-, and call-             and the reasons why they were selected. In addition, P RAXIS
+dependence between blocks. λV and λE annotate nodes and                 initializes an investigation queue Q to actively keep track of
+edges with their corresponding semantic attributes: λV includes           3We omit the full PDG for brevity, as the actual structure contains 44
+node type, defined and used variables, string literals, and code        hammock blocks.
+                                                                          4 N is a user-defined variable that we set to N = 5 for our experiments.
+  2 For brevity, we do not show all nodes/edges in the figure.          Further increases of this value yielded no improvements to our results.
+microservices that need to be investigated and initializes Q with   relevant point tied to the observed cloud incident is to identify
+those selected candidates: Q ← M(ψselect (A, T, λV (GC ))).         the initial node b0 in the PDG GP as the starting point of the
+   Figure 3 shows an example microservice candidate selection,      traversal. This node represents the code region most relevant
+based on the sustained alert and error traces from Phase 1. LLM     to the observed symptom described in the entity’s observability
+selects the Recommendation service as an initial candidate,         context ci (e.g., error descriptions, exception stack-trace, file
+noting that gRPC calls from the Frontend service exhibit gRPC       name, and line numbers).
+13 errors. These errors propagate upstream, manifesting as             Given ci and the PDG, we employ a language model
+HTTP500 errors observed in the Frontend service.                    M conditioned on a prompt composition function ψmatch
+   The initial investigation narrative I0 and the investigation     that encodes the runtime observability context ci and the
+queue Q serve as the starting point for PDG traversal and RCA       node attributes of the PDG λV (see §IV-A0b). Specifically,
+decision-making in Phase 3.                                         ψmatch (ci , λV ) constructs a joint representation with:
+                                                                    (1) observability data such as error logs, exception stack
+C. Phase 3: RCA Decision-making                                     frames, error events, and metric anomalies;
+   In Phase 3 (Figure 4), given the investigation queue Q and       (2) PDG node metadata including the method names, corre-
+the initial investigation narrative I0 from Phase 2, P RAXIS        sponding code fragments, and file/line identifiers and string
+iteratively dequeues and investigates an entity e from the head     literals.
+of Q and determines its role: a root cause, a symptom, or              The language model M then evaluates the correspondence
+unrelated to the cloud incident.                                    between those two modalities and selects an initial hammock
+   For each dequeued entity ei ∈ Q (designated as the focal         block node from GP :
+entity) at iteration i, P RAXIS first constructs the observability
+                                                                                  b0 = M (ψmatch (ci , λV ∈ V (GP )))
+context ci and retrieves the corresponding PDG GP . Crucially,
+P RAXIS then employs an LLM-driven PDG traversal that where b0 ∈ V (GP ) is a hammock block whose attributes (e.g.,
+traverses the entity’s (ei ’s) PDG (GP ) to construct an incident- a string literal) correlate to the observed signals (e.g., a log
+centric program context CP that explains the observed error entry). P RAXIS defaults to the hammock block corresponding
+symptoms from the perspective of entity code context. Given to the entry-point (e.g., the main function) or request-handling
+the observability context ci and program context CP of the methods (e.g., an API-handler function) of the microservice
+focal entity, P RAXIS uses the LLM to determine its role in program when observability data are absent or insufficient
+the cloud incident as one of P RIMARY FAILURE (the root due to the incident or when the matching is ambiguous (e.g.,
+cause), S YMPTOM O NLY (a symptom), or U NRELATED. After multiple matches).
+finishing the investigation of the current entity, P RAXIS moves PDG traversal. Once the starting hammock block b0 (i.e., a
+on to investigate the other LLM-selected microservices and node in PDG) has been identified, P RAXIS orchestrates the
+the dependees according to the SDG GC by adding them to LLM’s iterative agentic traversal of the PDG (GP ) to construct
+the investigation queue Q. P RAXIS repeats this analysis on all program context CP for in-depth RCA. Here, the program
+entities in Q until Q is empty.                                      context CP summarizes the microservice code paths that are
+   Specifically, this phase consists of the following steps:         likely related to the incident and explains the observed error
+(a) Observability context construction. P RAXIS first retrieves symptoms from the perspective of this code path. As such, CP
+the focal entity ei ’s observability data, comprising logs, metrics, provides rich, in-depth diagnostic context beyond symptom-
+and events, the SDG (GC ), and the focal entity’s PDG (GP ), level observability context for determining the microservice’s
+built in Phase 1. P RAXIS additionally collects inter-service role in the incident.
+interactions (e.g., inbound/outbound calls) as indicated by the         We define this agentic process as a 4-tuple:
+SDG and physical infrastructure attributes (e.g., cluster, node                              A = ⟨M, T , S, GP ⟩
+IDs) for each microservice-type entities. It also collects the • M is the LLM used for reasoning and decision-making;
+current configuration status using Kubectl for ConfigMaps- • T is the tool-set used by M to traverse over the PDG;
+type entities. P RAXIS structuralizes these collected data into a • S is the agent’s state space;
+JSON representation at the time of incident investigation for • GP is the PDG for microservice ei that acts as a transition
+the LLM to consume as observability context ci , providing function according to the tool action.
+the most up-to-date runtime evidence to anchor the agentic              The PDG traversal starts from the initial hammock-block
+program analysis and RCA reasoning.                                  node, bj = b0 , which serves as the initial anchor in the PDG.
+(b) LLM-driven PDG traversal. Leveraging the observability At each PDG-traversal iteration j, we define the state as:
+context ci and the graph GP , the LLM agent operates in                           sj = ⟨bj , Brelated , ci , Hj ⟩ ∈ S
+an iterative loop to traverse code paths defined by hammock where bj ∈ V (GP ) is the current hammock-block node under
+blocks and code dependencies in the PDG. It analyzes how analysis; Brelated is the set of blocks in GP related to bj by
+the underlying code logic aligns with the observed signals to control, data, or call dependencies (Brelated = {b|(bj , bk ) ∈
+pinpoint the root cause and explain the incident.                    E(GP )}); ci is the current microservice’s observability context;
+Initial hammock block (PDG node) selection. The first step and Hj is the past traversal history up to step j as PDG-traversal
+to ensure that the PDG traversal begins from a semantically memory.
+                                                                            Phase 3: RCA Decision Making
+      E.g., ei =
+                                                                                                                                                   RCA Decisions for Other Entities
+  Recommendation                                 LLM-driven Iterative PDG Traversal
+      Service                                                                                                                                       Name: Frontend, Frontend-proxy
+                                                  Focal H1                                       ei 's Program Context                              RCA Judgment: Symptoms
+       Focal                                      Block         Node Ctx.                        In get_product_list(), the response from
+      Entity, ei                                                          LLM                    product_catalog's ListProducts is iterated         Reason: RequestErrorRate alert and
+                                                                                                 via a nonexistent products_list attribute,         HTTP 500 responses after receiving
+                                                  H3   H2      H4                PDG             triggering the AttributeError.                     gRPC status 13 from the
+   Observability    ei's observability context
+                                                   Next Block        Act!      Traversal                                                            recommendation backend.
+   data (Jaeger,      (logs metrics, events,                                    Prompt
+     Kubectl)       service interactions) and     Focal Entity ei 's PDG
+                              PDG                                                                              ei 's Observability Context
+                                                        PDG Traversal Actions (Tools)*                                                              Name: Product-catalog
+    Focal-entity                                    Relate Complete Expand Discard                                 Logs,                            RCA Judgment: Unrelated
+       PDG                                                                                                                       Service
+                                                                                                                  Metrics,
+                                                                                                                               interactions         Reason: Product-catalog answers
+                        RCA Judgment: Primary Failure                                                             Events
+                                                                                                                                                    ListProducts RPCs successfully (gRPC
+                        Reason: Code shows Recommendation service                                                                                   0) with no log errors or configuration
+                Updates iterates "products_list": a nonexistent attribute, led to          LLM
+                                                                                                                                                    anomalies. The fault lies in the caller?s
+  Investigation         AttributeError shown in the logs. This is causing
+                                                                                       RCA Decision                                                 misuse of the service stub rather than
+    Narrative           Frontend high error rate.                                        Prompt                                                     in product-catalog?s implementation.
+                          Suggest: Investigate Product-catalog next
+
+Fig. 4: P RAXIS Phase 3: RCA decision-making. This process is repeated for the next focal entity that is (1) a dependee of the
+current focal entity and/or (2) suggested by the LLM based on the focal entity’s RCA decision.
+
+
+   Conditioned on the current state sj , the LLM M produces                                      TABLE I: PDG traversal tools available to the agent during
+a code-insight (ιj ) and the graph-traversal action (aj ) pair, i.e.,                            graph-based program analysis.
+                                                                                                   Tool         PDG Operation         Description                   Effect on Reasoning
+(aj , ιj ) = M (ψτ (sj )), where M is the LLM executing the                                        Expand         parent(bi )         Moves to the immediate        Broaden to examine
+reasoning and policy selection. ψτ is the prompt composer that                                                                        parent or dominator node.     higher-level hammock
+                                                                                                                                                                    blocks or callsites.
+encodes the current state sj into a structured form parametrized
+                                                                                                   Relate             Γ(bi )          Visits neighboring nodes      Explores adjacent code
+by a template τ . In particular, bj and Brelated ’s corresponding                                                                     linked by call, control, or   paths to collect supporting
+                                                                                                                                      data dependencies.            or refuting evidence.
+code snippets and relations are fetched by ψτ . aj ∈ T is
+                                                                                                   Complete            —              Terminates traversal and      Consolidates and finalizes
+the next chosen action (mapped to our tools), and ιj is the                                                                           triggers synthesis of         the code-level hypothesis.
+                                                                                                                                      program context CP .
+natural-language insight derived as the outcome of the current                                     Discard             —              Terminates traversal          Prunes irrelevant or
+state/action. Notice that the LLM only consumes code context                                                                          without using current         low-confidence
+                                                                                                                                      findings.                     trajectories.
+local to hammock blocks (bj , Brelated ) for each traversal
+                                                                                                   The traversal tool-set T = {Expand, Relate, Complete, Discard} defines the discrete action
+step, instead of large code files or codebases; this reduces                                       space of the agent. Each action is implemented as a callable operation on the versioned
+                                                                                                   PDG stored in the Neo4j-like graph database.
+the reasoning context space and allows the LLM to focus on
+concise, accurate context relevant to the incident, as indicated                                 complete traversal history HT (assuming T traversal steps
+by ci .                                                                                          in total). Notice that the visited code blocks ({b0 , b1 , ..., bT })
+   The agent’s traversal action is implemented with a set of                                     encompassed in HT form a code dependency path admitted
+PDG traversal tools T . Each tool in T corresponds to a concrete,                                by control, data, and call dependencies. Then, the LLM uses
+admissible traversal action on the PDG GP . Table I provides                                     a prompt ψsyn to combine traversal history and observability
+a detailed summary of the above tools. When an inadmissible                                      context, producing the final program context Cp (ei ) for
+action (e.g., a nonexistent block) is rejected by T , P RAXIS                                    microservice ei : CP (ei ) = M(ψsyn (HT , ci )). Here, CP
+prompts the LLM to regenerate a traversal action, subject to                                     highlights code regions, dependencies, and explanations, which
+a predefined retry limit. Each action invocation updates the                                     link error signals in the observability data with program
+traversal history (Hi+1 ) and fetches the next node (bj+1 ∈                                      evidence (code snippets and dependency flows) that might
+GP ) deterministically based on aj via T on GP : bj+1 =                                          explain the incident.
+T (GP ; aj ), Hj+1 = Hj ∪ {bj , ιj , aj }; we can then construct                                 (c) Entity role judgment and queue update. The final stage
+sj+1 accordingly for the next iteration.                                                         in this phase is entity role judgment and an investigation queue
+   Figure 5 illustrates a PDG traversal step in which the                                        update, in which P RAXIS provides a diagnostic judgment on
+LLM selects the Relate action to focus on Block 1 (the                                           the entity ei ’s role in the incident and an admissible explanation
+get_product_list function) for further investigation of the                                      with evidence, and updates the investigation queue accordingly.
+observed AttributeError. The LLM reasons that although the                                       Entity role judgment. After the program context for the entity
+error is caught in the current focal block (the try-catch state-                                 ei has been synthesized, P RAXIS determines the role of the
+ment), it likely arises during execution of get_product_list.                                    current entity ei in the incident: whether ei is the root cause
+   The traversal terminates when one of the actions, C OMPLETE                                   (primary cause of failure), a symptom, or unrelated. The role is
+or D ISCARD, is produced, when all the nodes are exhausted,                                      inferred by a language model M conditioned on a prompt ψj
+or when the user-defined budget (e.g., max number of blocks)                                     that composes observability (ci ) and program context (CP ) into
+is reached. Upon completion, the agent updates its memory                                        a reasoning prompt for the LLM M, i.e., J = M(ψj (ci , CP )),
+state H by committing the final traversal record, yielding the                                   where J is one of {P RIMARY FAILURE, S YMPTOM ONLY,
+                           Example One-step PDG Traversal
+                                                                                                                               Phase 4: PRAXIS Final RCA Summary
+Recommendation Service PDG                     Observability Context
+           ListRec()                           Error Trace Status: gRPC13 INTERNAL                           Root-cause identification: Recommendation service
+                                               Logs: Error fetching product catalog: AttributeError
+  EXP      Try-catch GetProdList()             Focal Hammock Block                                           Root-cause reasoning: Recommendation misuses the product-catalog gRPC
+          Focal Block                          try:                                                          stub...iterates a nonexistent products_list attribute in get_product_list
+                                                 prod_list = get_product_list(request.product_ids)           function, which raises AttributeError and forces ListRecommendations
+ Return                EXP      ListProd()     except Exception as e:
+                                                 logging.error(f"Error fetching product catalog: { e} ")     function to return gRPC INTERNAL error. The product-catalog service itself
+ Related Hammock Blocks                                                                                      responds successfully...the failure is isolated to recommendation?s code path.
+ def get_product_list(request_product_ids):                      PDG Traversal Prompt
+   cat_response = \
+      product_catalog_stub.ListProducts(demo_pb2.Empty())
+                                                                 I nstr uction: Select a traversal                 Fig. 6: P RAXIS Phase 4: Final RCA summary.
+                                                                 action and provide an updated code
+   product_ids = [x.id for x in cat_response.products_list]      insight that relates to the incident,
+ ...                   ID: 1, Relationship: function callee      citing specific code snippets as
+                                                                 evidence.
+                                                                                                           simply combining independent agents [18], [19], [33], [34].
+ def ListRecommendations(self, request, context):
+     ...               ID: 2, Relationship: data "request''      I nputs:                                  Critically, leveraging code-level insights to bypass gaps in the
+                                                                    Incident & Observability CTX
+                                         LLM                        Focal Block, Related Blocks            SDG, P RAXIS can traverse across missing links (e.g, error
+  PDG Traversal Action: (relate, Block ID:1)
+  Code Insights: As the handler aborts the RPC PDG Tool* ListRec() Next Focal Block
+                                                                                                           traces, logs) in observability data, as shown by the Cross-SDG-
+  whenever get_product_list raises, the                                                                    PDG traversal example in §III.
+  AttributeErrors in logs translate into the gRPC 13
+  errors seen by the callers. To identify the root    Exp Try-catch GetProdList()                             Moreover, by iteratively traversing the PDG node-by-node,
+  cause, we must inspect get_product_list where
+  the AttributeError originates.                     Return
+                                                                 Exp       ListProd()                      P RAXIS progressively refines the RCA scope, transitioning
+             Fig. 5: Example LLM-driven PDG traversal.                                                     from broader service-level observability signals to a more
+                                                                                                           focused analysis of specific code regions for each focal entity.
+or U NRELATED}. The model returns both the categorical                                                     Consequently, at each step, the LLM is strictly exposed
+judgment J and its natural language reasoning (Iei ) with                                                  to the local context of the current graph node rather than
+evidence grounded in both observability and program context                                                multiple microservices or codebases/code files. This isolation
+(ci and CP ). Iei is then appended to the global investigation                                             of unrelated information (other node contexts) improves context
+narrative I = I ∪ Iei used in subsequent investigation.                                                    efficiency, reduces token consumption, and mitigates potential
+Investigation queue update. The entity investigation queue Q                                               context overflow, allowing P RAXIS to scale effectively to large
+is then expanded to include new entities that are (1) dependees                                            cloud applications and codebases.
+of the current focal entity, and/or (2) suggested by the LLM
+based on the focal entity’s RCA decision. For (1), P RAXIS                                                 D. Phase 4: Final RCA Summary
+enqueues all unvisited dependees of ei according to the SDG                                                   After all entities in Q have been investigated, the LLM M
+GC , denoted by QGC = GC .getDependees(ei ), where each                                                    synthesizes a comprehensive RCA report using its accumulated
+dependee is a cloud entity on which ei depends. For (2),                                                   investigation history I from Phase 3 with a prompt ψsummary
+P RAXIS prompts the LLM M using the entity-queuing prompt                                                  to produce a diagnosis report D, i.e., D = M(ψsummary (I)).
+ψQ to identify up to k additional entities5 from GC . This                                                 D identifies the primary failure entities (root-cause entities),
+selection is based on the judgment J, the observability context                                            root-cause reasoning, and fault propagation chain, while provid-
+ci , the program context CP , and the nodes in the SDG                                                     ing a justification for each entity’s diagnosis, citing evidence
+GC , such that QMQ = M(ψQ (J, ci , CP , GC )). Finally, the                                                from the microservice code and observability data. This step
+queue is updated: Q = Q ∪ QMQ ∪ QGC . Mechanism (2) is                                                     consolidates the investigation and generates a structured, human-
+crucial as it allows the LLM to investigate entities in GC that                                            readable RCA report grounded in both observability and
+surface from the program context CP despite having partial                                                 program-level reasoning.
+or missing observability data (due to insufficient coverage or                                                Figure 6 presents an example final RCA report. P RAXIS
+the incident itself). Our evaluation confirms that this capability                                         correctly identifies the Recommendation service as the root
+helps diagnose entities that do not emit observability data (e.g.,                                         cause, specifically attributing the failure to a schema mismatch
+a ConfigMap) or have failed silently.                                                                      (accessing nonexistent fields), and suggests remediation. It also
+    Figure 4 depicts the investigation of the Recommendation                                               accurately classifies Frontend and Frontend-proxy as S YMPTOM
+service (selected in Phase 2, Figure 3), which was classified as                                           O NLY and Product-catalog as U NRELATED.
+a P RIMARY FAILURE based on its program (CP ) and observ-
+                                                                                                                                  V. E XPERIMENT S ETUP
+ability (ci ) contexts as well as subsequent RCA judgments for
+the Frontend, Frontend-proxy, and Product-catalog services.                                                  This section first clarifies the problem and evaluation scope,
+    P RAXIS repeats this phase (Phase 3) for the next entity                                               and then presents the cloud incident scenarios, baselines, and
+ei+1 at the head of the updated queue Q. By cross-traversing                                               metrics used for evaluation.
+between the SDG and PDG, P RAXIS can resolve cloud incidents
+                                                                                                           A. Problem and Evaluation Scope
+that require multiple hops to root-cause the incident while
+maintaining a coherent RCA summary via a consistent stream                                                    We evaluate P RAXIS on application-level incidents, focusing
+of investigation narrative I, a feature that is unobtainable by                                            on microservice codebases for which source code is available
+                                                                                                           for analysis. Our approach is beneficial even under partial code
+  5We set k = 3 in our implementation; however, across all evaluation runs,                                availability, as reasoning over available code improves diag-
+the LLM selected at most two entities.                                                                     nostic accuracy (see §VI-A); when source code is unavailable,
+P RAXIS falls back to using only observability and incident            TABLE II: Incident scenario descriptions and real-world
+contexts for RCA. Gains are naturally limited when no code is          reference. Deployment/resource cases are included as negative
+available (see §VI-B). P RAXIS’s scope is confined to incident         examples to highlight P RAXIS’s limitations.
+diagnosis within the investigation/diagnosis phase of the cloud        Scenario             Mechanism / How            Typical symptoms             #
+incident lifecycle [21], [35].                                         description          simulated                  (Real-world incidents)
+                                                                       Data schema          Access a nonexistent       Unhandled exception;         4
+B. Cloud Incident Evaluation Scenarios                                 mismatch/incom-      field                      5xx bursts; request
+   We developed the Code-Cloud-RCA Benchmark comprising                patibility between   (products_list) in a       failures. (Monzo 2017
+30 cloud incidents using [32], the same cloud application used         services             protobuf response          outage [4]; report [3],
+                                                                                            from another               [12], [14])
+in [23], supported by a standard monitoring stack [24]–[26],                                microservice.
+[29], [36]. These scenarios are distilled from root-cause types
+                                                                       Improper handling    Upstream DB/service        Latency spikes; retry        6
+commonly reported in production studies [3], [11]–[14], [37]           of external          hangs or returns           storms; high error rate.
+and real-world incidents [12], [38]. Table II enumerates the           dependency           empty results;             (Discord 2023
+scenario templates, fault mechanisms, expected symptoms, and           failures             dependent service          outage [39]; report [3],
+reference to real-world incidents; the rightmost column (#)                                 stalls without timeout     [11], [13], [14])
+                                                                                            or enters rapid retries.
+records the number of scenarios per template. As with any
+benchmark, comprehensive coverage cannot be guaranteed, and            Internal logic bug   Invert an assertion or     Slowness/timeouts;           2
+                                                                                            suboptimal                 intermittent crashes;
+by providing this benchmark, we invite the broader community                                implementation (e.g.,      incorrect results.
+to contribute to and expand its scope. Scenarios driven by the                              an exponential-time        (Cloudflare 2019
+same template vary in timing (startup vs. serving), observability                           LCS ranking                outage [40]; report [11],
+(stack traces vs. error logs vs. error codes), failure modes (stalls                        algorithm).                [13], [14], [37])
+vs. rapid retries), or configurations, and are annotated with          Resource label       Hardcoded, outdated        Connection refused;          2
+ground-truth root-cause microservices and reasoning.                   mismatch             label prevents             startup failure;
+                                                                                            discovery of intended      unavailability. (Reddit
+C. Baselines                                                                                DB/service.                2023 outage [5];
+   We benchmarked P RAXIS against ReAct-style [44] RCA                                                                 report [11], [12], [14])
+agents [15]:                                                           Constant             Wrong env/DB               Out-of-bounds access;        2
+                                                                       misconfiguration     constant (e.g., array      crashes; error bursts.
+SRE-Agent (baseline). ReAct-style SRE-Agent [15] that uses
+                                                                                            length) distorts control   (CrowdStrike 2024
+standard SRE tools to access the Kubernetes API, traces,                                    flow.                      outage [41]; report [3])
+metrics, events, and microservices application logs.
+                                                                       Feature-flag         Incorrect shared Flagd     Crashes; pod                 9
+SRE-Agent+CT (baseline+). Extends SRE-Agent with code                  ConfigMaps           rules/config; effects      terminations;
+tools (CT) for code retrieval, inspection, and summarization,          misconfiguration     depend on code paths       CPU/memory pressure.
+adding code context to the baseline.                                                        and flag usage.            (Spotify 2025
+P RAXIS (ours). The proposed method, P RAXIS, employs                                                                  incident [42]; report [3],
+                                                                                                                       [14])
+LLM-driven reasoning and traversal over program dependence
+and service dependency graphs.                                         Deployment           Invalid image tag or       ImagePullBackOff;            2
+                                                                       manifest error       replicas=0.                service unavailable.
+D. Evaluation Metrics                                                                                                  (Quryio 2020
+                                                                                                                       outage [43]; report [3])
+   We evaluated RCA effectiveness with respect to the below
+                                                                       Resource- &          Chaos Mesh: CPU            Saturation; packet loss;     3
+metrics following the same definitions as [15]:
+                                                                       Infrastructure-      stress, node-level         node/pod failures.
+Root cause identification (RCI) Pass@1 (%): The percent-               related fault        network outage, JVM        (Multiple cases in [12])
+age of instances for which the identified faulty microservice(s)                            corruption.
+exactly match the ground truth. In other words, RCI measures
+whether the agent correctly localizes the root cause to the            E. P RAXIS Implementation
+responsible microservice(s) or associated resource(s).                    P RAXIS is implemented in Python 3.12 using the LangGraph
+Root cause reasoning (RCR) Pass@1 (%): Pass@1                          agentic framework [46]. P RAXIS supports PDG construction
+accuracy of the agent’s RCA reasoning, measured by                     for microservices written in Python and Java, a scope we chose
+whether its explanation correctly identifies the faulty                based on current toolchain availability and the popularity of
+statement(s), function(s), or configuration(s) relative to the         these languages [47]. For evaluation purposes, all implemented
+ground truth, following Pass@K [45] with K = 1. In other               faults reside in, or are associated with, codebases available
+words, RCR measures whether the agent pinpoints the                    for analysis and supported by P RAXIS. We will submit our
+underlying fault (e.g., a faulty code-site or configuration) and       artifacts for evaluation and open-source the implementation.
+correctly explains (reasons about) how it led to the incident
+and the observed symptoms.                                                                  VI. E VALUATION R ESULTS
+We also report RCA efficiency via MTTD (mean time to                     We answer the following research questions (RQs):
+diagnosis) and ATC (average token consumption). See §VI-C              RQ-1 (§VI-A): How accurate is P RAXIS compared to baseline
+for a detailed explanation of MTTD and ATC.                            agents for cloud incident RCA?
+   TABLE III: Evaluation result of baseline and P RAXIS.             Why did baselines underperform? SRE-Agent underper-
+      LLM model       RCR Pass@1%↑        RCI Pass@1%↑            formed because it lacks code visibility, which is essential
+                        SRE-Agent                                 for diagnosing code-related scenarios. Adding code tools
+     gpt-oss-120b         0.00 ± 0.00      1.53 ± 1.07            (SRE-Agent+CT) yielded only marginal gains, not because
+     deepseek-r1          0.00 ± 0.0       9.79 ± 2.49            code is unhelpful, but because the search policy remained
+        o4-mini           3.42 ± 1.50      11.64 ± 2.65
+                                                                  unguided. Even with code and SRE tools, gpt-5-codex and
+  mistral-medium-3.1      9.65 ± 2.77      21.93 ± 3.88
+     gpt-5-codex          0.00 ± 0.00      11.43 ± 3.80           similar models exhibited premature closure: once local evidence
+                SRE-Agent w/ Code Tools (CT)                      seemed to explain alerts (e.g., an HTTP 500 handler or
+     gpt-oss-120b         0.68 ± 0.69      1.38 ± 0.97            nearby error traces), they terminated the investigation. Without
+     deepseek-r1          0.00 ± 0.0       11.41 ± 2.60           explicit awareness or external imposition of the microservice or
+        o4-mini           2.68 ± 1.32      14.77 ± 2.91           program dependencies, these baselines had neither a mechanism
+  mistral-medium-3.1     10.07 ± 2.55      20.86 ± 3.45           for traversing, nor an obligation to traverse the multi-hop
+     gpt-5-codex          0.00 ± 0.00      7.96 ± 2.54
+                                                                  dependency chain (which in our scenarios often involved
+                      P RAXIS (Ours)
+                                                                  7–10 hops across different microservices and their hammock
+     gpt-oss-120b        48.28 ± 4.15      71.03 ± 3.77
+     deepseek-r1         37.50 ± 4.74      57.69 ± 4.84           blocks) in which the true faults either resided or were indicated.
+        o4-mini          54.16 ± 4.15      70.14 ± 3.81           Notably, despite explicit instructions to invoke code tools
+  mistral-medium-3.1      4.37 ± 1.74      23.36 ± 3.61           in the prompt, SRE-Agent+CT invoked code tools for only
+     gpt-5-codex         61.54 ± 4.27      73.85 ± 3.85           46% of runs in which code analysis was required for RCA,
+   Metrics: (1) RCR Pass@1: Pass@1 % score for root cause         resulting in low RCA accuracy and inconsistent execution
+   reasoning. (2) RCI Pass@1: root cause identification accuracy. trajectories and highlighting SRE-Agent+CT’s fragility in agent
+   Best-performing agent+LLM model is shown in bold, and the      tool-calling [49], [50].
+   second-best is underlined. Higher is better.
+                                                                     In contrast, P RAXIS treats service and code-level dependen-
+RQ-2 (§VI-B): How does incident-centric program context           cies  as first-class as it constrains the LLM’s reasoning onto
+via PDG reasoning contribute to P RAXIS’s improvement?            the dependency    paths in PDG and systematically expands each
+RQ-3 (§VI-C): What are the diagnosis overheads of incorpo-        graph   node’s   neighborhood    with admissible graph traversal
+rating program context in cloud RCA?                              actions,  enforcing   iterative context gathering and reasoning
+                                                                  reconciliation. This graph-aware reasoning prevents early
+A. Baseline Comparison (RQ1)                                      stopping on symptomatic context and steers the investigation
+                                                                  to the upstream root cause in code, achieving in-depth RCA.
+   For RQ-1, we evaluated P RAXIS by comparing it against the
+current state of the art, i.e., the SRE-Agent [15], a ReAct-style B. Ablation Study (RQ2)
+RCA agent with default tools, and an extended SRE-Agent              For this RQ, we conducted an ablation study to assess the
+with code retrieval and summarization tools (which we call impact of P RAXIS’s core components on RCA effectiveness
+SRE-Agent+CT) to study whether code context can improve by evaluating the following P RAXIS variants.
+on the baseline performance.                                      P RAXIS (Obs. Ctx.): The observability context-only variant
+   Evaluation setup. We evaluated the agent across five disables PDG-traversal and program context (CP ), so only the
+different LLMs: o4-mini, gpt-5-codex, mistral-medium-3.1, incident context and observability context (ci ) are used in the
+deepseek-r1, and gpt-oss-120b. For statistical robustness, we RCA decision in §IV-C. This experiment characterized the
+repeated each ⟨LLM, scenario⟩ experiment five times with performance gains resulting from the use of program context.
+distinct random seeds, totaling 2,250 trajectories.               P RAXIS (Raw Code): The Raw Code variant skips PDG
+   Overall results. As shown in Table III, P RAXIS consistently construction (§IV-A0b) and LLM-driven PDG traversal (§IV-C)
+performed better than SRE-Agent and SRE-Agent+CT across when constructing CP and instead uses an LLM with a modified
+all LLMs that were evaluated, both on root-cause reasoning ψsyn prompt (§IV-C) to consolidate and generate program
+(RCR) accuracy and root-cause identification (RCI) accuracy. context directly from aggregated raw code files. We limited
+P RAXIS’s RCA reasoning accuracy correlates strongly with the raw code to 800k characters (∼200k tokens) to avoid
+root-cause identification accuracy, reflecting how human SREs overflowing the LLM’s context window.
+rely on accurate fault pinpointing for effective root-cause          Evaluation setup. We evaluated these P RAXIS variants
+analysis. Reasoning models (gpt-5-codex, o4-mini) exhibited using the best-performing LLM for P RAXIS–gpt-5-codex. For
+better RCA accuracies overall. Moreover, the strong perfor- statistical robustness, we repeated each ⟨variant, scenario⟩
+mance of gpt-5-codex likely stemmed from its superior code- experiment five times with distinct random seeds, yielding a
+understanding capabilities (demonstrated in [48]), enabling it total of 300 trajectories.
+to better correlate the code context and program behavior with       Ablation results. Table IV shows that augmenting the
+the incident. The low accuracy of mistral-medium-3.1 was due observability context ci with program context CP (PDG
+to its failure to select the correct initial candidates and its construction + LLM-guided traversal) is the primary driver of
+inability to follow output format instructions, which resulted RCA effectiveness. Relative to P RAXIS (Raw Code), P RAXIS
+in parsing errors.                                                improves overall RCR Pass@1 by 28.8 percentage points, from
+TABLE IV: Ablation study results on all scenario instances.                               halved its accuracy compared to that of the full approach.
+      Agent Variant                  Overall RCA Accuracy                                 Lacking explicit awareness of program-level dependencies,
+                              RCR Pass@1%↑        RCI Pass@1%↑
+    P RAXIS (Obs. Ctx.)         12.93 ± 2.77        41.50 ± 4.06
+                                                                                          P RAXIS (Raw Code) cannot effectively focus its reasoning
+    P RAXIS (Raw Code)          32.65 ± 3.87        59.18 ± 4.05                          on  code regions relevant to the incident. Instead, it “fixated”
+         P RAXIS (Ours)         61.54 ± 4.27        73.85 ± 3.85                          on ostensibly faulty regions—code that appears erroneous
+                                     Data Schema Mismatch                                 on the surface (e.g., manually thrown exceptions)—that are
+    P RAXIS (Obs. Ctx.)         40.0 ± 14.14         100.0 ± 0.0                          not pertinent to the observed failure. With code context
+    P RAXIS (Raw Code)          25.0 ± 18.97        85.0 ± 14.14                          exceeding 200k tokens at times, P RAXIS (Raw Code) exhibited
+         P RAXIS (Ours)          70.0 ± 8.94         95.0 ± 8.93
+                                Improper Ext. Failure Handling                            needle in a haystack [51] and context rot [52] phenomena,
+    P RAXIS (Obs. Ctx.)         10.0 ± 11.54         33.3 ± 1.6                           leading to degraded RCA accuracy. These findings confirm that
+    P RAXIS (Raw Code)          36.67 ± 20.0       43.33 ± 19.32                          PDG-guided diagnosis is essential: it enforces the alignment
+         P RAXIS (Ours)        85.83 ± 12.57        86.0 ± 12.60                          of observability data with concise, accurate code context
+                                       Internal Logic Bug                                 structurally presented to the LLM, grounding the RCA in
+    P RAXIS (Obs. Ctx.)         20.0 ± 15.49         100.0 ± 0.0                          relevant code paths and code regions to yield the observed
+    P RAXIS (Raw Code)          50.0 ± 17.89        90.0 ± 12.65
+         P RAXIS (Ours)         80.0 ± 17.89         100.0 ± 0.0                          performance gains.
+                                   Resource Label Mismatch                                   Illustration. We illustrate the RCA reasoning specificity
+    P RAXIS (Obs. Ctx.)          30.0 ± 15.4         100.0 ± 0.0                          improvement using an “improper handling of external depen-
+    P RAXIS (Raw Code)          40.0 ± 21.91        100.0 ± 0.00                          dency failure” scenario. Here, a degraded external database
+         P RAXIS (Ours)          80.0 ± 15.5         100.0 ± 0.0                          returned empty responses, triggering a silent retry loop in
+                                   Constant Misconfiguration
+                                                                                          the Recommendation service that manifested solely as high
+    P RAXIS (Obs. Ctx.)           0.0 ± 0.0          80.0 ± 15.0
+    P RAXIS (Raw Code)          20.0 ± 17.89        90.0 ± 12.65                          latency, without explicit error logs. As shown in Figure 7,
+         P RAXIS (Ours)          90.0 ± 13.0         100.0 ± 0.0                          P RAXIS without program context failed to detect this behavioral
+                               Feature-flag ConfigMaps Misconf.                           pattern, wrongly identifying the high latency, a symptom, as the
+    P RAXIS (Obs. Ctx.)           0.0 ± 0.0           0.0 ± 0.0                           root cause. Conversely, utilization of program context enabled
+    P RAXIS (Raw Code)         45.56 ± 19.71       54.44 ± 19.71                          P RAXIS to identify the retry logic and uncover the database
+         P RAXIS (Ours)        62.96 ± 16.67       65.74 ± 18.16
+                                                                                          dependency, correctly isolating the underlying storage issue
+   We used the same RCA accuracy metrics as in Table III.                                 (storage corruption → empty product list) as the true root
+ Relevant Code Context                                 Agent RCA Reasoning                cause.
+ logger.info(”Querying external product database.")      Praxis (Obs. Ctx.)                  Per-scenario trends. P RAXIS’s improvements hold across
+ while True:
+  with socket.socket(socket.SOCK_STREAM) as s:           The frontend service GET         most scenario types. For example, for Constant Misconfigura-
+   s.connect((productdb_addr, productdb _port))          handler exhibited extreme
+   response = json.loads(s.recv(1024).decode('utf-8’))   latency (~15s per request),
+                                                                                          tion, P RAXIS attained 90% RCR and 100% RCI while other
+   additional_products = response.get("products")        causing the proxy-router egress  agents achieved around 0%–20% RCR. A minor regression
+    if len(additional_products) > 0:
+                                                         to stall waiting for a response. appeared in Data Schema Mismatch (RCI Pass@1 100.0%
+        break
+
+ Recommendation SVC. Dependency                                                           → 95.0%), likely because error signals in logs occasionally
+                                                         Praxis
+                         Flagd                          External productdb encountered
+                                                                                          allow the observability-only variant (P RAXIS (Obs. Ctx.)) to
+     Recommendation
+                                                        store-corrupt and fell back to    correctly identify the faulty microservice without code analysis,
+                                                        empty product cache, causing      although it is unable to arrive at the correct root cause. Feature-
+                               Product-catalog          RecommendationService to stall
+Frontend                                                in  an infinite socket.recv loop, flag ConfigMaps misconfiguration scenarios remain challenging
+                                    External            introducing ~15s latency.
+                                    Product DB
+                                                                                          (RCI   ≈ 66%), likely due to insufficient observability data for
+Fig. 7: RCA reasoning of P RAXIS (Obs. Ctx.) and P RAXIS. P RAXIS to exploit during the PDG-traversal and RCA decision-
+Nodes are microservices; solid arrows are dependencies; the making.
+green dotted arrow is a dependency with missing traces and
+                                                                                          C. Diagnosis Overheads (RQ3)
+had to be derived from program context. SVC. = Service.
+                                                                                             For this RQ, we evaluated the RCA overheads of SRE-Agent
+32.7% to 61.5% (an 88.5% improvement), and RCI Pass@1 baselines, P RAXIS, P RAXIS (Obs. Ctx.), and P RAXIS (Raw
+by 14.7 percentage points, from 59.2% to 73.9% (a 24.8% Code) using mean time to completion (MTTC) in seconds
+improvement). Against P RAXIS (Obs. Ctx.), the gains are larger, and average token consumption (ATC) in thousands of tokens,
+at 48.6 percentage points and 32.4 percentage points for RCR measured across all scenarios using the best-performing LLMs.
+Pass@1 and RCI Pass@1, respectively.                                                         Evaluation setup. To account for differences in RCA rea-
+    Why do program context and LLM-driven PDG help? soning accuracy, we normalized both MTTC and ATC by RCR
+Similar to the SRE-Agent baseline, P RAXIS without program Pass@1% to assess diagnosis efficiency: Normalized metric =
+                                                                                           MTTC or ATC
+context (P RAXIS (Obs. Ctx.)) failed to identify root causes RCR                               Pass@1% . The resulting normalized MTTC (i.e., mean time
+within, or hinted by, the internal code logic, resulting in to diagnosis or MTTD) and normalized ATC (Effective ATC)
+superficial symptom-level RCA. Although the P RAXIS variant reflect time and token costs per successful diagnosis. Here,
+without PDG (P RAXIS (Raw Code)) retains service-level MTTC is the average time to complete a diagnosis, regardless
+dependency awareness, the absence of PDG-guided diagnosis of correctness. MTTD is the normalized MTTC and represents
+TABLE V: Diagnosis overheads across all scenario instances.                  (e.g., infrastructure/resource dependencies), traversal terminates
+                        MTTC↓       ATC↓      MTTD↓       Eff. ATC↓
+         SRE-Agent        99.69    85.39k      1,033.06    884.87k
+                                                                             prematurely at the upstream symptom, reducing RCA accuracy.
+      SRE-Agent+CT        90.18    85.03k       842.80     794.67k           These     implications explain P RAXIS’s practical scope and
+    P RAXIS (Obx. Ctx.) 1,321.02   75.59k     10,475.97    599.44k           limitations in its present form, described in the next paragraph.
+   P RAXIS (Raw Code)    838.44    329.53k     2,567.96   1,009.28k
+       P RAXIS (Ours)    907.43    102.44k     1,474.54    166.46k
+                                                                                 P RAXIS’s scope and limitations. Our evaluation (Table IV)
+   Metrics: (1) MTTC = mean time to completion in seconds; (2) ATC
+                                                                             shows    that P RAXIS is effective at diagnosing (1) code-related in-
+   = average token consumptions in tokens; (3) MTTD = mean time to           cidents   that fall under the fault models data schema mismatches,
+   diagnosis; (4) Eff. ATC = effective ATC. Best-performing variant is shown logical bugs, failure to handle external dependencies, and
+   in bold; second-best is underlined. Lower is better.
+                                                                             resource/address/label mismatches, and (2) misconfiguration-
+the expected time to reach a correct diagnosis. Thus, MTTD related incidents caused by misconfigured variables/constants
+jointly captures duration and accuracy: an agent that completes in code or in ConfigMaps (see §VI-B, Table IV). Collectively,
+diagnosis faster but is less accurate may still require more time, these fault models represent the vast majority of code-related
+in expectation, to reach a correct diagnosis, resulting in an and misconfiguration incidents observed in production [3],
+MTTD longer than that of a more accurate agent. The same [13], [14]. P RAXIS works well here as these faults emit
+interpretation applies to ATC and Effective ATC.                             observability signals and either are directly visible in code
+    Table V shows that although SRE-Agent has lower raw or can be more accurately pinpointed via code examination
+MTTC and ATC than P RAXIS, their MTTDs, which include (e.g., a misconfiguration altering execution paths).
+LLM backend response times, are comparable. However,                             As discussed, P RAXIS’s effectiveness depends on the avail-
+ReAct consumed 5.1× more tokens per successful diagnosis,                    ability  and quality of observability signals and the completeness
+indicating much lower token efficiency. When we compare                      of   its dependency     graphs. Weak observability signals (e.g.,
+P RAXIS with its ablated variants (P RAXIS (Raw Code)) and                   missing    traces  or ambiguous   logs) and incomplete or incorrect
+P RAXIS (Obs. Ctx.)), construction of program context via LLM-               graphs    can  hinder  diagnosis.   This explains why P RAXIS and
+driven PDG traversal reduced MTTD and effective ATC by up                    its variants   achieve near-zero   accuracy  on deployment-manifest
+to 85.9% and 83.5%, respectively, highlighting their significant             and    resource/infrastructure-related    incidents: those incidents
+contributions to efficient RCA. Notably, LLM-driven PDG                      lack   direct application-layer  observability and their dependency
+traversal reduced ATC by 6.1× compared to providing raw structures are not captured in P RAXIS’s graphs. We exclude
+code as plain text in the prompt, as in [20], [53]. P RAXIS’s these incidents from Table IV because all ablated variants
+MTTD of 1,474 seconds is substantially shorter than that of behave and perform identically, so including them would not
+manual RCA, which can take several hours for incidents with change the ablation comparison.
+similar root causes.                                                             For the same reason, we consider concurrency/timing bugs
+                                                                             out of scope: P RAXIS in its current form lacks dynamic runtime
+D. Discussions and Future Work                                               analysis to observe microservices’ internal runtime state
+    Scenarios with weak observability. P RAXIS’s effectiveness and does not encode timing-dependency structures between
+is contingent on the availability and quality of observability data microservices. These limitations are not inherent to the graph-
+to anchor its PDG traversal. Sparse or ambiguous traces, logs, based approach, and P RAXIS can be extended to address
+metrics, or events can limit P RAXIS’s ability to accurately align them, as discussed in the “Future work” section. Finally, while
+runtime error signals with corresponding dependency paths to P RAXIS may generalize to fault types beyond those evaluated,
+traverse. When a fault offers no direct or clear observable its effectiveness on such faults remains unverified.
+signal at the application layer to anchor RCA decision-making,                   Access to source code. P RAXIS’s gains from PDG traversal
+P RAXIS tends to falsely attribute the incident to fault-free are naturally limited when microservice code is unavailable
+code paths or configurations, leading to false positives. While for graph construction or code access is substantially limited
+collecting exhaustive observability data could mitigate this, it (e.g., extensive reliance on proprietary third-party libraries), in
+would incur significant production overheads. We explicitly which case P RAXIS must rely primarily on observability signals
+identify the fault categories most vulnerable to this limitation for diagnosis. In practice, partial code access is common (and
+in our scope discussion below.                                               matches our evaluation): Devs/SREs can access code developed
+    Graph representation. P RAXIS’s effectiveness relies on in-house but not proprietary third-party binaries. Even with
+the correctness and completeness of the dependency graphs. partial code access, P RAXIS can exploit clues in the available
+Dependency graphs that are incorrect or incomplete (e.g., an code captured by the PDG (e.g., call sites and configuration-
+outdated PDG, or a missing microservice in SDG) hinder controlled branches) to localize the root cause to external
+P RAXIS’s ability to diagnose a root cause. Because P RAXIS dependencies, thereby achieving higher RCA effectiveness
+diagnoses faults by traversing dependency edges anchored than observability-only variants, see Figure 1 and §VI-B for
+on observability signals, missing edges break the structural examples.
+path from symptom to root cause: observability may reveal                        Static code analysis. An inherent limitation of static code
+the symptomatic component, but without the corresponding analysis is its inability to accurately capture dynamic bindings
+edge, the agent cannot reach the true root-cause node. For (e.g., Java reflection), which can leave unlinked gaps in the
+isolated nodes or a complete absence of dependency structures PDG. Although P RAXIS cannot eliminate this limitation, its
+hierarchical hammock-block traversal alleviates it by leveraging these techniques will ground the static graph traversal in
+higher-level structural relations (e.g., class-level) to potentially verifiable runtime behavior, enabling more comprehensive
+bypass missing links at lower levels. Conversely, conditioning incident coverage and precise RCA.
+too strongly on static code context risks unintended bias, where
+                                                                                                      VII. R ELATED W ORK
+P RAXIS may mistakenly attribute faults to code blocks when the
+incident actually stems from external factors (e.g., deployment                 Agentic    approach     for cloud incident RCA. Recent agentic
+or resources). This risk can be mitigated by incorporating                   RCA     approaches      [15],  [17]–[19], [23] adopted the ReAct
+runtime instrumentation to confirm whether implicated code                   paradigm     [44]   to  analyze    observability data but lack struc-
+paths were indeed executed at the time of the incident.                      tured  reasoning     workflow    and  program context, limiting their
+    PDG construction overheads and continuous deployment.                    effectiveness     on  software    and  misconfiguration faults. Prior
+Regenerating all PDGs in our case took 116.42 seconds.                       approaches      that  incorporate    program   or code context [16],
+P RAXIS builds PDGs by using a syntactic parser (e.g., Tree-                 [20]  treat  code   as plain  text  in prompts   rather than explicitly
+sitter) to extract hammock blocks, and running CLDK-provided                 exploiting   its  inherent  structure,  as they  do not perform PDG-
+static analysis (e.g., WALA/RTA for Java and CodeQL/Scalpel                  guided    reasoning.    P RAXIS advances beyond those efforts by
+
+for Python) [31]. In practice, construction time is dominated performing LLM-driven reasoning over service dependency and
+by the static-analysis backend, and lightweight backends (e.g., program dependence graphs, unifying incident, observability,
+the RTA [54] backend used by CLDK) scale near-linearly with cloud, and program context for scalable, end-to-end RCA.
+microservice program size [55]. Subsequent PDG construction                     AI/ML for specific RCA workflow automation. AI/ML
+takes O(N + E), where N is the number of hammock blocks                      techniques     have long supported incident RCA through spe-
+and E is the number of dependency edges extracted. Going                     cialized   models    for anomaly detection, fault localization, and
+forward, P RAXIS will be integrated with a CI/CD pipeline.      6            diagnosis    [28],  [62]–[66].   Recent work has employed LLMs
+P RAXIS can avoid fully regenerating the PDGs because (1)                    for incident    querying,    understanding,   and classification [53],
+PDGs can be constructed and parallelized per microservice, and               [67]–[72],    typically   leveraging   prior knowledge    (e.g., TSGs,
+(2) each PDG update can be incremental [57], [58], recomputing               SOPs)    and  requiring   SRE   supervision.   P RAXIS performs auto-
+
+only nodes and transitive dependence regions affected by code mated RCA end-to-end, and those methods can be considered
+changes. Moreover, caching versioned PDGs by commit SHA complementary to it.
+enables fast reuse and comparison.                                              LLM for graph reasoning and traversal. LLM-driven
+                                                                             graph reasoning/traversal is an emerging field [73] that can be
+    Extensibility to other languages and platforms. P RAXIS is
+                                                                             applied to knowledge retrieval, question-answering [74]–[77],
+extensible beyond Python/Java and Kubernetes. SDG construc-
+                                                                             code search and localization [78], and execution path recon-
+tion requires discovery of the runtime inter-service topology and
+                                                                             struction [79]. Though graph models have been established
+dependencies, capabilities already supported by observability
+                                                                             in systems/AIOps [80], LLM-driven graph reasoning in this
+stacks (e.g., OpenTelemetry, Datadog) across platforms (e.g.,
+                                                                             domain is still underexplored, and we have demonstrated its
+OpenShift, ECS). PDG generation requires a syntactic parser
+                                                                             potential through P RAXIS.
+for extracting hammock blocks and a static-analysis backend to
+derive control/data-flow edges; thus, specific language support                                        VIII. C ONCLUSION
+is primarily limited by the availability of such toolchains.                    This paper proposes P RAXIS, an agentic approach that
+Because P RAXIS constructs PDG using Tree-sitter [30] and reasons over microservice and program dependency graphs for
+CLDK [31], which provide broad multi-language support, it a comprehensive, in-depth root-cause analysis. Our evaluation
+can be readily extended to additional languages, including Go, of P RAXIS on 30 scenarios that span software, configuration,
+Rust, TypeScript, and C/C++.                                                 deployment, and resource failures demonstrates that P RAXIS
+    Future work. Future iterations of P RAXIS will be extended achieves up to 6.3× better root-cause reasoning accuracy, 3.4×
+to diagnose resource-, infrastructure-, and deployment-related higher entity identification accuracy, and a 5.3× reduction
+incidents by augmenting the current dependency graphs with in token consumption compared to state-of-the-art agentic
+resource/infrastructure and deployment-manifest graphs that baselines.
+explicitly capture those dependencies. Furthermore, P RAXIS
+will incorporate dynamic program analysis to address static-                                          ACKNOWLEDGMENT
+analysis gaps and enable the diagnosis of concurrency bugs.                     We thank the reviewers, and R. Arora, Bhavya, N. Zheutlin,
+By leveraging lightweight, strategic runtime instrumentation P. T. Isaza, J. Ahn, A. Paradkar, L. Shwartz, R. K. Kottapalli,
+(e.g., at database calls and gRPC handlers) alongside dynamic A. D. Angelis, A. Patke, P. Cao, Z. Zheng, and J. Applequist
+tracing with sampling [59]–[61], P RAXIS can capture dynamic for technical input and feedback, and H. C. Fairow, S. Weick,
+bindings and gain crucial visibility into internal microservice K. Atchley, Y. Deng, R. Pavuluri, M. Vukovic, X. Liu, D.
+states. This runtime context will help reduce false positives for Sow, and N. Fuller for administrative support. This work is
+resource, infrastructure, and deployment faults, while simul- supported by the IBM-Illinois Discovery Accelerator Institute
+taneously bringing concurrency bugs into scope. Ultimately, (IIDAI) and NSF grant 2530738. Any opinions expressed here
+                                                                             are those of the authors and do not necessarily reflect the views
+   6 CI/CD stands for continuous integration and continuous deployment [56]. of IBM or NSF.
+                             R EFERENCES                                             the 33rd ACM International Conference on Information and Knowledge
+                                                                                     Management, ser. CIKM ’24. New York, NY, USA: Association
+ [1] New Relic, Inc., “New Relic study reveals businesses face                       for Computing Machinery, 2024, pp. 4966–4974. [Online]. Available:
+     an annual median cost of $76 million from high-impact IT                        https://doi.org/10.1145/3627673.3680016
+     outages,” Sep. 2025, press release. [Online]. Available: https:            [17] D. Roy, X. Zhang, R. Bhave, C. Bansal, P. Las-Casas, R. Fonseca, and
+     //newrelic.com/press-release/20250917                                           S. Rajmohan, “Exploring LLM-based agents for root cause analysis,” in
+ [2] ——, “2025 observability forecast report,” 2025, report.                         Companion Proceedings of the 32nd ACM International Conference on
+     [Online]. Available: https://newrelic.com/sites/default/files/2025-09/          the Foundations of Software Engineering, ser. FSE 2024. New York,
+     new-relic-2025-observability-forecast-report.pdf                                NY, USA: Association for Computing Machinery, 2024, pp. 208–219.
+ [3] S. Ghosh, M. Shetty, C. Bansal, and S. Nath, “How to fight production           [Online]. Available: https://doi.org/10.1145/3663529.3663841
+     incidents? An empirical study on a large-scale cloud service,” in          [18] J. Xu, Q. Zhang, Z. Zhong, S. He, C. Zhang, Q. Lin, D. Pei, P. He,
+     Proceedings of the 13th Symposium on Cloud Computing, ser. SoCC ’22.            D. Zhang, and Q. Zhang, “OpenRCA: Can large language models locate
+     New York, NY, USA: Association for Computing Machinery, 2022, pp.               the root cause of software failures?” in The Thirteenth International
+     126–141. [Online]. Available: https://doi.org/10.1145/3542929.3563482           Conference on Learning Representations, 2025. [Online]. Available:
+ [4] Monzo-engineer,       “RESOLVED:        Current     account    payments         https://openreview.net/forum?id=M4qNIzQYpd
+     may       fail:    Major      outage     27/10/2017,”     Oct.     2017,   [19] Y. Chen, J. Pan, J. Clark, Y. Su, N. Zheutlin, B. Bhavya, R. Arora,
+     Monzo           Community         Forum.         Accessed       2025-10-        Y. Deng, S. Jha, and T. Xu, “Stratus: A multi-agent system for
+     20.       [Online].      Available:     https://community.monzo.com/t/          autonomous reliability engineering of modern clouds,” in Proceedings
+     resolved-current-account-payments-may-fail-major-outage-27-10-2017/             of the 39th Conference on Neural Information Processing Systems
+     26296/95                                                                        (NeurIPS 2025), 2025, accepted; preprint available at arXiv:2506.02009.
+ [5] Reddit-engineer, “You broke Reddit: The Pi-Day outage,” Mar.                    [Online]. Available: https://arxiv.org/abs/2506.02009
+     2023, Reddit Engineering Blog. Accessed: 2025-10-09. [Online].             [20] Y. Li, Y. Wu, J. Liu, Z. Jiang, Z. Chen, G. Yu, and M. R. Lyu,
+     Available: https://www.reddit.com/r/RedditEng/comments/11xx5o0/you_             “COCA: Generative root cause analysis for distributed systems with
+     broke_reddit_the_piday_outage/                                                  code knowledge,” in Proceedings of the 47th IEEE/ACM International
+ [6] Amazon Web Services. (2025) Summary of the Amazon DynamoDB                      Conference on Software Engineering (ICSE ’25), 2025. [Online].
+     service disruption in the Northern Virginia (US-EAST-1) region. AWS.            Available: https://dl.acm.org/doi/10.1109/ICSE55347.2025.00234
+     Post-incident summary of the Oct 19–20, 2025 US-EAST-1 disruption.         [21] B. Beyer, C. Jones, J. Petoff, and N. R. Murphy, Site Reliability
+     [Online]. Available: https://aws.amazon.com/message/101925/                     Engineering: How Google Runs Production Systems, 2016. [Online].
+ [7] M. Prince, “Cloudflare outage on November 18, 2025,” https://blog.              Available: http://landing.google.com/sre/book.html
+     cloudflare.com/18-november-2025-outage/, Nov. 2025, accessed: 2025-        [22] J. Ferrante, K. J. Ottenstein, and J. D. Warren, “The program
+     11-20.                                                                          dependence graph and its use in optimization,” ACM Trans. Program.
+ [8] R. Johnson, D. Pearson, and K. Pingali, “The program structure tree:            Lang. Syst., vol. 9, no. 3, pp. 319–349, Jul. 1987. [Online]. Available:
+     Computing control regions in linear time,” in Proceedings of the ACM            https://doi.org/10.1145/24039.24041
+     SIGPLAN 1994 Conference on Programming Language Design and
+                                                                                [23] Y. Chen, M. Shetty, G. Somashekar, M. Ma, Y. Simmhan,
+     Implementation, ser. PLDI ’94. New York, NY, USA: Association
+                                                                                     J. Mace, C. Bansal, R. Wang, and S. Rajmohan, “AIOpsLab: A
+     for Computing Machinery, 1994, pp. 171–185. [Online]. Available:
+                                                                                     holistic framework to evaluate AI agents for enabling autonomous
+     https://doi.org/10.1145/178243.178258
+                                                                                     clouds,” in Proceedings of MLSys ’25, 2025. [Online]. Available:
+ [9] F. Zhang and E. H. D’Hollander, “Using hammock graphs to structure
+                                                                                     https://openreview.net/forum?id=3EXBLwGxtq
+     programs,” IEEE Trans. Softw. Eng., vol. 30, no. 4, pp. 231–245, Apr.
+     2004. [Online]. Available: https://doi.org/10.1109/TSE.2004.1274043        [24] Prometheus Authors, “Prometheus: Monitoring system & time series
+                                                                                     database,” 2025, open-source systems monitoring and alerting toolkit.
+[10] itbench-hub, “ITBench-Scenarios: Kubernetes topology monitor,”
+                                                                                     [Online]. Available: https://prometheus.io/
+     https://github.com/itbench-hub/ITBench-Scenarios/tree/main/sre/tools/
+     kubernetes-topology-monitor, 2025, code repository as part of ITBench      [25] Jaeger Project, “Jaeger: Open source, distributed tracing platform,” 2025,
+     SRE scenarios. Accessed: 2025-11-21.                                            originally open-sourced by Uber; CNCF project. [Online]. Available:
+[11] H. S. Gunawi et al., “Cloud Bug Study (CBS) database,” http://ucare.            https://www.jaegertracing.io/
+     cs.uchicago.edu/projects/cbs/, UCARE Research Group, University of         [26] ClickHouse, Inc., “ClickHouse: Fast open-source OLAP DBMS,” 2025,
+     Chicago, 2014, accessed: 2025-06-01.                                            column-oriented database for real-time analytics. [Online]. Available:
+[12] H. Jacobs, “Kubernetes failure stories,” https://codeberg.org/hjacobs/          https://clickhouse.com/
+     kubernetes-failure-stories, 2023, accessed: 2025-10-07.                    [27] L. Wu, J. Tordsson, E. Elmroth, and O. Kao, “MicroRCA: Root cause
+[13] H. S. Gunawi, M. Hao, T. Leesatapornwongsa, T. Patana-anake,                    localization of performance issues in microservices,” in NOMS 2020:
+     T. Do, J. Adityatama, K. J. Eliazar, A. Laksono, J. F. Lukman,                  2020 IEEE/IFIP Network Operations and Management Symposium,
+     V. Martin, and A. D. Satria, “What bugs live in the cloud? A study              2020, pp. 1–9. [Online]. Available: https://doi.org/10.1109/NOMS47738.
+     of 3000+ issues in cloud systems,” in Proceedings of the ACM                    2020.9110353
+     Symposium on Cloud Computing, ser. SOCC ’14. New York, NY,                 [28] Y. Gan, M. Liang, S. Dev, D. Lo, and C. Delimitrou, “Sage: Practical
+     USA: Association for Computing Machinery, 2014, pp. 1–14. [Online].             and scalable ML-driven performance debugging in microservices,”
+     Available: https://doi.org/10.1145/2670979.2670986                              in Proceedings of the 26th ACM International Conference on
+[14] H. Liu, S. Lu, M. Musuvathi, and S. Nath, “What bugs cause production           Architectural Support for Programming Languages and Operating
+     cloud incidents?” in Proceedings of the Workshop on Hot Topics in               Systems, ser. ASPLOS ’21. New York, NY, USA: Association
+     Operating Systems, ser. HotOS ’19. New York, NY, USA: Association               for Computing Machinery, 2021, pp. 135–151. [Online]. Available:
+     for Computing Machinery, 2019, pp. 155–162. [Online]. Available:                https://doi.org/10.1145/3445814.3446700
+     https://doi.org/10.1145/3317550.3321438                                    [29] Datadog, “Datadog cloud monitoring platform,” https://www.datadoghq.
+[15] S. Jha, R. R. Arora, Y. Watanabe, T. Yanagawa, Y. Chen, J. Clark,               com/, 2025, accessed: 2025-06-01.
+     B. Bhavya, M. Verma, H. Kumar, H. Kitahara, N. Zheutlin, S. Takano,        [30] M. Brunsfeld, A. Qureshi, A. Hlynskyi, ObserverOfTime, W. Lillis,
+     D. Pathak, F. George, X. Wu, B. O. Turkkan, G. Vanloo, M. Nidd,                 J. Vera, dundargoc, P. Turnbull, T. Clem, D. Creager, A. Helwer,
+     T. Dai, O. Chatterjee, P. Gupta, S. Samanta, P. Aggarwal, R. Lee,               R. Rix, D. Kavolis, C. Clason, M. Davis, R. Bruins, A. Delpeuch, Ika,
+     J. wook Ahn, D. Kar, A. Paradkar, Y. Deng, P. Moogi, P. Mohapatra,              A. Ya, T.-A. Nguyẽn, bfredl, S. Brunk, M. Massicotte, N. Hasabnis,
+     N. Abe, C. Narayanaswami, T. Xu, L. R. Varshney, R. Mahindru,                   J. McCoy, M. Dong, S. Moelius, S. Kalt, and Kolja, “tree-sitter/tree-sitter:
+     A. Sailer, L. Shwartz, D. Sow, N. C. M. Fuller, and R. Puri, “ITBench:          v0.25.10,” September 2025, software; MIT License. [Online]. Available:
+     Evaluating AI agents across diverse real-world IT automation tasks,”            https://doi.org/10.5281/zenodo.17180150
+     in Forty-second International Conference on Machine Learning, 2025.        [31] R. Krishna, R. Pan, S. Sinha, S. Tamilselvam, R. Pavuluri, and
+     [Online]. Available: https://openreview.net/forum?id=jP59rz1bZk                 M. Vukovic, “Codellm-Devkit: A framework for contextualizing code
+[16] Z. Wang, Z. Liu, Y. Zhang, A. Zhong, J. Wang, F. Yin, L. Fan, L. Wu,            LLMs with program analysis insights,” in Proceedings of the 33rd ACM
+     and Q. Wen, “RCAgent: Cloud root cause analysis by autonomous                   International Conference on the Foundations of Software Engineering,
+     agents with tool-augmented large language models,” in Proceedings of            ser. FSE Companion ’25. New York, NY, USA: Association
+     for Computing Machinery, 2025, pp. 308–318. [Online]. Available:                 on Learning Representations, 2024. [Online]. Available: https:
+     https://doi.org/10.1145/3696630.3728555                                          //openreview.net/forum?id=VTF8yNQM66
+[32] OpenTelemetry authors, “OpenTelemetry demo: Astronomy shop                  [49] C. Winston and R. Just, “A taxonomy of failures in tool-augmented
+     microservices,” https://github.com/open-telemetry/opentelemetry-demo,            LLMs,” in 2025 IEEE/ACM International Conference on Automation
+     2025, microservice-based distributed system illustrating OpenTelemetry           of Software Test (AST), 2025, pp. 125–135. [Online]. Available:
+     in a near real-world environment. Accessed: 2025-11-28.                          https://doi.org/10.1109/AST66626.2025.00019
+[33] T. Ahmed, S. Ghosh, C. Bansal, T. Zimmermann, X. Zhang, and                 [50] Q. Xiong, Y. Huang, Z. Jiang, Z. Chang, Y. Zheng, T. Li,
+     S. Rajmohan, “Recommending root-cause and mitigation steps for                   and M. Li, “Butterfly effects in toolchains: A comprehensive
+     cloud incidents using large language models,” in Proceedings of                  analysis of failed parameter filling in LLM tool-agent systems,”
+     the 45th International Conference on Software Engineering, ser.                  in Findings of the Association for Computational Linguistics:
+     ICSE ’23. IEEE Press, 2023, pp. 1737–1749. [Online]. Available:                  EMNLP 2025, C. Christodoulopoulos, T. Chakraborty, C. Rose,
+     https://doi.org/10.1109/ICSE48619.2023.00149                                     and V. Peng, Eds. Suzhou, China: Association for Computational
+[34] J. Yang, C. E. Jimenez, A. Wettig, K. Lieret, S. Yao, K. Narasimhan,             Linguistics, Nov. 2025, pp. 16 712–16 729. [Online]. Available:
+     and O. Press, “SWE-agent: Agent-computer interfaces enable automated             https://aclanthology.org/2025.findings-emnlp.907/
+     software engineering,” in Proceedings of the 38th International Confer-     [51] A. Gola, “Multi needle in a haystack,” https://blog.langchain.com/
+     ence on Neural Information Processing Systems, ser. NIPS ’24. Red                multi-needle-in-a-haystack/, Mar. 2024, accessed: 2025-11-23.
+     Hook, NY, USA: Curran Associates Inc., 2024.                                [52] K. Hong, A. Troynikov, and J. Huber, “Context rot: How increasing
+[35] Google Cloud, “Lifecycle of an incident,” https://docs.cloud.google.com/         input tokens impacts LLM performance,” Chroma, Tech. Rep., July
+     service-health/docs/incident-lifecycle, n.d., accessed: 2025-12-01.              2025. [Online]. Available: https://research.trychroma.com/context-rot
+[36] OpenTelemetry Authors, “OpenTelemetry specification: Overview,” https:      [53] Y. Chen, H. Xie, M. Ma, Y. Kang, X. Gao, L. Shi, Y. Cao, X. Gao,
+     //opentelemetry.io/docs/specs/otel/overview/, 2025, overview of the Open-        H. Fan, M. Wen, J. Zeng, S. Ghosh, X. Zhang, C. Zhang, Q. Lin,
+     Telemetry project and core concepts. Accessed: 2025-11-28.                       S. Rajmohan, D. Zhang, and T. Xu, “Automatic root cause analysis
+[37] H. Yan, Y. Chen, M. Ma, M. Wen, S. Lu, S. Zhang, T. Xu, R. Wang,                 via large language models for cloud incidents,” in Proceedings of the
+     C. Bansal, S. Rajmohan, C. Zhang, and D. Zhang, “An empirical study              Nineteenth European Conference on Computer Systems, ser. EuroSys ’24.
+     of production incidents in generative AI cloud services,” CoRR, vol.             New York, NY, USA: Association for Computing Machinery, 2024, pp.
+     abs/2504.08865, 2025, accepted to ISSRE 2025; preprint on arXiv.                 674–688. [Online]. Available: https://doi.org/10.1145/3627703.3629553
+     [Online]. Available: https://arxiv.org/abs/2504.08865                       [54] D. F. Bacon and P. F. Sweeney, “Fast static analysis of C++
+[38] M. Barletta, M. Cinque, C. Di Martino, Z. T. Kalbarczyk, and R. K. Iyer,         virtual function calls,” in Proceedings of the 11th ACM SIGPLAN
+     “Mutiny! How does Kubernetes fail, and what can we do about it?” in              Conference on Object-Oriented Programming, Systems, Languages, and
+     2024 54th Annual IEEE/IFIP International Conference on Dependable                Applications, ser. OOPSLA ’96. New York, NY, USA: Association
+     Systems and Networks (DSN), 2024, pp. 1–14.                                      for Computing Machinery, 1996, p. 324–341. [Online]. Available:
+[39] Discord Engineering, “25% or 6 to 4: The 11/6/23 authentication                  https://doi.org/10.1145/236337.236371
+     outage,” Nov. 2023, accessed: 2025-12-04. [Online]. Available:              [55] D. Grove and C. Chambers, “A framework for call graph construction
+     https://discord.com/blog/authentication-outage                                   algorithms,” ACM Trans. Program. Lang. Syst., vol. 23, no. 6, p. 685–746,
+[40] J. Graham-Cumming, “Details of the Cloudflare outage on July 2,                  Nov. 2001. [Online]. Available: https://doi.org/10.1145/506315.506316
+     2019,” Jul. 2019, accessed: 2025-12-04. [Online]. Available: https:         [56] Red Hat, Inc., “What is CI/CD?” https://www.redhat.com/en/topics/
+     //blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/           devops/what-is-ci-cd, June 2025, accessed: 2026-02-25.
+[41] CrowdStrike, “External technical root cause analysis —                      [57] M. A. Hammer, J. Dunfield, K. Headley, N. Labich, J. S. Foster,
+     channel file 291,” Aug. 2024, accessed: 2025-12-04. [Online].                    M. Hicks, and D. Van Horn, “Incremental computation with names,”
+     Available: https://www.crowdstrike.com/wp-content/uploads/2024/08/               SIGPLAN Not., vol. 50, no. 10, p. 748–766, Oct. 2015. [Online].
+     Channel-File-291-Incident-Root-Cause-Analysis-08.06.2024.pdf                     Available: https://doi.org/10.1145/2858965.2814305
+[42] Spotify Engineering, “Incident report: Spotify outage on april 16, 2025,”   [58] A. Souter and L. Pollock, “Incremental call graph reanalysis for object-
+     May 2025, accessed: 2025-12-04. [Online]. Available: https://engineering.        oriented software maintenance,” in Proceedings IEEE International
+     atspotify.com/2025/05/incident-report-spotify-outage-april-16                    Conference on Software Maintenance. ICSM 2001, 2001, pp. 682–691.
+[43] B. Dettelback, “About the Quay.io outage: Post mortem,” Aug. 2020,          [59] H. Liu, G. Li, J. F. Lukman, J. Li, S. Lu, H. S. Gunawi, and
+     accessed: 2025-12-04. [Online]. Available: https://www.redhat.com/en/            C. Tian, “DCatch: Automatically detecting distributed concurrency bugs
+     blog/about-the-quay.io-outage-post-mortem                                        in cloud systems,” in Proceedings of the Twenty-Second International
+[44] S. Yao, J. Zhao, D. Yu, N. Du, I. Shafran, K. R. Narasimhan, and Y. Cao,         Conference on Architectural Support for Programming Languages
+     “React: Synergizing reasoning and acting in language models,” in The             and Operating Systems, ser. ASPLOS ’17. New York, NY, USA:
+     Eleventh International Conference on Learning Representations, 2023.             Association for Computing Machinery, 2017, p. 677–691. [Online].
+     [Online]. Available: https://openreview.net/forum?id=WE_vluYUL-X                 Available: https://doi.org/10.1145/3037697.3037735
+[45] M. Chen, J. Tworek, H. Jun, Q. Yuan, H. P. de Oliveira Pinto, J. Kaplan,    [60] J. Lu, F. Li, L. Li, and X. Feng, “CloudRaid: Hunting concurrency bugs
+     H. Edwards, Y. Burda, N. Joseph, G. Brockman, A. Ray, R. Puri,                   in the cloud via log-mining,” in Proceedings of the 2018 26th ACM Joint
+     G. Krueger, M. Petrov, H. Khlaaf, G. Sastry, P. Mishkin, B. Chan,                Meeting on European Software Engineering Conference and Symposium
+     S. Gray, N. Ryder, M. Pavlov, A. Power, L. Kaiser, M. Bavarian,                  on the Foundations of Software Engineering, ser. ESEC/FSE 2018.
+     C. Winter, P. Tillet, F. P. Such, D. Cummings, M. Plappert, F. Chantzis,         New York, NY, USA: Association for Computing Machinery, 2018, p.
+     E. Barnes, A. Herbert-Voss, W. H. Guss, A. Nichol, A. Paino, N. Tezak,           3–14. [Online]. Available: https://doi.org/10.1145/3236024.3236071
+     J. Tang, I. Babuschkin, S. Balaji, S. Jain, W. Saunders, C. Hesse, A. N.    [61] X. Yuan and J. Yang, “Effective concurrency testing for distributed
+     Carr, J. Leike, J. Achiam, V. Misra, E. Morikawa, A. Radford, M. Knight,         systems,” in Proceedings of the Twenty-Fifth International Conference
+     M. Brundage, M. Murati, K. Mayer, P. Welinder, B. McGrew, D. Amodei,             on Architectural Support for Programming Languages and Operating
+     S. McCandlish, I. Sutskever, and W. Zaremba, “Evaluating large                   Systems, ser. ASPLOS ’20. New York, NY, USA: Association
+     language models trained on code,” arXiv preprint arXiv:2107.03374,               for Computing Machinery, 2020, p. 1141–1156. [Online]. Available:
+     2021. [Online]. Available: https://arxiv.org/abs/2107.03374                      https://doi.org/10.1145/3373376.3378484
+[46] LangChain AI, “LangGraph: Build resilient, stateful multi-agent             [62] M. Du, F. Li, G. Zheng, and V. Srikumar, “DeepLog: Anomaly
+     workflows for LLM applications,” 2025, open-source framework for                 detection and diagnosis from system logs through deep learning,” in
+     long-running, controllable LLM agents; integrates with LangChain.                Proceedings of the 2017 ACM SIGSAC Conference on Computer
+     [Online]. Available: https://github.com/langchain-ai/langgraph                   and Communications Security, ser. CCS ’17. New York, NY, USA:
+[47] TIOBE Software BV. TIOBE index for October 2025. Monthly                         Association for Computing Machinery, 2017, pp. 1285–1298. [Online].
+     updated indicator of the popularity of programming languages. [Online].          Available: https://doi.org/10.1145/3133956.3134015
+     Available: https://www.tiobe.com/tiobe-index/                               [63] H. Ren, B. Xu, Y. Wang, C. Yi, C. Huang, X. Kou, T. Xing, M. Yang,
+[48] C. E. Jimenez, J. Yang, A. Wettig, S. Yao, K. Pei, O. Press,                     J. Tong, and Q. Zhang, “Time-series anomaly detection service at
+     and K. R. Narasimhan, “SWE-bench: Can language models resolve                    Microsoft,” in Proceedings of the 25th ACM SIGKDD International
+     real-world GitHub issues?” in The Twelfth International Conference               Conference on Knowledge Discovery & Data Mining, ser. KDD ’19. New
+     York, NY, USA: Association for Computing Machinery, 2019, pp. 3009–          [76] L. Chen, P. Tong, Z. Jin, Y. Sun, J. Ye, and H. Xiong, “Plan-on-
+     3017. [Online]. Available: https://doi.org/10.1145/3292500.3330680                Graph: Self-correcting adaptive planning of large language model on
+[64] Z. Li, J. Chen, R. Jiao, N. Zhao, Z. Wang, S. Zhang, Y. Wu,                       knowledge graphs,” in Proceedings of the 38th International Conference
+     L. Jiang, L. Yan, Z. Wang, Z. Chen, W. Zhang, X. Nie, K. Sui, and                 on Neural Information Processing Systems, ser. NIPS ’24. Red
+     D. Pei, “Practical root cause localization for microservice systems               Hook, NY, USA: Curran Associates Inc., 2025. [Online]. Available:
+     via trace analysis,” in 2021 IEEE/ACM 29th International Symposium                https://doi.org/10.52202/079017-1189
+     on Quality of Service (IWQOS), 2021, pp. 1–10. [Online]. Available:          [77] X. Tan, X. Wang, Q. Liu, X. Xu, X. Yuan, and W. Zhang,
+     https://doi.org/10.1109/IWQOS52092.2021.9521340                                   “Paths-over-Graph: Knowledge graph empowered large language
+[65] S. Jha, S. Cui, S. S. Banerjee, T. Xu, J. Enos, M. Showerman, Z. T.               model reasoning,” in Proceedings of the ACM on Web Conference
+     Kalbarczyk, and R. K. Iyer, “Live forensics for HPC systems: A case               2025, ser. WWW ’25. New York, NY, USA: Association for
+     study on distributed storage systems,” in Proceedings of the International        Computing Machinery, 2025, pp. 3505–3522. [Online]. Available:
+     Conference for High Performance Computing, Networking, Storage                    https://doi.org/10.1145/3696410.3714892
+     and Analysis, ser. SC ’20. IEEE Press, 2020. [Online]. Available:            [78] Z. Chen, R. Tang, G. Deng, F. Wu, J. Wu, Z. Jiang, V. Prasanna,
+     https://doi.org/10.1109/SC41405.2020.00069                                        A. Cohan, and X. Wang, “LocAgent: Graph-guided LLM agents for
+[66] Y. Zhang, Z. Guan, H. Qian, L. Xu, H. Liu, Q. Wen, L. Sun,                        code localization,” in Proceedings of the 63rd Annual Meeting of the
+     J. Jiang, L. Fan, and M. Ke, “CloudRCA: A root cause analysis                     Association for Computational Linguistics (Volume 1: Long Papers),
+     framework for cloud computing platforms,” in Proceedings of the                   W. Che, J. Nabende, E. Shutova, and M. T. Pilehvar, Eds. Vienna,
+     30th ACM International Conference on Information & Knowledge                      Austria: Association for Computational Linguistics, Jul. 2025, pp. 8697–
+     Management, ser. CIKM ’21. New York, NY, USA: Association                         8727. [Online]. Available: https://aclanthology.org/2025.acl-long.426/
+     for Computing Machinery, 2021, pp. 4373–4382. [Online]. Available:           [79] J. Pu, Y. Li, Z. Chen, J. Liu, Z. Jiang, J. Chen, R. Shi, Z. Zheng,
+     https://doi.org/10.1145/3459637.3481903                                           and T. Zhang, “ErrorPrism: Reconstructing error propagation paths in
+[67] Y. Jiang, C. Zhang, S. He, Z. Yang, M. Ma, S. Qin, Y. Kang,                       cloud service systems,” arXiv preprint arXiv:2509.26463, 2025. [Online].
+     Y. Dang, S. Rajmohan, Q. Lin, and D. Zhang, “Xpert: Empowering                    Available: https://arxiv.org/abs/2509.26463
+     incident management with query recommendations via large language            [80] L. Pham, H. Ha, and H. Zhang, “Root cause analysis for microservice
+     models,” in Proceedings of the IEEE/ACM 46th International Conference             system based on causal inference: How far are we?” in Proceedings of
+     on Software Engineering, ser. ICSE ’24. New York, NY, USA:                        the 39th IEEE/ACM International Conference on Automated Software
+     Association for Computing Machinery, 2024. [Online]. Available:                   Engineering, ser. ASE ’24. New York, NY, USA: Association
+     https://doi.org/10.1145/3597503.3639081                                           for Computing Machinery, 2024, pp. 706–715. [Online]. Available:
+[68] D. Goel, F. Husain, A. Singh, S. Ghosh, A. Parayil, C. Bansal, X. Zhang,          https://doi.org/10.1145/3691620.3695065
+     and S. Rajmohan, “X-lifecycle learning for cloud incident management
+     using LLMs,” in Companion Proceedings of the 32nd ACM International
+     Conference on the Foundations of Software Engineering, ser. FSE 2024.
+     New York, NY, USA: Association for Computing Machinery, 2024, pp.
+     417–428. [Online]. Available: https://doi.org/10.1145/3663529.3663861
+[69] P. Jin, S. Zhang, M. Ma, H. Li, Y. Kang, L. Li, Y. Liu, B. Qiao,
+     C. Zhang, P. Zhao, S. He, F. Sarro, Y. Dang, S. Rajmohan, Q. Lin, and
+     D. Zhang, “Assess and summarize: Improve outage understanding with
+     large language models,” in Proceedings of the 31st ACM Joint European
+     Software Engineering Conference and Symposium on the Foundations of
+     Software Engineering, ser. ESEC/FSE 2023. New York, NY, USA:
+     Association for Computing Machinery, 2023, pp. 1657–1668. [Online].
+     Available: https://doi.org/10.1145/3611643.3613891
+[70] X. Zhang, T. Mittal, C. Bansal, R. Wang, M. Ma, Z. Ren, H. Huang, and
+     S. Rajmohan, “FLASH: A workflow automation agent for diagnosing
+     recurring incidents,” Microsoft Research Technical Report (preprint),
+     2024. [Online]. Available: https://www.microsoft.com/en-us/research/
+     wp-content/uploads/2024/10/FLASH_Paper.pdf
+[71] Y. Han, Q. Du, Y. Huang, J. Wu, F. Tian, and C. He, “The
+     potential of one-shot failure root cause analysis: Collaboration of
+     the large language model and small classifier,” in Proceedings of
+     the 39th IEEE/ACM International Conference on Automated Software
+     Engineering, ser. ASE ’24. New York, NY, USA: Association
+     for Computing Machinery, 2024, pp. 931–943. [Online]. Available:
+     https://doi.org/10.1145/3691620.3695475
+[72] C. Pei, Z. Wang, F. Liu, Z. Li, Y. Liu, X. He, R. Kang, T. Zhang,
+     J. Chen, J. Li, G. Xie, and D. Pei, “Flow-of-action: SOP enhanced
+     LLM-based multi-agent system for root cause analysis,” in Companion
+     Proceedings of the ACM on Web Conference 2025, ser. WWW ’25.
+     New York, NY, USA: Association for Computing Machinery, 2025, pp.
+     422–431. [Online]. Available: https://doi.org/10.1145/3701716.3715225
+[73] Y. Bei, W. Zhang, S. Wang, W. Chen, S. Zhou, H. Chen, Y. Li, J. Bu,
+     S. Pan, Y. Yu, I. King, F. Karray, and P. S. Yu, “Graphs meet AI
+     agents: Taxonomy, progress, and future opportunities,” 2025. [Online].
+     Available: https://arxiv.org/abs/2506.18019
+[74] B. Jin, C. Xie, J. Zhang, K. K. Roy, Y. Zhang, Z. Li, R. Li,
+     X. Tang, S. Wang, Y. Meng, and J. Han, “Graph chain-of-
+     thought: Augmenting large language models by reasoning on graphs,”
+     in Findings of ACL, 2024, pp. 163–184. [Online]. Available:
+     https://aclanthology.org/2024.findings-acl.11.pdf
+[75] J. Sun, C. Xu, L. Tang, S. Wang, C. Lin, Y. Gong, L. Ni, H.-Y. Shum,
+     and J. Guo, “Think-on-Graph: Deep and responsible reasoning of large
+     language model on knowledge graph,” in The Twelfth International
+     Conference on Learning Representations, 2024. [Online]. Available:
+     https://openreview.net/forum?id=nnVO1PvbTv
+

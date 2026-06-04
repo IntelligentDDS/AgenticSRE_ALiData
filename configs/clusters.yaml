@@ -1,0 +1,108 @@
+# ══════════════════════════════════════════════════════════════════════
+# AgenticSRE  ·  故障注入目标档案 (Fault Targets)
+# ──────────────────────────────────────────────────────────────────────
+# 这个文件定义"通算 / 智算"故障实验可以打到哪些目标：
+#   - k8s_clusters: 通算故障实验 - K8s 集群档案 (kubectl)
+#   - llm_hosts:    智算故障实验 - 裸机 GPU 主机档案 (SSH)
+#
+# 加载顺序:
+#   1) 首次启动: 从本文件 (configs/clusters.yaml) 读入默认值
+#   2) 之后:     UI "管理目标" 写入 data/cluster_profiles.json 覆盖默认值
+#                修改本文件不会影响已有的 cluster_profiles.json (除非删除)
+#
+# 在 UI 中怎么用:
+#   - 通算页 → 顶部"目标集群"下拉 = k8s_clusters[*].name
+#   - 智算页 → 切换"裸机"模式 → 主机下拉 = llm_hosts[*].name
+#   - 任何页面 → 点"管理目标"按钮 = 在浏览器里增删改 (无需重启)
+# ══════════════════════════════════════════════════════════════════════
+
+fault_targets:
+
+  # ─────────────────────────────────────────────────────────────────
+  # K8s 集群档案 (通算故障实验目标)
+  # ─────────────────────────────────────────────────────────────────
+  # 每条档案对应一套 kubectl 上下文，注入时会在 kubectl 命令前自动
+  # 拼接 `KUBECONFIG=<path>` + `--context=<ctx>`。
+  #
+  # 字段说明:
+  #   id                 (必填) 程序内引用 ID，仅 [a-z0-9_-]
+  #   name               (必填) UI 显示名
+  #   kubeconfig         (可选) kubeconfig 文件绝对路径
+  #                              空 = 用容器挂载的默认 ~/.kube/config
+  #   context            (可选) kubectl context 名
+  #                              空 = 用 kubeconfig 当前 context
+  #   default_namespace  (可选) 默认 namespace, 注入时 UI 可临时覆盖
+  #   description        (可选) UI 提示文字
+  k8s_clusters:
+
+    - id: default
+      name: "默认集群"
+      kubeconfig: ""                       # 用容器挂载的 ~/.kube/config
+      context: ""                          # 用当前 context
+      default_namespace: "default"
+      description: "通过 docker-compose 挂载的本机 kubeconfig"
+
+    # ─── 示例: 多集群场景 (按需启用并修改) ───
+    #
+    # - id: social-network
+    #   name: "Social-Network 测试集群"
+    #   kubeconfig: ""
+    #   context: ""
+    #   default_namespace: "test-social-network"
+    #   description: "DeathStarBench social-network 微服务"
+    #
+    # - id: aliyun-prod
+    #   name: "阿里云生产集群"
+    #   kubeconfig: "/root/.kube/aliyun-prod-config"   # 需挂载到容器内
+    #   context: "aliyun-prod"
+    #   default_namespace: "production"
+    #   description: "ACK 生产环境 (慎用)"
+
+  # ─────────────────────────────────────────────────────────────────
+  # 裸机 GPU 主机档案 (智算故障实验目标)
+  # ─────────────────────────────────────────────────────────────────
+  # 用于 vLLM/GPU 不跑在 K8s 内的场景。注入时容器内执行：
+  #     ssh -i <ssh_key_path> -J <jump_host> <ssh_user>@<host> <fault-cmd>
+  # 因此容器需要能挂载到 ssh_key_path (docker-compose 已挂载 ~/.ssh:ro)。
+  #
+  # 字段说明:
+  #   id            (必填) 程序内引用 ID，仅 [a-z0-9_-]
+  #   name          (必填) UI 显示名
+  #   host          (必填) 目标机 IP 或 hostname
+  #   ssh_user      (必填) 远程登录用户
+  #   ssh_key_path  (可选) 容器内 SSH 私钥路径
+  #                       空 = ssh-agent 或密码 (不推荐)
+  #   jump_host     (可选) 跳板机, 格式 user@host
+  #                       空 = 直连
+  #   gpu           (可选) GPU 型号信息, 仅展示用
+  #   role          (可选) 节点角色, 仅展示用
+  llm_hosts:
+
+    - id: t4-127
+      name: "T4-127"
+      host: "33.33.33.127"
+      ssh_user: "root"
+      ssh_key_path: "/root/.ssh/id_rsa"
+      jump_host: "guest@222.200.180.22"
+      gpu: "NVIDIA T4 x3"
+      role: "vLLM 推理服务 / 负载节点"
+
+    - id: t4-128
+      name: "T4-128"
+      host: "33.33.33.128"
+      ssh_user: "root"
+      ssh_key_path: "/root/.ssh/id_rsa"
+      jump_host: "guest@222.200.180.22"
+      gpu: "NVIDIA T4 x3"
+      role: "vLLM 推理服务 / 对照节点"
+
+    # ─── 示例: 单机直连 (无跳板) ───
+    #
+    # - id: local-a100
+    #   name: "本地 A100"
+    #   host: "10.0.0.50"
+    #   ssh_user: "ubuntu"
+    #   ssh_key_path: "/root/.ssh/id_ed25519"
+    #   jump_host: ""                          # 直连
+    #   gpu: "NVIDIA A100 80G"
+    #   role: "本地推理"

@@ -1,0 +1,34 @@
+services:
+  agenticsre:
+    image: agenticsre:latest
+    container_name: agenticsre
+    network_mode: host
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - VLLM_FAULT_INJECTOR_DIR=/app/vllm_fault_injector
+    volumes:
+      - ./agents:/app/agents:ro
+      - ./configs:/app/configs:ro
+      - ./eval:/app/eval:ro
+      - ./memory:/app/memory:ro
+      - ./observability:/app/observability:ro
+      - ./orchestrator:/app/orchestrator:ro
+      - ./paradigms:/app/paradigms:ro
+      - ./tools:/app/tools:ro
+      - ./web_app:/app/web_app:ro
+      - ./main.py:/app/main.py:ro
+      - ./mcp_server.py:/app/mcp_server.py:ro
+      - ./vllm_fault_injector:/app/vllm_fault_injector:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ~/.kube/config:/root/.kube/config:ro
+      - ~/.ssh:/root/.ssh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3

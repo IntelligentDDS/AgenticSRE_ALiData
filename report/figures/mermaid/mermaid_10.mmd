@@ -1,0 +1,8 @@
+graph TB
+    E["共享证据"] --> A1["分析 #1<br/>Temperature=0.1<br/>保守策略"]
+    E --> A2["分析 #2<br/>Temperature=0.5<br/>均衡策略"]
+    E --> A3["分析 #3<br/>Temperature=0.8<br/>探索策略"]
+    A1 --> V["投票聚合<br/>Majority Vote"]
+    A2 --> V
+    A3 --> V
+    V --> R["最终结果"]

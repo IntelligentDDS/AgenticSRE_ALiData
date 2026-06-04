@@ -1,0 +1,6 @@
+graph TB
+    H["假设生成<br/>Hypothesis Agent"] --> P["调查规划<br/>Planning Agent"]
+    P --> I["并行证据采集<br/>Domain Agents"]
+    I --> V["假设重排序<br/>Hypothesis Re-ranking"]
+    V -->|"置信度 < 阈值"| P
+    V -->|"置信度 ≥ 阈值"| C["关联分析 + 最终报告"]

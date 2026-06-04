@@ -1,0 +1,8 @@
+image=agenticsre:latest
+host=lsy-0
+exported_at=2026-05-31T11:23:10Z
+docker_image_id=sha256:73c5e3de2a15f2f4d5f14fb61a081de66f73bc4508b15c41de1f006411777a19
+docker_image_size=214750571
+docker_repo_tags=["agenticsre:latest","agenticsre:v20260527-0221"]
+container=018bd2c3fdcf agenticsre:latest agenticsre Up 53 minutes (healthy)
+health={"status":"ok","timestamp":1780226591.0596666,"llm_configured":true}

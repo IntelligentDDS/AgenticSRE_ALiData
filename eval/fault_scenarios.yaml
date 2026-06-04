@@ -1,0 +1,412 @@
+# ═══════════════════════════════════════════════════════════
+# AgenticSRE — Social-Network Cluster Fault Scenarios
+# For E2E evaluation with REALISTIC ALERT descriptions
+# Descriptions are SYMPTOM-ONLY — no root cause hints
+# ═══════════════════════════════════════════════════════════
+
+scenarios:
+  # ── CPU Stress ──
+  - id: sn-cpu-stress
+    name: "Social-Network CPU Stress"
+    category: resource
+    fault_type: cpu_pressure
+    description: "[ALERT] High CPU usage detected on node in test-social-network namespace. Post composition API response time increased from 50ms to 2000ms+. Multiple container CPU throttling events observed."
+    target_service: compose-post-service
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network run cpu-stress --image=containerstack/alpine-stress --restart=Never -- stress --cpu 4 --timeout 180"
+      cleanup:
+        - "kubectl -n test-social-network delete pod cpu-stress --force --grace-period=0"
+    expected:
+      root_cause_contains: ["cpu", "stress", "resource", "compose-post"]
+      fault_type: "resource_exhaustion"
+    validation:
+      max_detection_time_s: 180
+      min_confidence: 0.5
+
+  # ── Memory Pressure ──
+  - id: sn-mem-pressure
+    name: "Social-Network Memory Pressure"
+    category: resource
+    fault_type: memory_pressure
+    description: "[ALERT] Pod in test-social-network namespace terminated unexpectedly. Container exit code 137 (SIGKILL). Node memory utilization above 90%. Timeline service intermittently unreachable."
+    target_service: user-timeline-service
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network run mem-stress --image=containerstack/alpine-stress --restart=Never --limits='memory=64Mi' -- stress --vm 1 --vm-bytes 128M --timeout 180"
+      cleanup:
+        - "kubectl -n test-social-network delete pod mem-stress --force --grace-period=0"
+    expected:
+      root_cause_contains: ["memory", "oom", "pressure", "limit"]
+      fault_type: "resource_exhaustion"
+    validation:
+      max_detection_time_s: 120
+      min_confidence: 0.5
+
+  # ── CrashLoop ──
+  - id: sn-crashloop
+    name: "Social-Network CrashLoop"
+    category: application
+    fault_type: crash_loop
+    description: "[ALERT] Pod restart count rapidly increasing in test-social-network namespace. Container exiting immediately after start. Back-off restarting pattern detected."
+    target_service: crash-test
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network run crash-test --image=busybox --restart=Always -- /bin/sh -c 'exit 1'"
+      cleanup:
+        - "kubectl -n test-social-network delete pod crash-test --force --grace-period=0"
+    expected:
+      root_cause_contains: ["crash", "restart", "backoff", "exit"]
+      fault_type: "application_crash"
+    validation:
+      max_detection_time_s: 180
+      min_confidence: 0.5
+
+  # ── Network Delay ──
+  - id: sn-network-delay
+    name: "Social-Network Network Delay"
+    category: network
+    fault_type: network_latency
+    description: "[ALERT] Social network frontend (nginx-thrift) P99 latency spiked from 100ms to 5000ms+. All downstream API calls showing increased response time. Connection timeout errors increasing. No pod crashes or restarts observed."
+    target_service: nginx-thrift
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network exec deploy/nginx-thrift -- tc qdisc add dev eth0 root netem delay 500ms 2>/dev/null || true"
+      cleanup:
+        - "kubectl -n test-social-network exec deploy/nginx-thrift -- tc qdisc del dev eth0 root 2>/dev/null || true"
+    expected:
+      root_cause_contains: ["network", "latency", "delay", "timeout", "nginx"]
+      fault_type: "network_issue"
+    validation:
+      max_detection_time_s: 120
+      min_confidence: 0.5
+
+  # ── Service Scale Down ──
+  - id: sn-svc-scale-down
+    name: "Social-Network Service Scale Down"
+    category: availability
+    fault_type: service_unavailable
+    description: "[ALERT] Home timeline read API returning 503 Service Unavailable. No ready endpoints found for home-timeline-service. Users unable to load their home timeline feed. Other services appear healthy."
+    target_service: home-timeline-service
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network scale deploy/home-timeline-service --replicas=0"
+      cleanup:
+        - "kubectl -n test-social-network scale deploy/home-timeline-service --replicas=1"
+    expected:
+      root_cause_contains: ["replica", "scale", "unavailable", "endpoint", "home-timeline"]
+      fault_type: "service_disruption"
+    validation:
+      max_detection_time_s: 120
+      min_confidence: 0.5
+
+  # ═══════════════════════════════════════════════
+  #  级联故障 — 在业务服务Pod内部注入
+  # ═══════════════════════════════════════════════
+
+  # ── MongoDB 慢查询导致级联延迟 ──
+  - id: sn-db-slow
+    name: "Post Storage Write Latency Spike"
+    category: cascade
+    fault_type: database_degradation
+    description: "[ALERT] Post composition requests failing with timeout errors. post-storage-service P99 latency exceeded 10s (normal: 50ms). Compose-post-service reporting upstream connection timeouts. New posts are not being saved."
+    target_service: post-storage-mongodb
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network exec deploy/post-storage-mongodb -- bash -c 'mongosh --eval \"db.adminCommand({sleep:1, w:true, secs:120})\" &' || true"
+        - "kubectl -n test-social-network exec deploy/post-storage-mongodb -- bash -c 'dd if=/dev/zero of=/tmp/diskload bs=1M count=500 &' || true"
+      cleanup:
+        - "kubectl -n test-social-network exec deploy/post-storage-mongodb -- bash -c 'kill $(pgrep dd) 2>/dev/null; rm -f /tmp/diskload' || true"
+        - "kubectl -n test-social-network rollout restart deploy/post-storage-mongodb"
+    expected:
+      root_cause_contains: ["mongodb", "post-storage", "database", "slow", "latency", "timeout", "write", "io"]
+      fault_type: "dependency_failure"
+    validation:
+      max_detection_time_s: 180
+      min_confidence: 0.4
+
+  # ── Redis 缓存宕机导致全链路性能退化 ──
+  - id: sn-redis-down
+    name: "Home Timeline Performance Degradation"
+    category: cascade
+    fault_type: cache_failure
+    description: "[ALERT] Home timeline read latency increased 50x (from 20ms to 1000ms+). home-timeline-service reporting connection refused errors to an upstream dependency. Jaeger traces show abnormal span durations on home-timeline read path. No pod crashes detected."
+    target_service: home-timeline-redis
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network scale deploy/home-timeline-redis --replicas=0"
+      cleanup:
+        - "kubectl -n test-social-network scale deploy/home-timeline-redis --replicas=1"
+    expected:
+      root_cause_contains: ["redis", "cache", "home-timeline", "unavailable", "connection"]
+      fault_type: "dependency_failure"
+    validation:
+      max_detection_time_s: 120
+      min_confidence: 0.5
+
+  # ── Compose-Post 服务 CPU 饱和导致写入超时 ──
+  - id: sn-compose-cpu
+    name: "Post Composition Timeout"
+    category: cascade
+    fault_type: service_cpu_saturation
+    description: "[ALERT] Post composition API returning 504 Gateway Timeout. compose-post-service CPU utilization at 100%. Write path completely blocked — no new posts being created. Read operations unaffected. Frontend error rate spiked to 40%."
+    target_service: compose-post-service
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c 'for i in 1 2 3 4; do while true; do :; done & done'"
+      cleanup:
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c 'kill $(pgrep -f \"while true\") 2>/dev/null' || true"
+    expected:
+      root_cause_contains: ["compose-post", "cpu", "timeout", "latency", "write", "saturation"]
+      fault_type: "resource_exhaustion"
+    validation:
+      max_detection_time_s: 120
+      min_confidence: 0.5
+
+  # ── Memcached 宕机导致用户服务降级 ──
+  - id: sn-memcached-down
+    name: "User Authentication Slowdown"
+    category: cascade
+    fault_type: cache_failure
+    description: "[ALERT] All API endpoints showing increased latency (+300ms baseline). user-service response time degraded from 5ms to 200ms+. Login and profile operations abnormally slow. Traces show user-service as bottleneck across all request paths."
+    target_service: user-memcached
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network scale deploy/user-memcached --replicas=0"
+      cleanup:
+        - "kubectl -n test-social-network scale deploy/user-memcached --replicas=1"
+    expected:
+      root_cause_contains: ["memcached", "user", "cache", "unavailable", "auth", "connection"]
+      fault_type: "dependency_failure"
+    validation:
+      max_detection_time_s: 120
+      min_confidence: 0.4
+
+  # ── 多服务同时故障（复合故障） ──
+  - id: sn-multi-fault
+    name: "Multiple Service Degradation"
+    category: cascade
+    fault_type: compound_failure
+    description: "[ALERT] Two independent anomalies detected simultaneously: (1) Social graph follower/following queries returning connection errors. (2) Text processing in post composition showing extreme latency. The two failure patterns appear unrelated but co-occurring. Overall system health score dropped to 60%."
+    target_service: multiple
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network scale deploy/social-graph-redis --replicas=0"
+        - "kubectl -n test-social-network exec deploy/text-service -- bash -c 'for i in 1 2 3 4; do while true; do :; done & done'"
+      cleanup:
+        - "kubectl -n test-social-network scale deploy/social-graph-redis --replicas=1"
+        - "kubectl -n test-social-network exec deploy/text-service -- bash -c 'kill $(pgrep -f \"while true\") 2>/dev/null' || true"
+    expected:
+      root_cause_contains: ["social-graph", "redis", "text-service", "cpu", "multiple", "compound"]
+      fault_type: "compound_failure"
+    validation:
+      max_detection_time_s: 240
+      min_confidence: 0.3
+
+  # ── Network Partition (跨服务网络分区) ──
+  - id: sn-network-partition
+    name: "Partial Post Failure"
+    category: cascade
+    fault_type: network_partition
+    description: "[ALERT] Intermittent post composition failures — posts containing URLs fail with timeout, posts without URLs succeed normally. url-shorten-service health check failing. Partial outage pattern: ~30% of compose-post requests affected."
+    target_service: url-shorten-service
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network exec deploy/url-shorten-service -- bash -c 'apt-get update -qq && apt-get install -qq -y iptables > /dev/null 2>&1; iptables -A INPUT -p tcp --dport 9090 -j DROP; iptables -A OUTPUT -p tcp --sport 9090 -j DROP' || true"
+      cleanup:
+        - "kubectl -n test-social-network exec deploy/url-shorten-service -- bash -c 'iptables -F' || true"
+        - "kubectl -n test-social-network rollout restart deploy/url-shorten-service"
+    expected:
+      root_cause_contains: ["url-shorten", "network", "connection", "timeout", "refused", "partition"]
+      fault_type: "network_issue"
+    validation:
+      max_detection_time_s: 180
+      min_confidence: 0.4
+
+  # ═══════════════════════════════════════════════
+  #  复杂故障 — 多阶段 / 灰度 / 观测盲区 / 干扰信号
+  # ═══════════════════════════════════════════════
+
+  # ── 多阶段写路径级联：数据库 IO 慢 + 稍后 Compose CPU 饱和 ──
+  - id: sn-staged-write-cascade
+    name: "Staged Write Path Cascade"
+    category: complex
+    fault_type: staged_compound_failure
+    complexity: high
+    description: "[ALERT] Post creation latency increases in two waves. First, post-storage write latency rises above 5s; about one minute later compose-post-service CPU climbs sharply and 504 errors appear at the frontend. Read APIs remain mostly healthy. The incident timeline suggests a staged cascade rather than a single-point outage."
+    target_service: compose-post-service,post-storage-mongodb
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network exec deploy/post-storage-mongodb -- bash -c 'dd if=/dev/zero of=/tmp/agenticsre-diskload bs=1M count=700 2>/tmp/agenticsre-diskload.log &' || true"
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c '(sleep 45; for i in 1 2; do while true; do :; done & done) &'"
+      cleanup:
+        - "kubectl -n test-social-network exec deploy/post-storage-mongodb -- bash -c 'kill $(pgrep dd) 2>/dev/null; rm -f /tmp/agenticsre-diskload /tmp/agenticsre-diskload.log' || true"
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c 'kill $(pgrep -f \"while true\") 2>/dev/null' || true"
+    expected:
+      root_cause_contains: ["post-storage", "mongodb", "compose-post", "cpu", "cascade", "write", "latency"]
+      fault_type: "compound_failure"
+    validation:
+      max_detection_time_s: 240
+      min_confidence: 0.35
+
+  # ── 灰度故障：只有含 URL 的发帖路径受影响 ──
+  - id: sn-gray-url-brownout
+    name: "Gray Failure on URL Post Path"
+    category: complex
+    fault_type: gray_failure
+    complexity: high
+    description: "[ALERT] Only posts containing URLs are slow or timing out. Normal text-only post composition and read APIs remain mostly healthy. url-shorten-service CPU usage is elevated and its downstream calls show intermittent timeout. Overall error rate is moderate, but one user workflow is severely degraded."
+    target_service: url-shorten-service
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network exec deploy/url-shorten-service -- bash -c 'for i in 1 2 3; do while true; do :; done & done'"
+      cleanup:
+        - "kubectl -n test-social-network exec deploy/url-shorten-service -- bash -c 'kill $(pgrep -f \"while true\") 2>/dev/null' || true"
+    expected:
+      root_cause_contains: ["url-shorten", "url", "cpu", "partial", "gray", "timeout"]
+      fault_type: "resource_exhaustion"
+    validation:
+      max_detection_time_s: 180
+      min_confidence: 0.4
+
+  # ── 观测盲区：业务故障同时 kube-state-metrics 临时不可用 ──
+  - id: sn-observability-blindspot
+    name: "RCA Under Observability Blind Spot"
+    category: complex
+    fault_type: observability_blindspot
+    complexity: high
+    description: "[ALERT] Post composition write latency and 504 errors are increasing, but several Kubernetes object metrics disappear from dashboards at the same time. Metrics coverage is incomplete while user-facing errors continue. The RCA system must distinguish the business fault from the monitoring blind spot."
+    target_service: compose-post-service,kube-state-metrics
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n observe scale deploy/kube-prom-kube-state-metrics --replicas=0"
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c 'for i in 1 2 3; do while true; do :; done & done'"
+      cleanup:
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c 'kill $(pgrep -f \"while true\") 2>/dev/null' || true"
+        - "kubectl -n observe scale deploy/kube-prom-kube-state-metrics --replicas=1"
+    expected:
+      root_cause_contains: ["compose-post", "cpu", "metrics", "observability", "blind", "kube-state-metrics"]
+      fault_type: "compound_failure"
+    validation:
+      max_detection_time_s: 240
+      min_confidence: 0.3
+
+  # ── 干扰信号：无关 CrashLoop 与真实 CPU 饱和同时出现 ──
+  - id: sn-stale-signal-distractor
+    name: "Distractor Signal During CPU Saturation"
+    category: complex
+    fault_type: distractor_signal
+    complexity: medium
+    description: "[ALERT] compose-post-service write path is timing out and CPU is saturated. At the same time, an unrelated debug pod is crash-looping in the same namespace. The user-facing symptom is tied to post composition, but Kubernetes events contain a noisy crash signal that may distract RCA."
+    target_service: compose-post-service
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network run rca-distractor-crash --image=busybox --restart=Always -- /bin/sh -c 'exit 1'"
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c 'for i in 1 2 3 4; do while true; do :; done & done'"
+      cleanup:
+        - "kubectl -n test-social-network delete pod rca-distractor-crash --force --grace-period=0"
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c 'kill $(pgrep -f \"while true\") 2>/dev/null' || true"
+    expected:
+      root_cause_contains: ["compose-post", "cpu", "saturation", "distractor", "crash", "not root cause"]
+      fault_type: "resource_exhaustion"
+    validation:
+      max_detection_time_s: 180
+      min_confidence: 0.4
+
+  # ── 瞬态缓存抖动：Redis 短时不可用后恢复，症状有滞后 ──
+  - id: sn-transient-cache-flap
+    name: "Transient Cache Flap with Lagging Symptoms"
+    category: complex
+    fault_type: transient_dependency_failure
+    complexity: high
+    description: "[ALERT] Home timeline latency spikes for several minutes and then partially recovers. Error logs show short bursts of upstream connection failures, but current pod health looks normal. The root cause is transient and the symptom lags behind the dependency recovery."
+    target_service: home-timeline-redis
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "bash -c 'kubectl -n test-social-network scale deploy/home-timeline-redis --replicas=0; sleep 75; kubectl -n test-social-network scale deploy/home-timeline-redis --replicas=1' &"
+      cleanup:
+        - "kubectl -n test-social-network scale deploy/home-timeline-redis --replicas=1"
+    expected:
+      root_cause_contains: ["redis", "home-timeline", "transient", "cache", "connection", "recover"]
+      fault_type: "dependency_failure"
+    validation:
+      max_detection_time_s: 240
+      min_confidence: 0.35
+
+  # ── 调度/容量复杂故障：副本扩容失败 + 现有服务过载 ──
+  - id: sn-scaleout-capacity-failure
+    name: "Scale-Out Capacity Failure"
+    category: complex
+    fault_type: scheduling_capacity_failure
+    complexity: high
+    description: "[ALERT] Post composition traffic increases and HPA-like scale-out is attempted, but additional compose-post pods remain Pending or fail scheduling due to unrealistic resource requests. Existing compose-post instances become overloaded and frontend 504 errors increase."
+    target_service: compose-post-service
+    inject:
+      method: kubectl
+      namespace: test-social-network
+      commands:
+        - "kubectl -n test-social-network run compose-post-overrequest --image=busybox --restart=Never --requests='cpu=100,memory=1Ti' -- /bin/sh -c 'sleep 180'"
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c 'for i in 1 2; do while true; do :; done & done'"
+      cleanup:
+        - "kubectl -n test-social-network delete pod compose-post-overrequest --force --grace-period=0"
+        - "kubectl -n test-social-network exec deploy/compose-post-service -- bash -c 'kill $(pgrep -f \"while true\") 2>/dev/null' || true"
+    expected:
+      root_cause_contains: ["pending", "insufficient", "resource", "scheduling", "compose-post", "capacity"]
+      fault_type: "resource_exhaustion"
+    validation:
+      max_detection_time_s: 240
+      min_confidence: 0.35
+
+# ── Workload Configuration ──
+workload:
+  target_url: "http://localhost:8080"
+  endpoints:
+    - path: "/wrk2-api/post/compose"
+      method: POST
+      rate: 10
+    - path: "/wrk2-api/home-timeline/read"
+      method: GET
+      rate: 20
+    - path: "/wrk2-api/user-timeline/read"
+      method: GET
+      rate: 15
+  duration_per_scenario: 30
+
+# ── Scoring Weights (adjusted: reduce latency penalty, increase accuracy weight) ──
+scoring:
+  detection_time_weight: 0.10
+  confidence_weight: 0.25
+  root_cause_match_weight: 0.40
+  remediation_quality_weight: 0.25

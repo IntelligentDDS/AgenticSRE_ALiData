@@ -1,0 +1,592 @@
+                                                                   Understanding the planning of LLM agents: A survey
+                                                          Xu Huang1 , Weiwen Liu2 , Xiaolong Chen1 , Xingmei Wang1 , Hao Wang1 ,
+                                                                Defu Lian1∗ , Yasheng Wang2 , Ruiming Tang2 , Enhong Chen1
+                                                                  1
+                                                                    University of Science and Technology of China, Hefei, China
+                                                                           2
+                                                                             Huawei Noah’s Ark Lab, Shenzhen, China
+                                                          {xuhuangcs, chenxiaolong, xingmeiwang}@mail.ustc.edu.cn, {haowang, liandefu,
+                                                           cheneh}@ustc.edu.cn, {liuweiwen8, wangyasheng, tangruiming}@huawei.com
+
+                                                                       Abstract
+
+
+
+
+arXiv:2402.02716v1 [cs.AI] 5 Feb 2024
+                                                 As Large Language Models (LLMs) have shown
+                                                 significant intelligence, the progress to leverage
+                                                 LLMs as planning modules of autonomous agents
+                                                 has attracted more attention. This survey provides
+                                                                                                                                                      nal
+                                                 the first systematic view of LLM-based agents                                                     ter r             Re
+                                                                                                                                                                       fle
+                                                                                                                                                 Ex anne
+                                                 planning, covering recent works aiming to improve                                                 Pl                          ion
+                                                                                                                                                                             ct
+                                                 planning ability. We provide a taxonomy of ex-                                                         Planning
+                                                 isting works on LLM-Agent planning, which can                                  S e l e c t io           Ability                mo r y
+                                                 be categorized into Task Decomposition, Plan Se-                                     n
+                                                                                                                                                                              Me
+                                                 lection, External Module, Reflection and Memory.                                                 Dec
+                                                                                                                                                        o m p o si t i o n
+                                                 Comprehensive analyses are conducted for each di-
+                                                 rection, and further challenges for the field of re-                                             CoT     ReAct       PoT
+                                                 search are discussed.
+                                                                                                                                Visual Plan and Prog Hugging
+                                                                                                                               ChatGPT   Solve  prompt GPT
+
+
+                                        1       Introduction
+                                                                                                                    Figure 1: Taxonomy on LLM-Agent planning.
+                                        Autonomous agents have been recognized as intelligent en-
+                                        tities capable of accomplishing specific tasks, via perceiving
+                                        the environment, planning, and executing actions. Planning,       deep models, which serve as the policy network or reward
+                                        as one of the most critical capabilities for agents, requires     model. While RL algorithms often require a large number
+                                        complicated understanding, reasoning, and decision-making         of samples (interactions with the environment) to learn an ef-
+                                        progress [Ghallab et al., 2004].                                  fective policy, this can be impractical or costly in scenarios
+                                            Despite the abstract concept of planning, a general for-      where collecting data is time-consuming or expensive.
+                                        mulation of the planning tasks can be described as follows.
+                                        Given time step t, with the environment denoted as E, the            In recent years, the emergence of Large Language Models
+                                        action space as A, the task goal as g, and the action at step     (LLMs) has marked a paradigm shift. LLMs have achieved
+                                        t as at ∈ A, the planning procedure can be expressed as the       remarkable success across various domains, showcasing sig-
+                                        generation of a sequence of actions:                              nificant intelligence in reasoning, tool usage, planning, and
+                                                       p = (a0 , a1 , · · · , at ) = plan(E, g; Θ, P).    instruction-following. The surprising intelligence of LLMs
+                                                                                                          sheds light on employing LLMs as the cognitive core of
+                                         where Θ and P represent the parameters of the LLM and the
+                                                                                                          agents, thereby offering the potential to improve planning
+                                        prompts for the task, respectively.
+                                                                                                          ability. Numerous methodologies have been developed to
+                                           Conventional works mainly rely on symbolic methods or
+                                                                                                          harness the potential of LLMs for agent planning. While ex-
+                                        reinforcement learning-based methods, such as Planning Do-
+                                                                                                          isting surveys have attempted to summarize techniques for
+                                        main Definition Language (PDDL) [Aeronautiques et al.,
+                                                                                                          LLMs [Zhao et al., 2023a], LLMs for decision-making [Yang
+                                        1998; Haslum et al., 2019] or policy learning [He et al., 2015;
+                                                                                                          et al., 2023a], reasoning [Sun et al., 2023], tool learning [Qin
+                                        Yao et al., 2020a]. However, those conventional methods
+                                                                                                          et al., 2023], and autonomous agents [Wang et al., 2023a],
+                                        have several limitations. Symbolic methods require conver-
+                                                                                                          they often lack a detailed analysis of planning ability within
+                                        sion from flexible natural language-described problems into
+                                                                                                          the literature. In this survey, we analyze the latest research
+                                        symbolic modeling, which may require human experts’ ef-
+                                                                                                          works and discuss the advantages and limitations, aiming to
+                                        forts. Usually, this kind of method lacks error tolerance, re-
+                                                                                                          provide a systematic view of the planning ability of LLM-
+                                        sulting in failures even if there are only a few errors. Re-
+                                                                                                          based agents. Existing methods are further categorized into
+                                        inforcement learning (RL) methods are often combined with
+                                                                                                          five representative directions, with each direction undergo-
+                                            ∗
+                                                Defu Lian is the corresponding author.                    ing comprehensive analysis. Furthermore, we have evaluated
+several representative methods on four benchmarks. To the         It encourages LLM to reflect on failures and then refine the
+best of our knowledge, this is the first work that comprehen-     plan. The process could be formulated as follows:
+sively analyzes LLM-based agents from the planning abili-                             p0 = plan(E, g; Θ, P);
+ties.                                                                                 ri = reflect(E, g, pi ; Θ, P);
+   The subsequent sections of this paper are organized as fol-
+lows. In Section 2, we categorize the works into five main-                         pi+1 = refine(E, g, pi , ri ; Θ, P);
+stream directions and analyze their ideas regarding planning      Memory-augmented Planning. This kind of approach en-
+ability. Sections 3 to 7 provide detailed discussions and anal-   hances planning with an extra memory module, in which
+ysis of each direction. Finally, Section 9 concludes the sur-     valuable information is stored, such as commonsense knowl-
+vey, offering insights into future directions in this field.      edge, past experiences, domain-specific knowledge, et al.
+                                                                  The information is retrieved when planning, serving as auxil-
+                                                                  iary signals. The process could be formulated as follows:
+2   Taxonomy
+                                                                                          m = retrieve(E, g; M);
+As the research on the planning ability of LLM-based agents
+                                                                                          p = plan(E, g, m; Θ, P).
+presents a flourishing scene, various methods have been pro-
+posed to exploit the upper limit of planning ability. To have a    where M represents the memory module.
+better bird’s view of existing advanced works, we pick out           The five directions are interconnected rather than mutually
+some representative and influential works, analyzing their        exclusive, often involving the concurrent adoption of multi-
+motivations and essential ideas. To provide a better under-       ple techniques. In the subsequent sections, we delve deeper
+standing, we illustrate the analysis in Table 1.                  into the five research directions concerning LLM-agent plan-
+   According to the table, we present a novel and system-         ning, elucidating their motivations, proposing representation
+atic taxonomy for LLM-based agent plannning that divides          solutions, and addressing inherent limitations.
+existing works into five important categories, covering task
+decomposition, multi-plan selection, external module-aided        3     Task Decomposition
+planning, reflection and refinement and memory-augmented          In real-world scenarios, environments are often characterized
+planning, as illustrated in Figure 1. Here we briefly summa-      by complexity and variability, thereby addressing complex
+rize those five directions as below.                              tasks through a one-step planning process is a formidable
+Task Decomposition. Tasks in real life are usually compli-        challenge.
+cated and multi-step, bringing severe hardness for planning.
+This kind of method adopts the idea of divide and conquer,
+decomposing the complicated into several sub-tasks and then
+sequentially planning for each sub-task. The process could
+be formulated as follows:                                                    Goal
+                                                                                             LLM Agent                      LLM Agent
+                                                                                                                                         …
+
+        g0 , g1 , · · · , gn = decompose(E, g; Θ, P);                        Decompose
+                                                                                                     ①
+
+
+        pi = (ai0 , ai1 , · · · aim ) = sub-plan(E, gi ; Θ, P).                                           …                              …
+                                                                                         Sub      Sub          Sub      Sub      Sub          Sub
+                                                                                        Goal-1   Goal-2       Goal-n   Goal-1   Goal-2       Goal-n
+Multi-plan Selection. This kind of method focuses on lead-                   Sub-plan
+                                                                                                          …
+ing the LLM to “think” more, generating various alternative
+                                                                                    ②
+plans for a task. Then a task-related search algorithm is em-
+ployed to select one plan to execute. The process could be                     (a) Decomposition-First                    (b) Interleaved
+formulated as follows:
+            P = p1 , p2 , · · · , pn = plan(E, g; Θ, P);                   Figure 2: Types of task decomposition manners.
+            ∗
+           p = select(E, g, P ; Θ, F).
+                                                                     This simplification of complicated tasks is a remarkable
+ where F represents the search strategies, such as some tree      human ability, evident in the decomposition of one task into
+search algorithms [Yao et al., 2023; Zhao et al., 2023b].         several simpler sub-tasks [Schraagen et al., 2000], which is
+External Planner-Aided Planning. This methodology is              analogous to the well-known algorithmic strategy called “di-
+crafted to employ an external planner to elevate the planning     vide and conquer”, as illustrated in Eq. (1). Task decomposi-
+procedure, aiming to address the issues of efficiency and in-     tion generally involves two crucial steps: firstly, decomposing
+feasibility of generated plans, while the LLM mainly plays        the complex task, referred to as the “decompose” step, and
+the role in formalizing the tasks. The process could be for-      secondly, planning for the sub-tasks, known as the “sub-plan
+mulated as follows:                                               step”. Current methods for task decomposition in this domain
+                   h = formalize(E, g; Θ, P);                     generally fall into two categories: decomposition-first and in-
+                                                                  terleaved decomposition, illustrated in Figure 2.
+                   p = plan(E, g, h; Φ).
+
+ where Φ denotes the external planner module, h represents        3.1    Decomposition-First Methods
+the formalized information.                                       Decomposition-first methods decompose the task into sub-
+Reflection and Refinement. This methodology emphasizes            goals first and then plan for each sub-goal successively, pre-
+improving planning ability through reflection and refinement.     sented in Figure 2(a). The representative methods include
+                                      Table 1: A taxonomy for existing LLM-Agent planning works.
+
+         Method                Idea                 LLM’s task                   Formulation                  Representative works
+          Task                                   Task decomposition   [gi ] = decompose(E, g; Θ, P);        CoT [2022], ReAct [2022],
+                       Divide and Conquer
+      Decomposition                               Subtask planning      pi = sub-plan(E, gi ; Θ, P)           HuggingGPT [2023]
+       Multi-plan     Generate multiple plans     Plans generation        P = plan(E, g; Θ, P);             ToT [2023], GoT [2023],
+       Selection       and select the optimal     Plans evaluation      p∗ = select(E, g, P ; Θ, F)            CoT-SC [2022b]
+         External      Formalize tasks and                              h = formalize(E, g; Θ, P);              LLM+P [2023a],
+                                                 Task formalization
+      Planner-aided   utilize external planner                             p = plan(E, g, h; Φ)                LLM+PDDL [2023]
+                                                  Plan generation          p0 = plan(E, g; Θ, P);              Reflexion [2023],
+       Reflection     Reflect on experiences
+                                                     Reflection         ri = reflect(E, g, pi ; Θ, P);          CRITIC [2023],
+      & Refinement       and refine plans
+                                                    Refinement        pi+1 = refine(E, g, pi , ri ; Θ, P)      Self-Refine [2023]
+      Memory-aided      Leverage memory           Plan generation         m = retrieve(E, g; M);             REMEMBER [2023a],
+        Planning         to aid planning         Memory extraction        p = plan(E, g, m; Θ, P)             MemoryBank [2023]
+
+
+HuggingGPT [Shen et al., 2023], Plan-and-Solve [Wang et               reasoning abilities for task decomposition. Subsequently,
+al., 2023b], ProgPrompt [Singh et al., 2023], et al.                  Zero-shot CoT [Kojima et al., 2022] unlocks the LLM’s zero-
+   HuggingGPT [Shen et al., 2023] utilizes various multi-             shot reasoning abilities with the magical instruction “Let’s
+modal models from the Huggingface Hub to construct an                 think step-by-step”. In contrast to CoT, which embeds rea-
+intelligent agent for multimodal tasks. It is capable of han-         soning within the planning process, ReAct [Yao et al., 2022]
+dling tasks such as image generation, image classification,           decouples reasoning and planning. It alternates between rea-
+object recognition, video annotation, speech-to-text, et al. To       soning (Thought step) and planning (Action step), demon-
+facilitate collaboration between different models, the LLM            strating significant improvements in the planning capabilities.
+acts as a controller, responsible for decomposing tasks in-           Visual ChatGPT [Wu et al., 2023] utilizes ReAct’s mech-
+putted by humans, selecting models, and generating final re-          anism, employing LLM as the agent’s brain equipped with
+sponses. The most crucial stage is the initial task decom-            a series of visual models, resulting in an agent with image
+position, where HuggingGPT explicitly instructs the LLM to            processing capabilities. PAL [Gao et al., 2023] improves
+break down the given task into sub-tasks, providing depen-            CoT by leveraging the LLM’s coding abilities, guiding the
+dencies between tasks. Plan-and-Solve [Wang et al., 2023b]            LLM to generate code during reasoning. Finally, a code in-
+improves upon the Zero-shot Chain-of-Thought [Kojima et               terpreter (such as Python) is used to comprehensively exe-
+al., 2022] by transforming the original “Let’s think step-            cute the codes to obtain the solution. This method proves
+by-step” into a two-step prompt instruction: “Let’s first de-         helpful for agents in solving mathematical and symbolic rea-
+vise a plan” and “Let’s carry out the plan”. This zero-shot           soning problems. Program-of-Thought (PoT) [Chen et al.,
+approach has achieved improvements in mathematical rea-               2022] completely formalize the reasoning process as pro-
+soning, common-sense reasoning, and symbolic reasoning.               gramming. The authors also leverage a CodeX [Chen et al.,
+ProgPrompt [Singh et al., 2023] translates natural language           2021b] model trained on code-related data, enhancing perfor-
+descriptions of tasks into coding problems. It symbolizes the         mance in mathematical and financial problems.
+agent’s action space and objects in the environment through
+code, with each action formalized as a function and each ob-          3.3    Discussions
+ject represented as a variable. Consequently, task planning           For the decomposition-first method, the advantage lies in cre-
+is naturally transformed into function generation. When ex-           ating a stronger correlation between the sub-tasks and the
+ecuting tasks, the agent first generates a plan in the form of        original tasks, reducing the risk of task forgetting and halluci-
+function callings and then executes them step by step.                nations [Touvron et al., 2023]. However, since the sub-tasks
+                                                                      are predetermined at the beginning, additional mechanisms
+3.2    Interleaved Decomposition Methods                              for adjustment are required otherwise one error in some step
+Interleaved decomposition involves interleaved task decom-            will result in failure, which will be discussed in Section 6. On
+position and sub-task planning, where each decomposition              the other hand, interleaved decomposition and sub-planning
+only reveals one or two sub-tasks at the current state, illus-        dynamically adjust decomposition based on environmental
+trated in Figure 2(b). Representative methods in this category        feedback, improving the fault tolerance. However, for com-
+include the Chain-of-Thought (CoT) series [Wei et al., 2022;          plicated tasks, excessively long trajectories may lead to LLM
+Kojima et al., 2022], ReAct [Yao et al., 2022], PAL [Gao              experiencing hallucinations, deviating from the original goals
+et al., 2023], Program-of-Thought (PoT) [Chen et al., 2022],          during subsequent sub-tasks and sub-planning.
+Visual ChatGPT [Wu et al., 2023], et al.                                 Although task decomposition significantly enhances the
+   The introduction of Chain-of-Thought (CoT) [Wei et al.,            ability of LLM-Agent to solve complicated tasks, challenges
+2022] reveals the few-shot learning capabilities of LLM.              persist. The first challenge is the additional overhead in-
+CoT guides the LLM in reasoning about complex problems                troduced by task decomposition. Decomposing a task into
+through a few constructed trajectories, leveraging the LLM’s          multiple sub-tasks requires more reasoning and generation,
+incurring additional time and computational costs. On the          4.3       Discussions
+other hand, for highly complex tasks that are decomposed           The scalability of multi-plan selection is notably advanta-
+into dozens of sub-tasks, the planning is constrained by the       geous, providing a broader exploration of potential solu-
+context length of the LLM, leading to the forgetting of the        tions in the expansive search space. However, this advantage
+planning trajectories.                                             comes with inherent trade-offs. The increased computational
+                                                                   demands, especially for models with large token counts or
+4     Multi-Plan Selection                                         computations, pose practical challenges. This cost considera-
+                                                                   tion becomes crucial, particularly in scenarios where resource
+Due to the complexity of the tasks and the inherent uncer-         constraints are a significant factor, such as the online service.
+tainty of LLM, the plans generated by the LLM-Agent for a          Moreover, the reliance on LLM for the evaluation of plans in-
+given task can be diverse. Even though LLM possesses strong        troduces new challenges. As LLM’s performance in ranking
+reasoning abilities, a single plan generated by LLM is likely      tasks is still under scrutiny, there is a need for further valida-
+to be suboptimal or even infeasible. A more natural approach       tion and fine-tuning of its capabilities in this specific context.
+is multi-plan selection, comprising two major steps: multi-        The stochastic nature of LLMs adds randomness to the se-
+plan generation and optimal plan selection.                        lection, potentially affecting the consistency and reliability of
+                                                                   the chosen plans.
+4.1    Multi-Plan Generation
+Multi-plan generation involves generating a dozen paths of         5       External Planner-Aided Planning
+plans to comprise the candidate plan set. Mainstream meth-         Despite the powerful reasoning and task decomposition capa-
+ods consider employing uncertainty in the decoding process         bilities exhibited by Large Language Models (LLMs), chal-
+of generative models.                                              lenges arise when confronted with environments featuring in-
+   Self-consistency [Wang et al., 2022b] employs a sim-            tricate constraints, such as mathematical problem-solving or
+ple intuition: the solutions for complex problems are rarely       generating admissible actions. To address challenges, sev-
+unique. In contrast to CoT, which generates a single path,         eral methods integrate LLMs with external planners. Such
+Self-consistency obtains multiple distinct reasoning paths via     methods can be categorized into symbolic planners and neu-
+sampling strategies embodied in the decoding process, such         ral planners based on the introduced planners.
+as temperature sampling, top-k sampling. Tree-of-Thought
+(ToT) [Yao et al., 2023] proposes two strategies to gener-         5.1       Symbolic Planner
+ate plans (i.e. thoughts): sample and propose. The sam-            Symbolic planners have served as a fundamental component
+ple strategy is consistent with Self-consistency, where LLM        in the fields of automated planning for several decades. These
+would sample multiple plans in decoding process. The pro-          approaches, based on well-established symbolic formalized
+pose strategy explicitly instructs the LLM to generate various     models, such as PDDL models [Aeronautiques et al., 1998;
+plans via few-shot examples in prompts. Graph-of-Thought           Haslum et al., 2019], employ symbolic reasoning to identify
+(GoT) [Besta et al., 2023] extends ToT by adding transforma-       optimal paths from initial states to desired goal states.
+tions of thoughts, which supports arbitrary thoughts aggrega-         LLM+P [Liu et al., 2023a] enhances the planning profi-
+tion. LLM-MCTS [Zhao et al., 2023b] and RAP [Hao et al.,           ciency of LLMs by incorporating a PDDL-based symbolic
+2023] leverages LLM as the heuristic policy function for the       planner. Leveraging the semantic understanding and coding
+Monte Carlo Tree Search (MCTS), where multiple potential           capabilities of LLM, the authors organize problems into tex-
+actions are obtained by multiple calls.                            tual language prompts inputted to LLM. This prompts LLM
+                                                                   to organize the actions within the environment and specified
+4.2    Optimal Plan Selection                                      tasks into the format of the PDDL language. Subsequently,
+                                                                   after obtaining a formalized description, the authors employ
+To select the optimal plan among the candidate plans, diverse      the Fast-Downward 1 solver for the planning process. Build-
+strategies are adopted as heuristic search algorithms.             ing upon LLM+P, LLM-DP [Dagan et al., 2023] is specif-
+   Self-consistency [Wang et al., 2022b] applies the naive ma-     ically designed for dynamic interactive environments. Upon
+jority vote strategy, regarding the plan with the most votes       receiving feedback from the environment, LLM processes the
+as the optimal choice. Benefiting from the tree architecture,      information, formalizes it into PDDL language, and then em-
+Tree-of-Thought (ToT) [Yao et al., 2023] supports tree search      ploys a BFS [Lipovetzky et al., 2014] solver to generate a
+algorithms, such as conventional BFS and DFS. When select-         plan. LLM+PDDL [Guan et al., 2023] also utilizes the PDDL
+ing a node for expansion, it uses LLM to evaluate multiple         language to formalize the task, incorporating an additional
+actions and chooses the optimal one. Similar with ToT, LLM-        step for manual verification to check for potential issues in the
+MCTS [Zhao et al., 2023b] and RAP [Hao et al., 2023] also          PDDL model generated by LLM. During the planning pro-
+employ a tree structure to assist in multi-plan search. Unlike     cess, the authors propose using the plan generated by LLM
+ToT, they employ the Monte Carlo Tree Search (MCTS) algo-          as an initial heuristic solution to accelerate the search pro-
+rithm for search. LLM A* [Xiao and Wang, 2023] utilizes the        cess of local search planners, such as LPG [Gerevini and Se-
+classic A* algorithm from artificial intelligence to assist LLM    rina, 2002]. LLM+ASP [Yang et al., 2023b] transforms prob-
+in search. The Chebyshev distance from the current position        lems described in natural language by LLM into atomic facts,
+to the target position serves as the heuristic cost function for
+                                                                       1
+selecting the optimal path.                                                https://github.com/aibasel/downward/tree/release-22.12.0
+converting tasks into ASP problems. Subsequently, the ASP         6     Reflection and Refinement
+solver CLINGO is utilized to generate plans.                      Reflection and refinement are indispensable components in
+5.2   Neural Planner                                              the planning process. They enhance the fault tolerance and
+                                                                  error correction capabilities of LLM-Agent planning. Due to
+Neural planners are deep models trained on collected plan-        existing hallucination issues and insufficient reasoning abil-
+ning data with reinforcement learning or imitation learning       ities for complex problems, LLM-Agents may make errors
+techniques, showing effective planning abilities within the       and get stuck in “thought loops” during planning due to lim-
+specific domain. For instance, DRRN [He et al., 2015]             ited feedback. Reflecting on and summarizing failures helps
+models the planning process as a Markov Decision Pro-             agents correct errors and break out of such loops in subse-
+cess through reinforcement learning, training a policy net-       quent attempts.
+work to obtain a deep decision model. Decision Transformer           Self-refine [Madaan et al., 2023] utilizes an iterative pro-
+(DT) [Chen et al., 2021a] empowers a transformer model to         cess of generation, feedback, and refinement. After each gen-
+clone human decision-making behavior with planning data.          eration, LLM generates feedback for the plan, facilitating ad-
+   Well-trained neural planners exhibit excellent planning ca-    justments based on the feedback. Reflexion [Shinn et al.,
+pabilities within their respective domains and demonstrate        2023] extends ReAct by incorporating an evaluator to assess
+superior planning efficiency due to their smaller parameter       trajectories. LLM generates self-reflections upon error de-
+sizes. However, when faced with complex and less frequently       tection, aiding in error correction. CRITIC [Gou et al., 2023]
+encountered problems, where training data is scarce, these        uses external tools like Knowledge Bases and Search Engines
+small models tend to perform poorly due to insufficient gen-      to validate LLM-generated actions. It then leverages external
+eralization ability. Therefore, several works explore combin-     knowledge for self-correction, significantly reducing factual
+ing an LLM with a light-weight neural planner, to further en-     errors. InteRecAgent [Huang et al., 2023b] employs a mech-
+hance the planning capabilities. CALM [Yao et al., 2020a]         anism called ReChain for self-correction. An LLM is used to
+proposed an early approach that combines a language model         evaluate the response and tool-using plan generated by the in-
+with an RL-based neural planner. One language model pro-          teractive recommendation agent, summarize feedback on er-
+cesses textual environmental information, generating a set of     rors, and decide whether to restart planning. LEMA [An et
+candidate actions as priors based on the environmental infor-     al., 2023] gathers mistaken planning samples first and em-
+mation. A DRRN policy network is then employed to re-rank         ploys more powerful GPT-4 for correction. Those corrected
+these candidate actions, ultimately selecting the optimal ac-     samples are then used to fine-tune the LLM-Agent, result-
+tion. SwiftSage [Lin et al., 2023] leverages the dual-process     ing in significant performance improvements across various
+theory from cognitive psychology, dividing the planning pro-      scales of the LLaMA model.
+cess into slow thinking and fast thinking. The slow-thinking         Particularly, the self-reflective strategy bears resemblance
+process involves complex reasoning and rational deliberation      to the principles of reinforcement learning, where the agent
+while fast-thinking resembles an instinctive response devel-      plays the role of the decision-maker, such as the policy net-
+oped through long-term training. The authors utilize a DT         work. Environmental feedback triggers updates of the policy
+model, trained through imitation learning, as the fast-thinking   network. However, in contrast to deep reinforcement learn-
+model for rapid plan generation. When errors occur during         ing where updates are achieved by modifying model param-
+plan execution, indicating a more complex problem, the agent      eters, in the LLM agent, this update occurs through self-
+switches to the slow-thinking process, where LLM engages in       reflection by the LLM itself, culminating in textual verbal
+reasoning and planning based on the current state. This com-      feedbacks. These textual feedbacks can serve as both long-
+bination of fast and slow thinking has proven to be highly        term and short-term memory, influencing the agent’s subse-
+effective in terms of efficiency.                                 quent planning outputs through the prompts. Nevertheless,
+                                                                  the convergence of this textual form of update currently lacks
+5.3   Discussions                                                 a guaranteed proof, indicating the inability to demonstrate
+For those strategies that leverage an additional planner for      that continual reflection can ultimately lead the LLM agent
+assistance, LLM primarily plays a supportive role. Its main       to a specified goal.
+functions involve parsing textual feedback and providing ad-
+ditional reasoning information to assist in planning, partic-     7     Memory-Augumented Planning
+ularly when addressing complex problems. Specifically, the
+enhancement of LLM’s capabilities in code generation em-          For agents, memory is a crucial pathway to enhance plan-
+powers the potential to deal with more general tasks for sym-     ning capabilities and the potential for growth. Regarding the
+bolic artificial intelligence. Actually, a significant drawback   memory mechanisms in LLM-Agents, there are currently two
+of traditional symbolic AI systems lies in the complexity         major approaches to enhance planning abilities through mem-
+and heavy reliance on human experts in constructing sym-          ory: RAG-based memory and embodied memory.
+bolic models, while LLM accelerates this process, facilitating
+faster and more optimal establishment of symbolic models.         7.1    RAG-based Memory
+The advantages brought by symbolic systems include theoret-       Retrieval Augmented Generation (RAG) [Lewis et al., 2020;
+ical completeness, stability, and interpretability. The combi-    Mao et al., 2020; Cai et al., 2022] techniques are proposed
+nation of statistical AI with LLM is poised to become a major     to aid text generation with retrieved information. It is capa-
+trend in the future development of artificial intelligence.       ble of enhancing the LLM with the latest knowledge, such
+as New Bing2 and Google Bard3 . For LLM agents, past                Table 2: Evaluation of representative prompt-based methods on four
+experiences could be stored in the memory and retrieved             interactive benchmarks. The SR, AR and EX are abbreviations
+                                                                    of success rate, average rewards, and expenses respectively. The
+when needed. The core idea of such methods is to retrieve
+                                                                    expenses are calculated based on the number of consumed tokens
+task-relevant experiences from the memory during task plan-         through OpenAI’s API. Z-CoT and F-CoT represent Zeroshot-CoT
+ning. Among those methods, memories are typically stored            and Fewshot-CoT, respectively.
+in additional storage, and the forms are diverse, such as
+texts [Park et al., 2023; Liu et al., 2023b; Packer et al., 2023;                   AlfWorld       ScienceWorld       HotPotQA         FEVER
+Wang et al., 2023c; Zhong et al., 2023], tabular forms [Zhang        Metrics      SR(%)   EX($)     AR     EX($)    SR(%)   EX($)    SR(%)   EX($)
+et al., 2023a], knowledge graph [Pan et al., 2024], etc.             Z-CoT         N/A      N/A     N/A      N/A     0.01     0.95    0.39    1.07
+                                                                     F-CoT         0.43    98.60   16.58   272.22    0.32     5.73    0.61    2.25
+   Generative Agents [Park et al., 2023] store the daily expe-       CoT-SC        0.57   105.37   15.24   274.33    0.33     7.86    0.62    3.21
+riences of human-like agents in text form and retrieve mem-          SayCan        0.60   113.61   12.36   125.71    N/A      N/A     N/A     N/A
+ories based on a composite score of recency and relevance to         ReAct         0.57   152.18   15.05   356.03    0.34    66.00    0.63   22.20
+                                                                     Reflexion     0.71   220.17   19.39   724.48    0.39   112.49    0.68   37.26
+the current situation. Similarly, MemoryBank [Zhong et al.,
+2023], TiM [Liu et al., 2023b], and RecMind [Wang et al.,
+2023c] encode each memory using a text encoding model into          7.3       Discussions
+a vector and establish an indexing structure, such as FAISS li-     The RAG-based and Fine-tuning-based memory approaches
+brary [Johnson et al., 2019]. During retrieval, the description     enhance LLM-Agent planning capabilities, each with distinct
+of the current status is used as a query to retrieve memories       advantages and limitations. RAG-based methods offer real-
+from the memory pool. The difference between the three lies         time, low-cost external memory updates mainly in natural
+in the way memories are updated. MemGPT [Packer et al.,             language text, but rely on the accuracy of retrieval algorithm.
+2023] leverages the concept of multiple levels of storage in        Finetuning provides a larger memorization capacity through
+computer architecture, abstracting the context of LLM into          parameter modifications but has high memory update costs
+RAM and treating the additional storage structure as a disk.        and struggles with retaining fine-grained details.
+LLM can spontaneously decide whether to retrieve historical            Memory-enhanced LLM-Agents demonstrate enhanced
+memories or save the current context to storage. REMEM-             growth and fault tolerance in planning, yet memory gener-
+BER [Zhang et al., 2023a] stores historical memories in the         ation heavily depends on LLM’s generation capabilities. Im-
+form of a Q-value table, where each record is (environment,         proving weaker LLM-Agents through self-generated memory
+task, action, Q-value)-tuple. During retrieval, positive and        remains a challenging area to explore.
+negative memories are both retrieved for LLM to generate
+plan based on the similarity of the environment and task.
+                                                                    8       Evaluation
+7.2      Embodied Memory                                            Evaluating the planning capability of the agent is a critical
+                                                                    issue in the research area. Here we investigate several main-
+Embodied memory involves finetuning the LLM with the                stream benchmarking methods, categorizing them into the
+agent’s historical experiential samples, embedding memories         following types.
+into the model parameters. Usually the experiential samples         Interactive Gaming Environments: Game environments may
+are collected from the agents’s interactions with environment,      provide real-time multi-modal feedback based on the agent’s
+which may consist of commonsense knowledge about the en-            actions, including textual and visual feedback. Currently, the
+vironment, task-related priors, and successful or failed expe-      most widely used gaming environment is Minecraft 4 , where
+riences. While the cost of training a language model with           the agent needs to gather materials to create tools for ob-
+more than billions of parameters is huge, parameter-efficient       taining more rewards. The quantity of tools created by the
+fine-tuning (PEFT) techniques are leveraged to reduce cost          agent is often used as an evaluation metric. Another popu-
+and speed up by training a small part of parameters only, such      lar category is the text-based interactive environments, such
+as LoRA, QLoRA, P-tuning, et al.                                    as ALFWorld [Shridhar et al., 2020], ScienceWorld [Wang
+   CALM [Yao et al., 2020b] utilizes ground-truth action tra-       et al., 2022a], et al, where the agent locates in an environ-
+jectories collected from the text-world environment to fine-        ment described in natural language, with limited actions and
+tune GPT-2 using next token prediction task, enabling it to         locations. The success rate or the rewards obtained are com-
+memorize planning-related information and generalize well           monly used as evaluation metrics. Compared with Minecraft,
+on planning tasks. Similarly, TDT [Wang et al., 2022a] uses         these text-based interactive environments are often simpler,
+collected Markov decision process data to fine-tune Text De-        with straightforward feedback and fewer feasible actions.
+cision Transformer (TDT). It achieves better success rates on
+                                                                    Interactive Retrieval Environments: Interactive retrieval en-
+more challenging ScienceWorld [Wang et al., 2022a] tasks.
+                                                                    vironments simulate the process of information retrieval and
+AgentTuning [Zeng et al., 2023] organizes plan trajecto-
+                                                                    reasoning that humans undergo in real life. In these environ-
+ries from various tasks into a dialogue form to finetune the
+                                                                    ments, agents are often allowed to interact with search en-
+LLaMA model, showing significant improvements in perfor-
+                                                                    gines and other web services, using actions such as search-
+mance on unseen planning tasks.
+                                                                    ing keywords or executing click, forward, and backward op-
+   2
+                                                                    erations to acquire more information, thereby obtaining an-
+       https://www.bing.com/
+   3                                                                    4
+       https://bard.google.com                                              https://www.minecraft.net/
+swers to questions or completing information retrieval tasks.      suming about twice the tokens compared with ReAct, the im-
+Commonly used retrieval environments include question-             provements in complicated tasks are promising, such as ALF-
+answering tasks based on the Wikipedia engine [Yao et              World and ScienceWorld, which shows that LLM possesses
+al., 2022] (such as HotPotQA [Yang et al., 2018] and               the error-correcting capability.
+Fever [Thorne et al., 2018]) and web browsing tasks to find
+specific information, including WebShop, Mind2Web [Deng
+et al., 2023], and WebArena [Zhou et al., 2023]. The task
+                                                                   9   Conclusions and Future Directions
+success rate is usually used as the metric.                        Since LLM has shown the emergence of intelligence, there
+Interactive Programming Environments: Interactive pro-             has been an increasing focus on using LLM to enhance the
+gramming environments simulate the interaction between             planning capabilities of agents. The major directions are sum-
+programmers and computers, testing the agent’s planning            marized in Figure 1, with a detailed comparison and anal-
+ability in solving computer-related problems. In these envi-       ysis of various methods presented in Sections 3 to 7. We
+ronments, agents are required to interact with computers to        also conducted experiments on four benchmarks, comparing
+solve problems by writing code or instructions. They would         the effectiveness of several representative methods and show-
+receive various feedback including compile and runtime er-         ing that performance increases with expenses. Despite the
+ror messages, as well as execution results. Popular interactive    enhancements made by these works in planning capabilities,
+programming environments involve issues related to operat-         there are still some significant challenges.
+ing systems, databases, etc., such as Agent Bench [Liu et al.,     Hallucinations. During the planning process, LLM often
+2023c], MiniWoB++ [Kim and others, 2023].                          suffers from hallucinations, leading to irrational plans, un-
+   Most of these existing interactive environments lack fine-      faithfulness to task prompts, or failing to follow complex in-
+grained evaluation, where the performance is predominantly         structions. For instance, plans may include actions that inter-
+evaluated by the final success rate. Furthermore, unlike real-     act with items not existed in the environment. Although these
+world scenarios where there are often multiple paths to com-       issues can be alleviated through careful prompt engineering,
+plete a task, there is typically only one “golden” path in most    they reflect fundamental shortcomings in LLM [Zhang et al.,
+simulated environments due to the high annotation cost.            2023b; Huang et al., 2023a].
+Experiments. We have conducted experiments on four                 Feasibility of Generated Plans. LLM, being fundamen-
+benchmarks to validate the performance of representative           tally based on statistical learning, optimizes the probability
+works, shown in Table 2. We have implemented six prompt-           of the next word through massive data. Compared to sym-
+based methods due to limited budgets, covering task de-            bolic artificial intelligence, this approach struggles to obey
+composition, multi-path selection, and reflection. As for          complex constraints, especially when dealing with less com-
+the benchmarks, ALFWorld, ScienceWorld, HotPotQA, and              mon constraints encountered during LLM training. Conse-
+FEVER are employed, involving interactive gaming and               quently, plans generated by LLM may lack feasibility without
+question-answering benchmarks. Since ALFWorld and Sci-             considering adequate preconditions. Connecting LLM with
+enceWorld are involved in larger action space, the zero-shot       symbolic planning models without altering LLM itself is a
+method, i.e. ZeroShot-CoT, is not applicable due to unaware-       promising future direction.
+ness of action space. SayCan improves CoT by grounding
+output actions into action space with a value function, which      Efficiency of Generated Plans. Generating efficient plans is
+does not apply to QA tasks because there are only two ac-          a crucial issue in planning. However, in existing LLM agents,
+tions: S EARCH [ KEYWORD ] and L OOKUP [ KEYWORD ]. And            planning is greedily based on generated plans from LLM out-
+we set the value function as a textual embedding model bge-        put, without considering the efficiency of the generated plans.
+small-en-v1.5 [Xiao and others, 2023]. We obtain 3 actions         Therefore, future developments may require introducing ad-
+and 5 answers each step for gaming tasks and QA tasks for          ditional efficiency evaluation modules to work in conjunction
+CoT-SC, respectively. The round of retries in Reflexion is set     with LLM for more efficient plans.
+to 1. We use the API of text-davinci-003 in OpenAI as LLM.         Multi-Modal Environment Feedback. LLM is originally
+(i) The performance increases with the expenses. As CoT-           designed for processing textual inputs, but real-world envi-
+SC, ReAct and Reflexion are involved in multiple plans, ad-        ronment feedback is often multi-modal, including images,
+ditional thoughts, and reflections, respectively, their expenses   audio, etc., which are challenging to describe in natural lan-
+are more than their backbone methods. Intuitively, more to-        guage. Therefore, LLM agents face limitations when han-
+kens represent more detailed thinking, resulting in perfor-        dling such scenarios. Future considerations may involve in-
+mance improvements.                                                tegrating the development of multi-modal large models and
+(ii) Fewshot examples are suggested for complicated tasks.         revisiting related planning strategies.
+Despite that the magic instruction Let’s think step by step can    Fine-grained Evaluation. As mentioned in Section 8, exist-
+lead to more reasoning, ZeroShot-CoT exhibits severe per-          ing benchmarks mostly rely on the final completion status of
+formance degradation in two QA benchmarks, which demon-            tasks, lacking fine-grained step-wise evaluations. Addition-
+strates the necessity of the examples for LLM to further un-       ally, environmental feedback is often rule-based, simplistic,
+derstand the task.                                                 and distant from real-world scenarios. A potential future di-
+(iii) Reflection plays a crucial role in improving the success     rection is to leverage high-intelligence models like LLM to
+rate, especially for complex tasks. Despite Reflexion con-         design more realistic evaluation environments.
+References                                                       [He et al., 2015] Ji He, Jianshu Chen, et al. Deep reinforce-
+[Aeronautiques et al., 1998] Constructions Aeronautiques,          ment learning with a natural language action space. arXiv
+                                                                   preprint arXiv:1511.04636, 2015.
+  Adele Howe, et al. Pddl— the planning domain definition
+  language. Technical Report, Tech. Rep., 1998.                  [Huang et al., 2023a] Lei Huang, Yu Weijiang, et al. A sur-
+[An et al., 2023] Shengnan An, Zexiong Ma, et al. Learning         vey on hallucination in large language models: Principles,
+                                                                   taxonomy, challenges, and open questions. arXiv preprint
+  from mistakes makes llm better reasoner. arXiv preprint
+                                                                   arXiv:2311.05232, 2023.
+  arXiv:2310.20689, 2023.
+[Besta et al., 2023] Maciej Besta, Nils Blach, et al. Graph of   [Huang et al., 2023b] Xu Huang, Jianxun Lian, et al. Rec-
+  thoughts: Solving elaborate problems with large language         ommender ai agent: Integrating large language mod-
+  models. arXiv preprint arXiv:2308.09687, 2023.                   els for interactive recommendations.    arXiv preprint
+                                                                   arXiv:2308.16505, 2023.
+[Cai et al., 2022] Deng Cai, Yan Wang, Lemao Liu, and
+                                                                 [Johnson et al., 2019] Jeff Johnson, Matthijs Douze, and
+  Shuming Shi. Recent advances in retrieval-augmented text
+  generation. In SIGIR, pages 3417–3419, 2022.                      Hervé Jégou. Billion-scale similarity search with GPUs.
+                                                                    IEEE Transactions on Big Data, 7(3):535–547, 2019.
+[Chen et al., 2021a] Lili Chen, Kevin Lu, et al. Decision
+  transformer: Reinforcement learning via sequence mod-          [Kim and others, 2023] Geunwoo Kim et al. Language
+  eling. NeurIPS, 34:15084–15097, 2021.                            models can solve computer tasks.    arXiv preprint
+                                                                   arXiv:2303.17491, 2023.
+[Chen et al., 2021b] Mark Chen, Jerry Tworek, et al. Eval-
+  uating large language models trained on code. arXiv            [Kojima et al., 2022] Takeshi Kojima, Shixiang Shane Gu,
+  preprint arXiv:2107.03374, 2021.                                 et al. Large language models are zero-shot reasoners.
+                                                                   NeurIPS, 35:22199–22213, 2022.
+[Chen et al., 2022] Wenhu Chen, Xueguang Ma, et al. Pro-
+  gram of thoughts prompting: Disentangling computation          [Lewis et al., 2020] Patrick Lewis, Ethan Perez, et al.
+  from reasoning for numerical reasoning tasks. arXiv               Retrieval-augmented generation for knowledge-intensive
+  preprint arXiv:2211.12588, 2022.                                  nlp tasks. NeurIPS, 33:9459–9474, 2020.
+[Dagan et al., 2023] Gautier Dagan, Frank Keller, and Alex       [Lin et al., 2023] Bill Yuchen Lin, Yicheng Fu, et al. Swift-
+  Lascarides. Dynamic planning with a llm. arXiv preprint           sage: A generative agent with fast and slow think-
+  arXiv:2308.06391, 2023.                                           ing for complex interactive tasks.        arXiv preprint
+                                                                    arXiv:2305.17390, 2023.
+[Deng et al., 2023] Xiang Deng, Yu Gu, et al. Mind2web:
+  Towards a generalist agent for the web. arXiv preprint         [Lipovetzky et al., 2014] Nir Lipovetzky, Miquel Ramirez,
+  arXiv:2306.06070, 2023.                                           et al. Width and inference based planners: Siw, bfs (f),
+                                                                    and probe. IPC, page 43, 2014.
+[Gao et al., 2023] Luyu Gao, Aman Madaan, et al. Pal:
+  Program-aided language models. In ICML, pages 10764–           [Liu et al., 2023a] Bo Liu, Yuqian Jiang, et al. Llm+ p: Em-
+  10799, 2023.                                                      powering large language models with optimal planning
+                                                                    proficiency. arXiv preprint arXiv:2304.11477, 2023.
+[Gerevini and Serina, 2002] Alfonso Gerevini and Ivan Se-
+  rina. Lpg: A planner based on local search for planning        [Liu et al., 2023b] Lei Liu, Xiaoyan Yang, et al. Think-in-
+  graphs with action costs. In Aips, volume 2, pages 281–           memory: Recalling and post-thinking enable llms with
+  290, 2002.                                                        long-term memory. arXiv preprint arXiv:2311.08719,
+                                                                    2023.
+[Ghallab et al., 2004] Malik Ghallab, Dana Nau, et al. Auto-
+  mated Planning: theory and practice. Elsevier, 2004.           [Liu et al., 2023c] Xiao Liu, Hao Yu, et al.   Agent-
+                                                                    bench: Evaluating llms as agents.    arXiv preprint
+[Gou et al., 2023] Zhibin Gou, Zhihong Shao, et al. Critic:
+                                                                    arXiv:2308.03688, 2023.
+  Large language models can self-correct with tool-
+  interactive critiquing. arXiv preprint arXiv:2305.11738,       [Madaan et al., 2023] Aman Madaan, Niket Tandon, , et al.
+  2023.                                                            Self-refine: Iterative refinement with self-feedback. arXiv
+                                                                   preprint arXiv:2303.17651, 2023.
+[Guan et al., 2023] Lin Guan, Karthik Valmeekam, et al.
+  Leveraging pre-trained large language models to construct      [Mao et al., 2020] Yuning Mao, Pengcheng He, Liu, et al.
+  and utilize world models for model-based task planning.          Generation-augmented retrieval for open-domain question
+  arXiv preprint arXiv:2305.14909, 2023.                           answering. arXiv preprint arXiv:2009.08553, 2020.
+[Hao et al., 2023] Shibo Hao, Yi Gu, et al. Reasoning with       [Packer et al., 2023] Charles Packer, Vivian Fang, et al.
+  language model is planning with world model. arXiv                Memgpt: Towards llms as operating systems. arXiv
+  preprint arXiv:2305.14992, 2023.                                  preprint arXiv:2310.08560, 2023.
+[Haslum et al., 2019] Patrik Haslum, Nir Lipovetzky, et al.      [Pan et al., 2024] Shirui Pan, Linhao Luo, et al. Unifying
+  An introduction to the planning domain definition lan-            large language models and knowledge graphs: A roadmap.
+  guage, volume 13. Springer, 2019.                                 TKDE, 2024.
+[Park et al., 2023] Joon Sung Park, Joseph O’Brien, et al.        [Xiao and others, 2023] Shitao Xiao et al. C-pack: Packaged
+   Generative agents: Interactive simulacra of human behav-         resources to advance general chinese embedding, 2023.
+   ior. In SUIST, pages 1–22, 2023.                               [Xiao and Wang, 2023] Hengjia Xiao and Peng Wang. Llm
+[Qin et al., 2023] Yujia Qin, Shengding Hu, et al. Tool             a*: Human in the loop large language models enabled
+   learning with foundation models.            arXiv preprint       a* search for robotics. arXiv preprint arXiv:2312.01797,
+   arXiv:2304.08354, 2023.                                          2023.
+[Schraagen et al., 2000] Jan Maarten Schraagen, Susan F           [Yang et al., 2018] Zhilin Yang, Peng Qi, et al. Hotpotqa:
+   Chipman, et al. Cognitive task analysis. Psychology Press,       A dataset for diverse, explainable multi-hop question an-
+   2000.                                                            swering. arXiv preprint arXiv:1809.09600, 2018.
+[Shen et al., 2023] Yongliang Shen, Kaitao Song, et al. Hug-      [Yang et al., 2023a] Sherry Yang, Nachum Ofir, et al. Foun-
+   ginggpt: Solving ai tasks with chatgpt and its friends in        dation models for decision making: Problems, meth-
+   huggingface. arXiv preprint arXiv:2303.17580, 2023.              ods, and opportunities. arXiv preprint arXiv:2303.04129,
+[Shinn et al., 2023] Noah Shinn, Federico Cassano, et al.           2023.
+   Reflexion: Language agents with verbal reinforcement           [Yang et al., 2023b] Zhun Yang, Adam Ishay, and Joohyung
+   learning. In NeurIPS, 2023.                                      Lee. Coupling large language models with logic program-
+[Shridhar et al., 2020] Mohit Shridhar, Xingdi Yuan, et al.         ming for robust and general reasoning from text. arXiv
+   Alfworld: Aligning text and embodied environments for            preprint arXiv:2307.07696, 2023.
+   interactive learning. arXiv preprint arXiv:2010.03768,         [Yao et al., 2020a] Shunyu Yao, Rohan Rao, et al. Keep calm
+   2020.                                                            and explore: Language models for action generation in
+[Singh et al., 2023] Ishika Singh, Valts Blukis, et al. Prog-       text-based games. arXiv preprint arXiv:2010.02903, 2020.
+   prompt: Generating situated robot task plans using large       [Yao et al., 2020b] Shunyu Yao, Rohan Rao, et al. Keep
+   language models. In ICRA 2023, pages 11523–11530.                calm and explore: Language models for action generation
+   IEEE, 2023.                                                      in text-based games. arXiv preprint arXiv:2010.02903,
+[Sun et al., 2023] Jiankai Sun, Chuanyang Zheng, et al. A           2020.
+   survey of reasoning with foundation models. arXiv              [Yao et al., 2022] Shunyu Yao, Jeffrey Zhao, et al. Re-
+   preprint arXiv:2312.11562, 2023.                                 act: Synergizing reasoning and acting in language models.
+[Thorne et al., 2018] James Thorne, Andreas Vlachos, et al.         arXiv preprint arXiv:2210.03629, 2022.
+   Fever: a large-scale dataset for fact extraction and verifi-   [Yao et al., 2023] Shunyu Yao, Dian Yu, et al. Tree of
+   cation. arXiv preprint arXiv:1803.05355, 2018.                   thoughts: Deliberate problem solving with large language
+[Touvron et al., 2023] Hugo Touvron, Louis Martin, et al.           models. arXiv preprint arXiv:2305.10601, 2023.
+   Llama 2: Open foundation and fine-tuned chat models.           [Zeng et al., 2023] Aohan Zeng, Mingdao Liu, et al. Agent-
+   arXiv preprint arXiv:2307.09288, 2023.                           tuning: Enabling generalized agent abilities for llms. arXiv
+[Wang et al., 2022a] Ruoyao Wang, Peter Jansen, et al. Sci-         preprint arXiv:2310.12823, 2023.
+   enceworld: Is your agent smarter than a 5th grader? arXiv      [Zhang et al., 2023a] Danyang Zhang, Lu Chen, et al. Large
+   preprint arXiv:2203.07540, 2022.                                 language model is semi-parametric reinforcement learning
+[Wang et al., 2022b] Xuezhi Wang, Jason Wei, et al. Self-           agent. arXiv preprint arXiv:2306.07929, 2023.
+   consistency improves chain of thought reasoning in lan-        [Zhang et al., 2023b] Yue Zhang, Yafu Li, et al. Siren’s song
+   guage models. arXiv preprint arXiv:2203.11171, 2022.             in the ai ocean: A survey on hallucination in large lan-
+[Wang et al., 2023a] Lei Wang, Chen Ma, et al. A survey             guage models. arXiv preprint arXiv:2309.01219, 2023.
+   on large language model based autonomous agents. arXiv         [Zhao et al., 2023a] Wayne Xin Zhao, Kun Zhou, et al.
+   preprint arXiv:2308.11432, 2023.                                 A survey of large language models. arXiv preprint
+[Wang et al., 2023b] Lei Wang, Wanyu Xu, et al. Plan-and-           arXiv:2303.18223, 2023.
+   solve prompting: Improving zero-shot chain-of-thought          [Zhao et al., 2023b] Zirui Zhao, Wee Sun Lee, and David
+   reasoning by large language models. arXiv preprint
+                                                                    Hsu. Large language models as commonsense knowl-
+   arXiv:2305.04091, 2023.
+                                                                    edge for large-scale task planning.         arXiv preprint
+[Wang et al., 2023c] Yancheng Wang, Ziyan Jiang, et al.             arXiv:2305.14078, 2023.
+   Recmind: Large language model powered agent for rec-           [Zhong et al., 2023] Wanjun Zhong, Lianghong Guo, Qiqi
+   ommendation. arXiv preprint arXiv:2308.14296, 2023.
+                                                                    Gao, and Yanlin Wang. Memorybank: Enhancing large
+[Wei et al., 2022] Jason Wei, Xuezhi Wang, et al. Chain-            language models with long-term memory. arXiv preprint
+   of-thought prompting elicits reasoning in large language         arXiv:2305.10250, 2023.
+   models. NeurIPS, 35:24824–24837, 2022.
+                                                                  [Zhou et al., 2023] Shuyan Zhou, Frank F Xu, et al. We-
+[Wu et al., 2023] Chenfei Wu, Shengming Yin, et al. Visual          barena: A realistic web environment for building au-
+   chatgpt: Talking, drawing and editing with visual founda-        tonomous agents. arXiv preprint arXiv:2307.13854, 2023.
+   tion models. arXiv preprint arXiv:2303.04671, 2023.
+

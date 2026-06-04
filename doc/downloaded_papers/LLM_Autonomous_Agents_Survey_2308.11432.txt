@@ -1,0 +1,2092 @@
+                                        Front. Comput. Sci., 2025, 0(0): 1–42
+                                        https://doi.org/10.1007/s11704-024-40231-1
+
+                                          REVIEW ARTICLE
+
+
+
+                                        A Survey on Large Language Model based Autonomous
+                                                              Agents
+
+                                          Lei Wang, Chen Ma* , Xueyang Feng* , Zeyu Zhang, Hao Yang, Jingsen Zhang,
+
+
+
+
+arXiv:2308.11432v7 [cs.AI] 2 Mar 2025
+                                          Zhi-Yuan Chen, Jiakai Tang, Xu Chen(B), Yankai Lin(B), Wayne Xin Zhao,
+                                                                  Zhewei Wei, Ji-Rong Wen
+                                             Gaoling School of Artificial Intelligence, Renmin University of China, Beijing, 100872, China
+
+
+                                        © Higher Education Press 2025
+
+
+
+                                        Abstract Autonomous agents have long been a LLM-based autonomous agents. Based on the pre-
+                                        research focus in academic and industry commu- vious studies, we also present several challenges
+                                        nities. Previous research often focuses on training and future directions in this field.
+                                        agents with limited knowledge within isolated envi- Keywords Autonomous agent, Large language
+                                        ronments, which diverges significantly from human model, Human-level intelligence
+                                        learning processes, and makes the agents hard to
+                                        achieve human-like decisions. Recently, through
+                                        the acquisition of vast amounts of web knowledge, 1 Introduction
+                                        large language models (LLMs) have shown poten-
+                                                                                                “An autonomous agent is a system situated within and a
+                                        tial in human-level intelligence, leading to a surge in
+                                                                                                 part of an environment that senses that environment and
+                                        research on LLM-based autonomous agents. In this
+                                                                                                 acts on it, over time, in pursuit of its own agenda and so
+                                        paper, we present a comprehensive survey of these as to effect what it senses in the future.”
+                                        studies, delivering a systematic review of LLM-
+                                        based autonomous agents from a holistic perspec-                                       Franklin and Graesser (1997)
+
+                                        tive. We first discuss the construction of LLM-based
+                                                                                                   Autonomous agents have long been recognized
+                                        autonomous agents, proposing a unified framework
+                                                                                                 as a promising approach to achieving artificial gen-
+                                        that encompasses much of previous work. Then, we
+                                                                                                 eral intelligence (AGI), which is expected to ac-
+                                        present an overview of the diverse applications of
+                                        LLM-based autonomous agents in social science,
+                                                                                                 Received month dd, yyyy; accepted month dd, yyyy
+                                        natural science, and engineering. Finally, we delve
+                                                                                                 E-mail: xu.chen@ruc.edu.cn;yankailin@ruc.edu.cn
+                                        into the evaluation strategies commonly used for            * Both authors contribute equally to this paper.
+2                                                               Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+
+
+ Number of Papers （cumulated）
+                                    General Agent
+                                                                                                                                                           ChatDev 2023-7
+                                    Tool Agent                                                                                  Voyager 2023-5
+                                                                 DEPS 2023-2
+                                                                                              Generative Agent 2023-4
+                                    Simulation Agent
+
+                                    Embodied Agent
+                                                                                                Toolformer 2023-2
+                                                                WebShop 2022-7                                           GITM 2023-5
+                                    Game Agent                                                                                                              CO-LLM 2023-7
+
+
+
+                                    Web Agent                                                                                          MIND2WEB 2023-6
+
+
+                                    Assistant Agent         Inner Monologue 2022-7                AutoGPT 2023-3
+
+                                                                                                                                                           AgentSims 2023-8
+                                                                                                                             ToT 2023-5
+
+
+
+                                                                CoT 2022-1                           HuggingGPT 2023-3
+                                    WebGPT
+                                    2021-12
+
+
+
+
+                                                                                                AgentGPT 2023-4                 RecAgent 2023-6            ToolBench 2023-7
+                                                                        TALM 2022-5
+
+
+                                2021-1                 2022-1                        2023-2                         2023-4                        2023-6                    2023-8
+
+                                                                                       Time （Year-Month）
+
+
+Fig. 1 Illustration of the growth trend in the field of LLM-based autonomous agents. We present the cumulative number of
+papers published from January 2021 to August 2023. We assign different colors to represent various agent categories. For
+example, a game agent aims to simulate a game-player, while a tool agent mainly focuses on tool using. For each time period,
+we provide a curated list of studies with diverse agent categories.
+
+
+complish tasks through self-directed planning and  research area that employs LLMs as central con-
+actions. In previous studies, the agents are assumed
+                                                   trollers to construct autonomous agents to obtain
+to act based on simple and heuristic policy func-  human-like decision-making capabilities [11–17].
+tions, and learned in isolated and restricted envi-   Compared to reinforcement learning, LLM-based
+ronments [1–6]. Such assumptions significantly     agents possess more comprehensive internal world
+differs from the human learning process, since the knowledge, enabling them to perform informed ac-
+human mind is highly complex and individuals can   tions even without training on specific domain data.
+learn from a much wider variety of environments.   Furthermore, LLM-based agents can offer natural
+Because of these gaps, the agents obtained from    language interfaces for human interaction, provid-
+previous studies are usually far from replicating  ing greater flexibility and enhanced explainability.
+human-level decision processes, especially in un-     Along this direction, researchers have developed
+constrained, open-domain settings.                 numerous promising models (see Figure 1 for an
+   In recent years, large language models (LLMs) overview), where the key idea is to equip LLMs
+have achieved notable successes, demonstrating with human capabilities such as memory and plan-
+significant potential to achieve human-like intel- ning to make them behave like humans and com-
+ligence [5–10]. This capability arises from lever- plete various tasks effectively. Previously, these
+aging comprehensive training datasets alongside a models were proposed independently, with limited
+substantial number of model parameters. Build- efforts made to summarize and compare them holis-
+ing upon this capability, there has been a growing tically. However, we believe that a systematic sum-
+                Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                       3
+
+
+mary of this rapidly developing field is of great
+                                                          2     LLM-based Autonomous Agent Con-
+significance for a comprehensive understanding of
+                                                                struction
+it and is beneficial in inspiring future research.
+   In this paper, we conduct a comprehensive sur-         LLM-based autonomous agents are expected to ef-
+vey of the field of LLM-based autonomous agents.          fectively perform diverse tasks by leveraging the
+We organize our survey around three key aspects:          human-like capabilities of LLMs. In order to achieve
+construction, application, and evaluation of LLM-         this goal, there are two significant aspects: (1) which
+based autonomous agents. For agent construction,          architecture should be designed to better use LLMs
+we focus on two problems, that is, (1) how to design      and (2) given the designed architecture, how to en-
+the agent architecture to better leverage LLMs, and       able the agent to acquire capabilities for accomplish-
+(2) how to inspire and enhance the agent capabil-         ing specific tasks. Within the context of architec-
+ity to complete different tasks. Intuitively, the first   ture design, we contribute a systematic synthesis of
+problem aims to build the hardware fundamentals           existing research, culminating in a comprehensive
+for the agent, while the second problem focuses on        unified framework. As for the second aspect, we
+providing the agent with software resources. For the      summarize the strategies for agent capability acqui-
+first problem, we present a unified agent framework,      sition based on whether they fine-tune the LLMs.
+which can encompass most of the previous studies.         Comparing LLM-based autonomous agents to tradi-
+For the second problem, we provide a summary on           tional machine learning, architecture design is anal-
+the commonly-used strategies for agents’ capability       ogous to defining the network structure, while capa-
+acquisition. In addition to discussing agent con-         bility acquisition resembles the process of learning
+struction, we also provide a systematic overview of       network parameters. In the following sections, we
+the applications of LLM-based autonomous agents           explore these two aspects in greater detail.
+in social science, natural science, and engineering.
+Finally, we delve into the strategies for evaluating      2.1   Agent Architecture Design
+LLM-based autonomous agents, focusing on both             Recent advancements in LLMs have demonstrated
+subjective and objective strategies.                      their great potential to accomplish a wide range
+   In summary, this survey conducts a systematic          of tasks in the form of question-answering (QA).
+review and establishes comprehensive taxonomies           However, building autonomous agents is far from
+for existing studies in the burgeoning field of LLM-      QA, since they need to fulfill specific roles and
+based autonomous agents. Our focus encompasses            autonomously perceive and learn from the environ-
+three primary areas: the construction of agents, their    ment to evolve themselves like humans. To bridge
+applications, and methods of evaluation. Drawing          the gap between traditional LLMs and autonomous
+from a wealth of previous studies, we identify var-       agents, a crucial aspect is to design rational agent
+ious challenges in this field and discuss potential       architectures to assist LLMs in maximizing their ca-
+future directions. We expect that our survey can pro-     pabilities. Along this direction, previous work has
+vide newcomers of LLM-based autonomous agents             developed a number of modules to enhance LLMs.
+with a comprehensive background knowledge, and            In this section, we propose a unified framework to
+also encourage further groundbreaking studies.            summarize these modules. Specifically, the overall
+4                                              Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+
+
+            Profile                           Memory                        Planning                          Action
+
+
+
+       Profile Contents                   Memory Structure                                              Action Target
+                                                                       Planning w/o Feedback
+                                            Ø Unified Memory                                      Ø Task Completion Ø Exploration
+    Ø Demographic Information                                                                     Ø Communication
+                                            Ø Hybrid Memory             Ø Single-path Reasoning
+    Ø Personality Information                                                                           Action Production
+                                          Memory Formats                Ø Multi-path Reasoning
+    Ø Social Information                                                                             Ø Memory Recollection
+                                                                        Ø External Planner
+                                         Ø Languages    Ø Databases                                  Ø Plan Following
+       Generation Strategy               Ø Embeddings   Ø Lists
+                                                                       Planning w/ Feedback             Action Space
+    Ø Handcrafting Method                 Memory Operation                                          Ø Tools    Ø Self-Knowledge
+                                                                        Ø Environment Feedback
+    Ø LLM-Generation Method                 Ø Memory Reading                                            Action Impact
+                                                                        Ø Human Feedback
+                                            Ø Memory Writing                                      Ø Environments Ø New Actions
+    Ø Dataset Alignment Method                                          Ø Model Feedback
+                                            Ø Memory Reflection                                   Ø Internal States
+
+
+                    Fig. 2      A unified framework for the architecture design of LLM-based autonomous agent.
+
+
+structure of our framework is illustrated in Figure 2,                and career [20], as well as psychology information,
+which is composed of a profiling module, a memory                     reflecting the personalities of the agents, and so-
+module, a planning module, and an action module.                      cial information, detailing the relationships between
+The purpose of the profiling module is to identify                    agents [21]. The choice of information to profile the
+the role of the agent. The memory and planning                        agent is largely determined by the specific applica-
+modules place the agent into a dynamic environ-                       tion scenarios. For instance, if the application aims
+ment, enabling it to recall past behaviors and plan                   to study human cognitive process, then the psychol-
+future actions. The action module is responsible for                  ogy information becomes pivotal. After identifying
+translating the agent’s decisions into specific out-                  the types of profile information, the next important
+puts. Within these modules, the profiling module                      problem is to create specific profiles for the agents.
+impacts the memory and planning modules, and col-                     Existing literature commonly employs the following
+lectively, these three modules influence the action                   three strategies.
+module. In the following, we detail these modules.      Handcrafting Method: in this method, agent
+                                                     profiles are manually specified. For instance, if one
+2.1.1 Profiling Module                               would like to design agents with different person-
+                                                     alities, he can use "you are an outgoing person" or
+Autonomous agents typically perform tasks by as- "you are an introverted person" to profile the agent.
+suming specific roles, such as coders, teachers, and The handcrafting method has been leveraged in a
+domain experts [18, 19]. The profiling module aims lot of previous work to specify the agent profiles.
+to indicate the profiles of the agent roles, which For example, Generative Agent [22] describes the
+are usually written into the prompt to influence agent by the information such as name, objectives,
+the behavior of the LLM. Agent profiles typically and relationships with other agents. MetaGPT [23],
+encompass basic information such as age, gender, ChatDev [18], and Self-collaboration [24] predefine
+                Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                  5
+
+
+various roles and their corresponding responsibili- about real humans in the datasets into natural lan-
+ties in software development, manually assigning guage prompts, and then leverage it to profile the
+distinct profiles to each agent to facilitate collabo- agents. For instance, in [29], the authors assign
+ration. PTLLM [25] aims to explore and quantify roles to GPT-3 based on the demographic back-
+personality traits displayed in texts generated by grounds (such as race/ethnicity, gender, age, and
+LLMs. This method guides LLMs in generating di- state of residence) of participants in the Ameri-
+verse responses by manually defining various agent can National Election Studies (ANES). They sub-
+characters through the use of personality assessment sequently investigate whether GPT-3 can produce
+tools such as IPIP-NEO [26] and BFI [27]. [28] similar results to those of real humans. The dataset
+studies the toxicity of the LLM output by manu- alignment method accurately captures the attributes
+ally prompting LLMs with different roles, such as of the real population, thereby making the agent
+politicians, journalists and businesspersons. In gen- behaviors more meaningful and reflective of real-
+eral, the handcrafting method is very flexible, since world scenarios.
+one can assign any profile information to the agents. Remark. While most of the previous work lever-
+However, it can be also labor-intensive, particularly age the above profile generation strategies indepen-
+when dealing with a large number of agents.            dently, we argue that combining them may yield
+   LLM-generation Method: in this method, agent additional benefits. For example, in order to predict
+profiles are automatically generated based on LLMs. social developments via agent simulation, one can
+Typically, it begins by indicating the profile gen- leverage real-world datasets to profile a subset of
+eration rules, elucidating the composition and at- the agents, thereby accurately reflecting the current
+tributes of the agent profiles within the target popu- social status. Subsequently, roles that do not exist
+lation. Then, one can optionally specify several seed in the real world but may emerge in the future can
+agent profiles to serve as few-shot examples. Fi- be manually assigned to the other agents, enabling
+nally, LLMs are leveraged to generate all the agent the prediction of future social development. Be-
+profiles. For example, RecAgent [21] first creates yond this example, one can also flexibly combine
+seed profiles for a few agents by manually crafting the other strategies. The profile module serves as
+their attributes such as age, gender, personal traits, the foundation for agent design, exerting significant
+and movie preferences. Then, it leverages ChatGPT influence on the agent memorization, planning, and
+to generate more agent profiles based on the seed in- action procedures.
+formation. This approach significantly reduces the
+time and effort required to construct agent profiles, 2.1.2 Memory Module
+particularly for large-scale populations. However, it The memory module plays a very important role
+may lack precise control over the generated profiles, in the agent architecture design. It stores informa-
+which can result in inconsistencies or deviations tion perceived from the environment and leverages
+from the intended characteristics.                     the recorded memories to facilitate future actions.
+  Dataset Alignment Method: in this method, the The memory module can help the agent to accumu-
+agent profiles are obtained from real-world datasets. late experiences, self-evolve, and behave in a more
+Typically, one can first organize the information consistent, reasonable, and effective manner. This
+6                                   Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+section provides a comprehensive overview of the        tion, and previous summaries. DEPS [33] is also
+memory module, focusing on its structures, formats,     a game agent, developed for Minecraft. The agent
+and operations.                                         initially generates task plans and then utilizes them
+   Memory Structures: LLM-based autonomous              to prompt LLMs, which in turn produce actions to
+agents often draw inspiration from cognitive sci-       complete the task. These plans can be deemed as
+ence research on human memory processes. Hu-            the agent’s short-term memory. In practice, imple-
+man memory follows a general progression from           menting short-term memory is straightforward and
+sensory memory that registers perceptual inputs,        can enhance an agent’s ability to perceive recent or
+to short-term memory that maintains information         contextually sensitive behaviors and observations.
+transiently, to long-term memory that consolidates      However, the limited context window of LLMs re-
+information over extended periods. When design-         stricts incorporating comprehensive memories into
+ing the agent memory structures, researchers take       prompts, which can impair agent performance. This
+inspiration from these aspects of human memory.         challenge necessitates LLMs with larger context
+In particular, short-term memory is analogous to        windows and the ability to handle extended con-
+the input information within the context window         texts. Consequently, numerous researchers turn to
+constrained by the transformer architecture. Long-      hybrid memory systems to mitigate this issue.
+term memory resembles the external vector storage             • Hybrid Memory. This structure explicitly
+that agents can rapidly query and retrieve from as      models the human short-term and long-term mem-
+needed. In the following, we introduce two com-         ories. The short-term memory temporarily buffers
+monly used memory structures based on the short-        recent perceptions, while long-term memory con-
+term and long-term memories.                            solidates important information over time. For in-
+      • Unified Memory. This structure only simu-       stance, Generative Agent [20] employs a hybrid
+lates the human short-term memory, which is usu-        memory structure to facilitate agent behaviors. The
+ally realized by in-context learning, and the memory    short-term memory contains the context informa-
+information is directly written into the prompts. For   tion about the agent current situations, while the
+example, RLP [30] is a conversation agent, which        long-term memory stores the agent past behaviors
+maintains internal states for the speaker and lis-      and thoughts, which can be retrieved according to
+tener. During each round of conversation, these         the current events. AgentSims [34] also implements
+states serve as LLM prompts, functioning as the         a hybrid memory architecture. The information pro-
+agent’s short-term memory. SayPlan [31] is an em-       vided in the prompt can be considered as short-term
+bodied agent specifically designed for task plan-       memory. In order to enhance the storage capac-
+ning. In this agent, the scene graphs and envi-         ity of memory, the authors propose a long-term
+ronment feedback serve as the agent’s short-term        memory system that utilizes a vector database, fa-
+memory, guiding its actions. CALYPSO [32] is an         cilitating efficient storage and retrieval. Specifi-
+agent designed for the game Dungeons & Dragons,         cally, the agent’s daily memories are encoded as
+which can assist Dungeon Masters in the creation        embeddings and stored in the vector database. If
+and narration of stories. Its short-term memory         the agent needs to recall its previous memories, the
+is built upon scene descriptions, monster informa-      long-term memory system retrieves relevant infor-
+               Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                  7
+
+
+mation using embedding similarities. This process high correlation. Therefore, the capture of short-
+can improve the consistency of the agent’s behav- term memory is very important and usually cannot
+ior. In GITM [16], the short-term memory stores be disregarded.
+the current trajectory, and the long-term memory
+                                                          Memory Formats: In addition to the memory
+saves reference plans summarized from successful
+                                                      structure, another perspective to analyze the mem-
+prior trajectories. Long-term memory provides sta-
+                                                      ory module is based on the formats of the mem-
+ble knowledge, while short-term memory allows
+                                                      ory storage medium, for example, natural language
+flexible planning. Reflexion [12] utilizes a short-
+                                                      memory or embedding memory. Different memory
+term sliding window to capture recent feedback and
+                                                      formats possess distinct strengths and are suitable
+incorporates persistent long-term storage to retain
+                                                      for various applications. In the following, we intro-
+condensed insights. This combination allows for the
+                                                      duce several representative memory formats.
+utilization of both detailed immediate experiences
+                                                            • Natural Languages. In this format, memory
+and high-level abstractions. SCM [35] selectively
+                                                      information such as the agent behaviors and ob-
+activates the most relevant long-term knowledge
+                                                      servations are directly described using raw natural
+to combine with short-term memory, enabling rea-
+                                                      language. This format possesses several strengths.
+soning over complex contextual dialogues. Sim-
+                                                      Firstly, the memory information can be expressed
+plyRetrieve [36] utilizes user queries as short-term
+                                                      in a flexible and understandable manner. Moreover,
+memory and stores long-term memory using pri-
+                                                      it retains rich semantic information that can provide
+vate knowledge bases. This design enhances the
+                                                      comprehensive signals to guide agent behaviors. In
+model accuracy while guaranteeing user privacy.
+                                                      the previous work, Reflexion [12] stores experien-
+MemorySandbox [37] implements long-term and
+                                                      tial feedback in natural language within a sliding
+short-term memory to store different objects, which
+                                                      window. Voyager [38] employs natural language
+can then be accessed throughout various conversa-
+                                                      descriptions to represent skills within the Minecraft
+tions. Users can create multiple conversations with
+                                                      game, which are directly stored in memory.
+different agents on the same canvas, facilitating the
+                                                            • Embeddings. In this format, memory infor-
+sharing of memory objects through a simple drag-
+                                                      mation is encoded into embedding vectors, which
+and-drop interface. In practice, integrating both
+                                                      enhances both retrieval and reading efficiency. For
+short-term and long-term memories can enhance an
+                                                      instance, MemoryBank [39] encodes each memory
+agent’s ability for long-range reasoning and accu-
+                                                      segment as an embedding vector and employs a
+mulation of valuable experiences, which are crucial
+                                                      dual-tower dense retrieval model to efficiently re-
+for accomplishing tasks in complex environments.
+                                                      trieve relevant information from past conversations.
+Remark. Careful readers may find that there may             • Databases. In this format, memory infor-
+also exist another type of memory structure, that is, mation is stored in databases, allowing the agent
+only based on the long-term memory. However, we to manipulate memories efficiently and comprehen-
+find that such type of memory is rarely documented sively. For example, ChatDB [40] uses a database
+in the literature. Our speculation is that the agents as a symbolic memory module. The agent can uti-
+are always situated in continuous and dynamic en- lize SQL statements to precisely add, delete, and
+vironments, with consecutive actions displaying a modify the memory information.
+8                                    Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+     • Structured Lists. In this format, memory in-       tions more in detail.
+formation is organized into lists, and the semantic of          • Memory Reading. The objective of mem-
+memory can be conveyed in an efficient and concise        ory reading is to extract meaningful information
+manner. For instance, GITM [16] stores action lists       from memory to enhance the agent’s actions. For
+for sub-goals in a hierarchical tree structure. The hi-   example, using the previously successful actions to
+erarchical structure explicitly captures the relation-    achieve similar goals [16]. The key of memory read-
+ships between goals and corresponding plans. RET-         ing lies in how to extract valuable information from
+LLM [41] initially converts natural language sen-         history actions. Usually, there are three commonly
+tences into triplet phrases, and subsequently stores      used criteria for information extraction, that is, the
+them in memory.                                           recency, relevance, and importance [20]. Memories
+Remark. Here we only show several representative          that are more recent, relevant, and important are
+memory formats, but it is important to note that          more likely to be extracted. Formally, we conclude
+there are many uncovered ones, such as the pro-           the following equation from existing literature for
+gramming code used by [38]. Moreover, it should           memory information extraction:
+                                                                                                              
+be emphasized that these formats are not mutually         m∗ = arg max αsrec (q, m) + βsrel (q, m) + γsimp (m) ,
+                                                                   m∈M
+exclusive; many models incorporate multiple for-                                                               (1)
+mats to concurrently harness their respective bene- where q is the query, for example, the task that
+fits. A notable example is the memory module of the agent should address or the context in which
+GITM [16], which utilizes a key-value list struc- the agent is situated. M is the set of all memories.
+ture. In this structure, the keys are represented by srec (·), srel (·) and simp (·) are the scoring functions for
+embedding vectors, while the values consist of raw measuring the recency, relevance, and importance of
+natural languages. The use of embedding vectors the memory m, with higher scores indicating more
+allows for efficient retrieval of memory records. By recent, more relevant, and more important memo-
+utilizing natural languages, the memory contents ries respectively. These scoring functions can be
+become highly comprehensive, enabling more in- implemented using various methods, for example,
+formed agent actions.                                 srel (q, m) can be calculated using vector similarity
+   Above, we mainly discuss the internal designs measures between query and memory embeddings.
+of the memory module. In the following, we turn It should be noted that simp only reflects the charac-
+our focus to memory operations, which are used to ters of the memory itself, thus it is unrelated to the
+interact with external environments.                  query q. α, β and γ are balancing parameters. By
+   Memory Operations: The memory module plays assigning them with different values, one can obtain
+a critical role in allowing the agent to acquire, ac- various memory reading strategies. For example, by
+cumulate, and utilize significant knowledge by in- setting α = γ = 0, many studies [16, 30, 38, 41] only
+teracting with the environment. The interaction consider the relevance score srel for memory read-
+between the agent and the environment is accom- ing. By assigning α = β = γ = 1.0, [20] equally
+plished through three crucial memory operations: weights all the above three metrics to extract infor-
+memory reading, memory writing, and memory re- mation from memory.
+flection. In the following, we introduce these opera-        • Memory Writing. The purpose of memory
+                Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                   9
+
+
+writing is to store information about the perceived summarize and infer more abstract, complex and
+environment in memory. Storing valuable informa- high-level information. More specifically, in Gen-
+tion in memory provides a foundation for retrieving erative Agent [20], the agent has the capability to
+informative memories in the future, enabling the summarize its past experiences stored in memory
+agent to act more efficiently and rationally. During into broader and more abstract insights. To begin
+the memory writing process, there are two poten- with, the agent generates three key questions based
+tial problems that should be carefully addressed. on its recent memories. Then, these questions are
+On one hand, it is crucial to address how to store used to query the memory to obtain relevant infor-
+information that is similar to existing memories mation. Building upon the acquired information,
+(i.e., memory duplicated). On the other hand, it the agent generates five insights, which reflect the
+is important to consider how to remove informa- agent high-level ideas. For example, the low-level
+tion when the memory reaches its storage limit (i.e., memories “Klaus Mueller is writing a research pa-
+memory overflow). In the following, we discuss per”, “Klaus Mueller is engaging with a librarian
+these problems more in detail. (1) Memory Dupli- to further his research”, and “Klaus Mueller is con-
+cated. To incorporate similar information, people versing with Ayesha Khan about his research” can
+have developed various methods for integrating new induce the high-level insight “Klaus Mueller is ded-
+and previous records. For instance, in [16], the icated to his research”. In addition, the reflection
+successful action sequences related to the same sub- process can occur hierarchically, meaning that the
+goal are stored in a list. Once the size of the list insights can be generated based on existing insights.
+reaches N(=5), all the sequences in it are condensed In GITM [16], the actions that successfully accom-
+into a unified plan solution using LLMs. The origi- plish the sub-goals are stored in a list. When the
+nal sequences in the memory are replaced with the list contains more than five elements, the agent sum-
+newly generated one. Augmented LLM [42] aggre- marizes them into a common and abstract pattern
+gates duplicate information via count accumulation, and replaces all the elements. In ExpeL [43], two
+avoiding redundant storage. (2) Memory Overflow. approaches are introduced for the agent to acquire
+In order to write information into the memory when reflection. Firstly, the agent compares successful or
+it is full, people design different methods to delete failed trajectories within the same task. Secondly,
+existing information to continue the memorizing the agent learns from a collection of successful tra-
+process. For example, in ChatDB [40], memories jectories to gain experiences.
+can be explicitly deleted based on user commands.
+                                                          A significant distinction between traditional LLMs
+RET-LLM [41] uses a fixed-size buffer for memory,
+                                                       and the agents is that the latter must possess the ca-
+overwriting the oldest entries in a first-in-first-out
+                                                       pability to learn and complete tasks in dynamic en-
+(FIFO) manner.
+                                                       vironments. If we consider the memory module as
+       • Memory Reflection. Memory reflection emu- responsible for managing the agents’ past behaviors,
+lates humans’ ability to witness and evaluate their it becomes essential to have another significant mod-
+own cognitive, emotional, and behavioral processes. ule that can assist the agents in planning their future
+When adapted to agents, the objective is to pro- actions. In the following, we present an overview
+vide agents with the capability to independently of how researchers design the planning module.
+10                                           Front. Comput. Sci., 2025, 0(0): 1–42
+
+           CoT，Zero-shot Cot   ReWOO，HuggingGPT                   CoT-SC                          ToT，LMZSP，RAP
+
+               Prompts             Prompts                       Prompts                               Prompts
+
+
+
+
+             LLM                  LLM                           LLM                                  LLM
+
+                                                                                                           Step-1
+           Reasoning Step-1     Reasoning Step-1       Step-1     Step-1     Step-1
+
+           Reasoning Step-2       LLM                  Step-2     Step-2     Step-2
+
+
+                                Reasoning Step-2                                         Step-2            Step-2            Step-2
+           Reasoning Step-n                            Step-n     Step-n     Step-n
+
+                                  LLM
+            Single-Path                                         Multi-Path
+                                Reasoning Step-n                                      Step-3      Step-3            Step-3      Step-3
+             Reasoning                                          Reasoning
+
+
+Fig. 3   Comparison between the strategies of single-path and multi-path reasoning. LMZSP is the model proposed in [44].
+
+
+2.1.3    Planning Module                                          to generate task reasoning processes by prompt-
+                                                                  ing them with trigger sentences like "think step by
+When faced with a complex task, humans tend to                    step". Unlike CoT, this method does not incorpo-
+deconstruct it into simpler subtasks and solve them               rate reasoning steps as examples in the prompts. Re-
+individually. The planning module aims to empower                 Prompting [47] involves checking whether each step
+the agents with such human capability, which is                   meets the necessary prerequisites before generating
+expected to make the agent behave more reasonably,                a plan. If a step fails to meet the prerequisites, it
+powerfully, and reliably. In specific, we summarize               introduces a prerequisite error message and prompts
+existing studies based on whether the agent can                   the LLM to regenerate the plan. ReWOO [48] intro-
+receive feedback in the planing process, which are                duces a paradigm of separating plans from external
+detailed as follows:                                              observations, where the agents first generate plans
+  Planning without Feedback: In this method, the                  and obtain observations independently, and then
+agents do not receive feedback that can influence its             combine them together to derive the final results.
+future behaviors after taking actions. In the follow-             HuggingGPT [13] first decomposes the task into
+ing, we present several representative strategies.                many sub-goals, and then solves each of them based
+      • Single-path Reasoning. In this strategy, the              on Huggingface. Different from CoT and Zero-
+final task is decomposed into several intermediate                shot-CoT, which outcome all the reasoning steps
+steps. These steps are connected in a cascading man-              in a one-shot manner, ReWOO and HuggingGPT
+ner, with each step leading to only one subsequent                produce the results by accessing LLMs multiply
+step. LLMs follow these steps to achieve the final                times. SWIFTSAGE [49], inspired by the dual-
+goal. Specifically, Chain of Thought (CoT) [45]                   process theory of human cognition [50], combines
+proposes inputting reasoning steps for solving com-               the power of both SWIFT and SAGE modules for
+plex problems into the prompt. These steps serve                  planning in complex interactive tasks. The SWIFT
+as examples to inspire LLMs to plan and act in a                  module provides quick responses based on learned
+step-by-step manner. In this method, the plans are                patterns, while the SAGE module, using large lan-
+created based on the inspiration from the examples                guage models, conducts in-depth planning by ask-
+in the prompts. Zero-shot-CoT [46] enables LLMs
+               Lei Wang et al. A Survey on Large Language Model based Autonomous Agents               11
+
+
+ing key questions and generating action sequences    multiple possible next steps, and then determine
+to ensure successful task completion.                the final one based on their distances to admissible
+                                                     actions. [56] further improves [44] by incorporat-
+      • Multi-path Reasoning. In this strategy, the
+                                                     ing examples that are similar to the queries in the
+reasoning steps for generating the final plans are
+                                                     prompts. RAP [57] builds a world model to simu-
+organized into a tree-like structure. Each intermedi-
+                                                     late the potential benefits of different plans based
+ate step may have multiple subsequent steps. This
+                                                     on Monte Carlo Tree Search (MCTS), and then,
+approach is analogous to human thinking, as indi-
+                                                     the final plan is generated by aggregating multiple
+viduals may have multiple choices at each reasoning
+                                                     MCTS iterations. To enhance comprehension, we
+step. In specific, Self-consistent CoT (CoT-SC) [51]
+                                                     provide an illustration comparing the strategies of
+believes that each complex problem has multiple
+                                                     single-path and multi-path reasoning in Figure 3.
+ways of thinking to deduce the final answer. Thus, it
+starts by employing CoT to generate various reason-       • External Planner. Despite the demonstrated
+ing paths and corresponding answers. Subsequently, power of LLMs in zero-shot planning, effectively
+the answer with the highest frequency is chosen generating plans for domain-specific problems re-
+as the final output. Tree of Thoughts (ToT) [52] mains highly challenging. To address this challenge,
+is designed to generate plans using a tree-like rea- researchers turn to external planners. These tools
+soning structure. In this approach, each node in are well-developed and employ efficient search algo-
+the tree represents a "thought," which corresponds rithms to rapidly identify correct, or even optimal,
+to an intermediate reasoning step. The selection plans. In specific, LLM+P [58] first transforms
+of these intermediate steps is based on the evalu- the task descriptions into formal Planning Domain
+ation of LLMs. The final plan is generated using Definition Languages (PDDL), and then it uses an
+either the breadth-first search (BFS) or depth-first external planner to deal with the PDDL. Finally, the
+search (DFS) strategy. Comparing with CoT-SC, generated results are transformed back into natural
+which generates all the planed steps together, ToT language by LLMs. Similarly, LLM-DP [59] uti-
+needs to query LLMs for each reasoning step. In lizes LLMs to convert the observations, the current
+RecMind [53], the authors designed a self-inspiring world state, and the target objectives into PDDL.
+mechanism, where the discarded historical infor- Subsequently, this transformed data is passed to
+mation in the planning process is also leveraged an external planner, which efficiently determines
+to derive new reasoning steps. In GoT [54], the the final action sequence. CO-LLM [22] demon-
+authors expand the tree-like reasoning structure in strates that LLMs is good at generating high-level
+ToT to graph structures, resulting in more power- plans, but struggle with low-level control. To ad-
+ful prompting strategies. In AoT [55], the authors dress this limitation, a heuristically designed ex-
+design a novel method to enhance the reasoning ternal low-level planner is employed to effectively
+processes of LLMs by incorporating algorithmic ex- execute actions based on high-level plans.
+amples into the prompts. Remarkably, this method        Planning with Feedback: In many real-world
+only needs to query LLMs for only one or a few scenarios, the agents need to make long-horizon
+times. In [44], the LLMs are leveraged as zero-shot planning to solve complex tasks. When facing these
+planners. At each planning step, they first generate tasks, the above planning modules without feedback
+12                                 Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+can be less effective due to the following reasons: feedback encompasses the environment states as
+firstly, generating a flawless plan directly from the well as the success and failure information for each
+beginning is extremely difficult as it needs to con- executed action. SayPlan [31] leverages environ-
+sider various complex preconditions. As a result, mental feedback derived from a scene graph sim-
+simply following the initial plan often leads to fail- ulator to validate and refine its strategic formula-
+ure. Moreover, the execution of the plan may be tions. This simulator is adept at discerning the
+hindered by unpredictable transition dynamics, ren- outcomes and state transitions subsequent to agent
+dering the initial plan non-executable. Simultane- actions, facilitating SayPlan’s iterative recalibra-
+ously, when examining how humans tackle complex tion of its strategies until a viable plan is ascer-
+tasks, we find that individuals may iteratively make tained. In DEPS [33], the authors argue that solely
+and revise their plans based on external feedback. providing information about the completion of a
+To simulate such human capability, researchers have task is often inadequate for correcting planning er-
+designed many planning modules, where the agent rors. Therefore, they propose informing the agent
+can receive feedback after taking actions. The feed- about the detail reasons for task failure, allowing
+back can be obtained from environments, humans, them to more effectively revise their plans. LLM-
+and models, which are detailed in the following.       Planner [61] introduces a grounded re-planning al-
+                                                       gorithm that dynamically updates plans generated
+      • Environmental Feedback. This feedback is
+                                                       by LLMs when encountering object mismatches and
+obtained from the objective world or virtual envi-
+                                                       unattainable plans during task completion. Inner
+ronment. For instance, it could be the game’s task
+                                                       Monologue [62] provides three types of feedback
+completion signals or the observations made after
+                                                       to the agent after it takes actions: (1) whether the
+the agent takes an action. In specific, ReAct [60]
+                                                       task is successfully completed, (2) passive scene
+proposes constructing prompts using thought-act-
+                                                       descriptions, and (3) active scene descriptions. The
+observation triplets. The thought component aims
+                                                       former two are generated from the environments,
+to facilitate high-level reasoning and planning for
+                                                       which makes the agent actions more reasonable.
+guiding agent behaviors. The act represents a spe-
+cific action taken by the agent. The observation            • Human Feedback. In addition to obtaining
+corresponds to the outcome of the action, acquired feedback from the environment, directly interact-
+through external feedback, such as search engine ing with humans is also a very intuitive strategy to
+results. The next thought is influenced by the previ- enhance the agent planning capability. The human
+ous observations, which makes the generated plans feedback is a subjective signal. It can effectively
+more adaptive to the environment. Voyager [38] make the agent align with the human values and
+makes plans by incorporating three types of environ- preferences, and also help to alleviate the hallucina-
+ment feedback including the intermediate progress tion problem. In Inner Monologue [62], the agent
+of program execution, the execution error and self- aims to perform high-level natural language instruc-
+verification results. These signals can help the agent tions in a 3D visual environment. It is given the
+to make better plans for the next action. Similar to capability to actively solicit feedback from humans
+Voyager, Ghost [16] also incorporates feedback into regarding scene descriptions. Then, the agent in-
+the reasoning and action taking processes. This corporates the human feedback into its prompts,
+                Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                     13
+
+
+enabling more informed planning and reasoning. In value, this model leverages LLMs to provide more
+the above cases, we can see, different types of feed- detailed verbal feedback, which can provide more
+back can be combined to enhance the agent plan- comprehensive supports for the agent plans.
+ning capability. For example, Inner Monologue [62] Remark. In conclusion, the implementation of plan-
+collects both environment and human feedback to ning module without feedback is relatively straight-
+facilitate the agent plans.                           forward. However, it is primarily suitable for simple
+      • Model Feedback. Apart from the aforemen- tasks that only require a small number of reason-
+tioned environmental and human feedback, which ing steps. Conversely, the strategy of planning with
+are external signals, researchers have also investi- feedback needs more careful designs to handle the
+gated the utilization of internal feedback from the feedback. Nevertheless, it is considerably more
+agents themselves. This type of feedback is usu- powerful and capable of effectively addressing com-
+ally generated based on pre-trained models. In spe- plex tasks that involve long-range reasoning.
+cific, [63] proposes a self-refine mechanism. This
+                                                        2.1.4   Action Module
+mechanism consists of three crucial components:
+output, feedback, and refinement. Firstly, the agent    The action module is responsible for translating
+generates an output. Then, it utilizes LLMs to pro-     the agent’s decisions into specific outcomes. This
+vide feedback on the output and offer guidance on       module is located at the most downstream position
+how to refine it. At last, the output is improved by    and directly interacts with the environment. It is
+the feedback and refinement. This output-feedback-      influenced by the profile, memory, and planning
+refinement process iterates until reaching some de-     modules. This section introduces the action module
+sired conditions. SelfCheck [64] allows agents to       from four perspectives: (1) Action goal: what are
+examine and evaluate their reasoning steps gener-       the intended outcomes of the actions? (2) Action
+ated at various stages. They can then correct any er-   production: how are the actions generated? (3)
+rors by comparing the outcomes. InterAct [65] uses      Action space: what are the available actions? (4)
+different language models (such as ChatGPT and          Action impact: what are the consequences of the
+InstructGPT) as auxiliary roles, such as checkers       actions? Among these perspectives, the first two
+and sorters, to help the main language model avoid      focus on the aspects preceding the action ("before-
+erroneous and inefficient actions. ChatCoT [66]         action" aspects), the third focuses on the action itself
+utilizes model feedback to improve the quality of       ("in-action" aspect), and the fourth emphasizes the
+its reasoning process. The model feedback is gen-       impact of the actions ("after-action" aspect).
+erated by an evaluation module that monitors the           Action Goal: The agent can perform actions with
+agent reasoning steps. Reflexion [12] is developed      various objectives. Here, we present several repre-
+to enhance the agent’s planning capability through      sentative examples: (1) Task Completion. In this
+detailed verbal feedback. In this model, the agent      scenario, the agent’s actions are aimed at accom-
+first produces an action based on its memory, and       plishing specific tasks, such as crafting an iron pick-
+then, the evaluator generates feedback by taking        axe in Minecraft [38] or completing a function in
+the agent trajectory as input. In contrast to previ-    software development [18]. These actions usually
+ous studies, where the feedback is given as a scalar    have well-defined objectives, and each action con-
+14                                 Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+tributes to the completion of the final task. Ac- successful actions to handle the current task directly.
+tions aimed at this type of goal are very common In collaborative agents such as ChatDev [18] and
+in existing literature. (2) Communication. In this MetaGPT [23], different agents may communicate
+case, the actions are taken to communicate with the with each other. In this process, the conversation
+other agents or real humans for sharing informa- history in a dialog is remembered in the agent mem-
+tion or collaboration. For example, the agents in ories. Each utterance generated by the agent is
+ChatDev [18] may communicate with each other influenced by its memory. (2) Action via Plan Fol-
+to collectively accomplish software development lowing. In this strategy, the agent takes actions
+tasks. In Inner Monologue [62], the agent actively following its pre-generated plans. For instance, in
+engages in communication with humans and ad- DEPS [33], for a given task, the agent first makes
+justs its action strategies based on human feedback. action plans. If there are no signals indicating plan
+(3) Environment Exploration. In this example, the failure, the agent will strictly adhere to these plans.
+agent aims to explore unfamiliar environments to In GITM [16], the agent makes high-level plans by
+expand its perception and strike a balance between decomposing the task into many sub-goals. Based
+exploring and exploiting. For instance, the agent in on these plans, the agent takes actions to solve each
+Voyager [38] may explore unknown skills in their sub-goal sequentially to complete the final task.
+task completion process and continually refine the     Action Space: Action space refers to the set of
+skill execution code based on environment feedback possible actions that can be performed by the agent.
+through trial and error.                             In general, we can roughly divide these actions
+   Action Production: Different from ordinary LLMs, into two classes: (1) external tools and (2) inter-
+where the model input and output are directly as- nal knowledge of the LLMs. In the following, we
+sociated, the agent may take actions via different introduce these actions more in detail.
+strategies and sources. In the following, we intro-         • External Tools. While LLMs have been
+duce two types of commonly used action production demonstrated to be effective in accomplishing a
+strategies. (1) Action via Memory Recollection. In large amount of tasks, they may not work well
+this strategy, the action is generated by extracting for the domains which need comprehensive expert
+information from the agent memory according to knowledge. In addition, LLMs may also encounter
+the current task. The task and the extracted memo- hallucination problems, which are hard to be re-
+ries are used as prompts to trigger the agent actions. solved by themselves. To alleviate the above prob-
+For example, in Generative Agents [20], the agent lems, the agents are empowered with the capability
+maintains a memory stream, and before taking each to call external tools for executing action. In the
+action, it retrieves recent, relevant and important following, we present several representative tools
+information from the memory steam to guide the which have been exploited in the literature.
+agent actions. In GITM [16], in order to achieve a       (1) APIs. Leveraging external APIs to comple-
+low-level sub-goal, the agent queries its memory to ment and expand action space is a popular paradigm
+determine if there are any successful experiences in recent years. For example, HuggingGPT [13] in-
+related to the task. If similar tasks have been com- tegrates HuggingFace’s vast model ecosystem to
+pleted previously, the agent invokes the previously tackle complex user tasks. Similarly, WebGPT [67]
+               Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                 15
+
+
+proposes to automatically generate queries to ex- employs SQL statements to query databases, facil-
+tract relevant content from external web pages when itating actions by the agents in a logical manner.
+responding to user request. TPTU [68] explores the MRKL [73] and OpenAGI [74] incorporate vari-
+potential of LLMs to address intricate tasks through ous expert systems such as knowledge bases and
+strategic task planning and API-based tools. Go- planners to access domain-specific information.
+rilla [69] introduces a fine-tuned LLM capable of        (3) External Models. Previous studies often uti-
+generating precise input arguments for API calls, lize external models to expand the range of possible
+effectively mitigating hallucination issues during actions. In comparison to APIs, external models
+external API usage. ToolFormer [15] employs self- typically handle more complex tasks. Each external
+supervised learning to determine when and how model may correspond to multiple APIs. For ex-
+to invoke external tools, using demonstrations of ample, ViperGPT [75] firstly uses Codex, which is
+tool APIs for training. API-Bank [70] offers a com- implemented based on language model, to generate
+prehensive benchmark with a diverse collection of Python code from text descriptions, and then exe-
+API tools to systematically evaluate tool-augmented cutes the code to complete the given tasks. Chem-
+LLMs, alongside robust training datasets designed Crow [76] is an LLM-based chemical agent de-
+to enhance their integration capabilities. ToolL- signed to perform tasks in organic synthesis, drug
+LaMA [14] proposes a tool-use framework encom- discovery, and material design. It utilizes seven-
+passing data collection, training, and evaluation, teen expert-designed models to assist its operations.
+with the resulting fine-tuned model excelling across MM-REACT [77] integrates various external mod-
+a wide array of APIs. RestGPT [71] connects LLMs els, such as VideoBERT for video summarization,
+with RESTful APIs, which follow widely accepted X-decoder for image generation, and SpeechBERT
+standards for web services development, making the for audio processing, enhancing its capability in
+resulting program more compatible with real-world diverse multimodal scenarios.
+applications. TaskMatrix.AI [72] connects LLMs
+                                                           • Internal Knowledge. In addition to utilizing
+with an extensive ecosystem of APIs to support
+                                                      external tools, many agents rely solely on the inter-
+task execution. At its core lies a multimodal con-
+                                                      nal knowledge of LLMs to guide their actions. We
+versational foundational model that interacts with
+                                                      now present several crucial capabilities of LLMs
+users, understands their goals and context, and then
+                                                      that can support the agent to behave reasonably
+produces executable code for particular tasks. In
+                                                      and effectively. (1) Planning Capability. Previous
+essence, these intelligent agents strategically har-
+                                                      work has demonstrated that LLMs can be used as
+ness external APIs as versatile tools, systematically
+                                                      decent planners to decompose complex tasks into
+expanding their action space and transcending the
+                                                      simpler ones [45]. Such a capability of LLMs can
+inherent limitations of traditional language models
+                                                      be even triggered without incorporating examples
+by integrating diverse computational capabilities.
+                                                      in the prompts [46]. Building on the planning ca-
+   (2) Databases & Knowledge Bases. Integrating pability of LLMs, DEPS [33] develops a Minecraft
+external database or knowledge base enables agents agent, which can solve complex tasks via sub-goal
+to obtain specific domain information for generating decomposition. Similar agents like GITM [16] and
+more realistic actions. For example, ChatDB [40] Voyager [38] also heavily rely on the planning ca-
+16                                  Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+pability of LLMs to successfully complete various       updating memories, forming new plans, acquiring
+tasks. (2) Conversation Capability. LLMs can usu-       novel knowledge, and more. For example, in Gen-
+ally generate high-quality conversations. This capa-    erative Agents [20], memory streams are updated
+bility enables agents to behave more like humans. In    after performing actions within the system. Simi-
+the previous work, many agents take actions based       larly, SayCan [79] enables agents to take actions to
+on the strong conversation capability of LLMs. For      update understandings of the environment. (3) Trig-
+example, in ChatDev [18], different agents can dis-     gering New Actions. In task completion processes,
+cuss the software development process and reflect       one action often leads to subsequent actions. For ex-
+on their own behaviors. In RLP [30], the agent          ample, in Voyager [38], once the agent has gathered
+can communicate with the listeners based on their       the necessary resources, it triggers the construction
+potential feedback on the agent’s utterance. (3)        of buildings.
+Common Sense Understanding Capability. Another
+important capability of LLMs is that they can well      2.2   Agent Capability Acquisition
+comprehend human common sense. Based on this
+                                                        In the sections above, we focus mainly on how to
+capability, many agents can simulate human daily
+                                                        design the agent architecture to better harness the ca-
+life and make human-like decisions. For example,
+                                                        pabilities of LLMs to enabling them to accomplish
+in Generative Agent [20], the agent can accurately
+                                                        tasks akin to human performance. The architecture
+understand its current state, the surrounding envi-
+                                                        functions as the “hardware” of an agent. However,
+ronment, and summarize high-level ideas based on
+                                                        relying solely on the hardware is insufficient for
+basic observations. Without the common sense un-
+                                                        achieving effective task performance. This is be-
+derstanding capability of LLMs, these behaviors
+                                                        cause the agent may lack the necessary task-specific
+cannot be reliably simulated. Similar conclusions
+                                                        capabilities, skills, and experiences, which can be
+may also apply to RecAgent [21] and S3 [78], where
+                                                        regarded as "software" resources. In order to equip
+the agents focus on simulating user social behaviors.
+                                                        the agent with these resources, various strategies
+   Action Impact: Action impact refers to the con-      have been devised. Generally, we categorize these
+sequences of an agent’s actions. While the range        strategies into two classes based on whether they re-
+of possible impacts is vast, we highlight a few key     quire fine-tuning of the LLMs. Below, we introduce
+examples for clarity: (1) Changing Environments.        each category in detail.
+Agents can directly alter environment states by ac-        Capability Acquisition with Fine-tuning: A
+tions, such as moving their positions, collecting       direct approach to enhance agent capabilities for
+items, constructing buildings, etc. For instance, in    task completion is to fine-tune the model using task-
+GITM [16] and Voyager [38], the environments are        specific datasets. These datasets can be constructed
+changed by the actions of the agents in their task      from human annotations, LLM-generated content,
+completion process. Specifically, when an agent         or real-world applications. We discuss these meth-
+collects resources—such as harvesting three pieces      ods in detail below.
+of wood—the resources disappear from the environ-             • Fine-tuning with Human Annotated Datasets.
+ment. (2) Altering Internal States. Actions taken by    To fine-tune the agent, utilizing human annotated
+the agent can also change the agent itself, including   datasets is a versatile approach that can be employed
+                  Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                                 17
+
+Table 1 For the profile module, we use ①, ② and ③ to represent the handcrafting method, LLM-generation method, and
+dataset alignment method, respectively. For the memory module, we focus on the implementation strategies for memory
+operation and memory structure. For memory operation, we use ① and ② to indicate that the model only has read/write
+operations and has read/write/reflection operations, respectively. For memory structure, we use ① and ② to represent unified
+and hybrid memories, respectively. For the planning module, we use ① and ② to represent planning w/o feedback and w/
+feedback, respectively. For the action module, we use ① and ② to represent that the model does not use tools and use tools,
+respectively. For the agent capability acquisition (CA) strategy, we use ① and ② to represent the methods with and without
+fine-tuning, respectively. “-” indicates that the corresponding content is not explicitly discussed in the paper.
+                                                        Memory
+  Model                          Profile                                       Planning     Action      CA        Time
+                                                Operation      Structure
+  WebGPT [67]                      -                -              -              -           ②         ①        12/2021
+  SayCan [79]                      -                -              -              ①           ①         ②        04/2022
+  MRKL [73]                        -                -              -              ①           ②         -        05/2022
+  Inner Monologue [62]             -                -              -              ②           ①         ②        07/2022
+  Social Simulacra [80]            ②                -              -              -           ①         -        08/2022
+  ReAct [60]                       -                -              -              ②           ②         ①        10/2022
+  MALLM [42]                       -               ①               ②              -           ①         -        01/2023
+  DEPS [33]                        -                -              -              ②           ①         ②        02/2023
+  Toolformer [15]                  -                -              -              ①           ②         ①        02/2023
+  Reflexion [12]                   -               ②               ②              ②           ①         ②        03/2023
+  CAMEL [81]                      ①②                -              -              ②           ①         -        03/2023
+  API-Bank [70]                    -                -              -              ②           ②         ②        04/2023
+  ViperGPT [75]                    -               -               -              -           ②         -        03/2023
+  HuggingGPT [13]                  -               ①               ①              ①           ②         -        03/2023
+  Generative Agents [20]           ①               ②               ②              ②           ①         -        04/2023
+  LLM+P [58]                       -                -              -              ①           ①         -        04/2023
+  ChemCrow [76]                    -               -               -              ②           ②         -        04/2023
+  OpenAGI [74]                     -               -               -              ②           ②         ①        04/2023
+  AutoGPT [82]                     -               ①               ②              ②           ②         ②        04/2023
+  SCM [35]                         -               ②               ②              -           ①         -        04/2023
+  Socially Alignment [83]          -               ①               ②              -           ①         ①        05/2023
+  GITM [16]                        -               ②               ②              ②           ①         ②        05/2023
+  Voyager [38]                     -               ②               ②              ②           ①         ②        05/2023
+  Introspective Tips [84]          -               -               -              ②           ①         ②        05/2023
+  RET-LLM [41]                     -               ①               ②              -           ①         ①        05/2023
+  ChatDB [40]                      -               ①               ②              ②           ②         -        06/2023
+  S 3 [78]                        ③                ②               ②              -           ①         -        07/2023
+  ChatDev [18]                    ①                ②               ②              ②           ①         ②        07/2023
+  ToolLLM [14]                     -               -               -              ②           ②         ①        07/2023
+  MemoryBank [39]                  -               ②               ②              -           ①         -        07/2023
+  MetaGPT [23]                    ①                ②               ②              ②           ②         -        08/2023
+
+in various application scenarios. In this approach, The LLMs are directly fine-tuned based on these
+researchers first design annotation tasks and then natural language datasets. In RET-LLM [41], in
+recruit workers to complete them. For example, order to better convert natural languages into struc-
+in CoH [85], the authors aim to align LLMs with tured memory information, the authors fine-tune
+human values and preferences. Different from the LLMs based on a human constructed dataset, where
+other models, where the human feedback is lever- each sample is a “triplet-natural language” pair. In
+aged in a simple and symbolic manner, this method WebShop [86], the authors collect 1.18 million real-
+converts the human feedback into detailed compar- world products from amazon.com, and put them
+ison information in the form of natural languages. onto a simulated e-commerce website, which con-
+18                                   Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+tains several carefully designed human shopping           question, the central agent first generates initial re-
+scenarios. Based on this website, the authors re-         sponses. Then, it shares the responses to its nearby
+cruit 13 workers to collect a real-human behavior         agents for collecting their feedback. Based on the
+dataset. At last, three methods based on heuristic        feedback as well as its detailed explanations, the
+rules, imitation learning and reinforcement learn-        central agent revise its initial responses to make
+ing are trained based on this dataset. Although the       them more consistent with social norms. In this
+authors do not fine-tune LLM-based agents, we be-         process, the authors collect a large amount of agent
+lieve that the dataset proposed in this paper holds im-   social interaction data, which is then leveraged to
+mense potential to enhance the capabilities of agents     fine-tune the LLMs.
+in the field of web shopping. In EduChat [87], the              • Fine-tuning with Real-world Datasets. In ad-
+authors aim to enhance the educational functions          dition to building datasets based on human or LLM
+of LLMs, such as open-domain question answering,          annotations, directly using real-world datasets to
+essay assessment, Socratic teaching, and emotional        fine-tune the agent is also a common strategy. For
+support. They fine-tune LLMs based on human               example, in MIND2WEB [88], the authors collect
+annotated datasets that cover various educational         a large amount of real-world datasets to enhance
+scenarios and tasks.                                      the agent capability in the web domain. In con-
+      • Fine-tuning with LLM Generated Datasets.          trast to prior studies, the dataset presented in this
+Building human-annotated datasets typically requires      paper encompasses diverse tasks, real-world sce-
+recruiting people, which can be costly, especially        narios, and comprehensive user interaction patterns.
+when dealing with large-scale annotation tasks. Con-      Specifically, the authors collect over 2,000 open-
+sidering that LLMs can achieve human-like capabil-        ended tasks from 137 real-world websites spanning
+ities in a wide range of tasks, a natural idea is using   31 domains. Using this dataset, the authors fine-
+LLMs to accomplish the annotation task. While             tune LLMs to enhance their performance on web-
+the datasets produced from this method can be not         related tasks such as movie discovery and ticket
+as perfect as the human annotated ones, it is much        booking. Similarly, in SQL-PaLM [89], researchers
+cheaper, and can be leveraged to generate more sam-       fine-tune PaLM-2 using cross-domain, large-scale
+ples. For example, in ToolBench [14], to enhance          text-to-SQL datasets, including Spider and BIRD.
+the tool-using capability of open-source LLMs, the        The resulting model achieves notable performance
+authors collect 16,464 real-world APIs spanning           improvements on text-to-SQL tasks, demonstrating
+49 categories from the RapidAPI Hub. They used            the effectiveness of real-world datasets for domain-
+these APIs to prompt ChatGPT to generate diverse          specific applications.
+instructions, covering both single-tool and multi-          Capability Acquisition without Fine-tuning: In
+tool scenarios. Based on the obtained dataset, the        the era of tradition machine learning, the model ca-
+authors fine-tune LLaMA [9], and obtain significant       pability is mainly acquired by learning from datasets,
+performance improvement in terms of tool using.           where the knowledge is encoded into the model pa-
+In [83], to empower the agent with social capability,     rameters. In the era of LLMs, the model capability
+the authors design a sandbox, and deploy multiple         can be acquired either by training/fine-tuning the
+agents to interact with each other. Given a social        model parameters or designing delicate prompts
+                  Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                                           19
+
+
+        Parameter Learning                                 Parameter Learning                        Parameter Learning
+
+                                                              Model                                        Model
+                         Output
+        Dataset                                                                                      Prompt Engineering
+                                                        Prompt Engineering
+                                                                                            Agent relevant Prompts             Output
+                        Model                 Classify the text into
+                                              neutral, negative or              Output          Mechanism Engineering
+                                              positive. Text: I think
+                                              the food was okay.                Neutral     Trial-and-              Crowd-
+                          Input               Sentiment:                                       Error               sourcing
+
+   Model Parameters     Capability                   Prompts                Capability                                  Capability
+
+
+
+
+    The era of machine learning             The era of large language model                              The era of agent
+
+                      Fig. 4   Illustration of transitions in strategies for acquiring model capabilities.
+
+
+(i.e., prompt engineering). In prompt engineering,                      examples in the prompt. Similar techniques are also
+one needs to write valuable information into the                        used in CoT-SC [51] and ToT [52]. In RLP [30], the
+prompts to enhance the model capability or unleash                      authors aim to enhance an agent’s self-awareness in
+existing LLM capabilities. In the era of agents, the                    conversations by prompting LLMs with the agent’s
+model capability can be acquired based on three                         beliefs about both its own and the listeners’ men-
+strategies: (1) model fine-tuning, (2) prompt engi-                     tal states. This approach results in more engaging
+neering and (3) designing proper agent evolution                        and adaptive utterances. Furthermore, the incorpo-
+mechanisms (we called it as mechanism engineer-                         ration of the target mental states of listeners allows
+ing). Mechanism engineering is a broad concept                          the agent to formulate more strategic plans. Retro-
+that involves developing specialized modules, in-                       former [90] presents a retrospective model that en-
+troducing novel working rules, and other strategies                     ables the agent to generate reflections on its past fail-
+to enhance agent capabilities. For clearly under-                       ures. The reflections are integrated into the prompt
+standing the transitions of model capability acqui-                     of LLMs to guide the agent’s future actions. Ad-
+sition strategies, we illustrate them in Figure 4. In                   ditionally, this model utilizes reinforcement learn-
+the following, we detail prompting engineering and                      ing to iteratively improve the retrospective model,
+mechanism engineering.                                                  thereby refining the LLM prompt.
+
+     • Prompting Engineering. Due to the strong                               • Mechanism Engineering. Unlike model fine-
+language comprehension capabilities, people can di-                     tuning and prompt engineering, mechanism engi-
+rectly interact with LLMs using natural languages.                      neering is a unique strategy to enhance agent capa-
+This introduces a novel strategy for enhancing agent                    bility. In the following, we present several represen-
+capabilities, that is, one can describe the desired ca-                 tative methods of mechanism engineering.
+pability using natural language and then use it as                         (1) Trial-and-error. In this method, the agent first
+prompts to influence LLM actions. For example, in                       performs an action, and subsequently, a pre-defined
+CoT [45], in order to empower the agent with the                        critic is invoked to judge the action. If the action
+capability for complex task reasoning, the authors                      is deemed unsatisfactory, then the agent reacts by
+present the intermediate reasoning steps as few-shot                    incorporating the critic’s feedback. For example, in
+20                                 Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+RAH [91], the agent serves as a user assistant in ing and incorporating the other agents’ opinions.
+recommender systems. One of the agent’s crucial           (3) Experience Accumulation. In GITM [16], the
+roles is to simulate human behavior and generate agent does not know how to solve a task in the begin-
+responses on behalf of the user. To fulfill this objec- ning. Then, it makes explorations, and once it has
+tive, the agent first generates a predicted response successfully accomplished a task, the actions used
+and then compares it with the real human feedback. in this task are stored into the agent memory. In the
+If the predicted response and the real human feed- future, if the agent encounters a similar task, then
+back differ, the critic generates failure information, the relevant memories are extracted to complete the
+which is subsequently incorporated into the agent’s current task. In this process, the improved agent
+next action. Similarly, in DEPS [33], the agent capability comes from the specially designed mem-
+first designs a plan to accomplish a given task. In ory accumulation and utilization mechanisms. Voy-
+the plan execution process, if an action fails, the ager [38] introduces a skill library, where executable
+explainer generates specific details explaining the codes for specific skills are refined through interac-
+cause of the failure. This information is then in- tions with the environment, enabling efficient task
+corporated by the agent to redesign the plan. In execution over time. In AppAgent [95], the agent is
+RoCo [92], the agent first proposes a sub-task plan designed to interact with apps in a manner akin to
+and a path of 3D waypoints for each robot in a multi- human users, learning through both autonomous ex-
+robot collaboration task. The plan and waypoints ploration and observation of human demonstrations.
+are then validated by a set of environment checks, Throughout this process, it constructs a knowledge
+such as collision detection and inverse kinematics. base, which serves as a reference for performing in-
+If any of the checks fail, the feedback is appended to tricate tasks across various applications on a mobile
+each agent’s prompt and another round of dialog be- phone. In MemPrompt [96], the users are requested
+gins. The agents use LLMs to discuss and improve to provide feedback in natural language regarding
+their plan and waypoints until they pass all valida- the problem-solving intentions of the agent, and this
+tions. PREFER [93] extends this idea by leveraging feedback is stored in memory. When the agent en-
+LLMs to generate detailed feedback when the agent counters similar tasks, it attempts to retrieve related
+underperforms, enabling iterative refinement and memories to generate more suitable responses.
+performance improvement.
+                                                          (4) Self-driven Evolution. This method allows
+   (2) Crowd-sourcing. In [94], the authors design agents to autonomously improve through self-directed
+a debating mechanism that leverages the wisdom learning and feedback mechanisms. LMA3 [97]
+of crowds to enhance agent capabilities. To begin enables the agent to autonomously set goals for it-
+with, different agents provide separate responses to self, and gradually improve its capability by explor-
+a given question. If their responses are not consis- ing the environment and receiving feedback from
+tent, they will be prompted to incorporate the solu- a reward function. Following this mechanism, the
+tions from other agents and provide an updated re- agent can acquire knowledge and develop capabil-
+sponse. This iterative process continues until reach- ities according to its own preferences. SALLM-
+ing a final consensus answer. In this method, the MS [98] integrates advanced LLMs like GPT-4 into
+capability of each agent is enhanced by understand- a multi-agent system, agents can adapt and perform
+                Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                   21
+
+
+complex tasks, showcasing advanced communica-           but are highly related to this area.
+tion capabilities, thereby realizing self-driven evo-
+lution in their interactions with the environment. In
+                                                        3     LLM-based Autonomous Agent Ap-
+CLMTWA [99], by using a large language model
+                                                              plication
+as a teacher and a weaker language model as a stu-
+dent, the teacher can generate and communicate          Owing to the strong language comprehension, com-
+natural language explanations to improve the stu-       plex task reasoning, and common sense understand-
+dent’s reasoning skills via theory of mind. The         ing capabilities, LLM-based autonomous agents
+teacher can also personalize its explanations for the   have shown significant potential to influence mul-
+student and intervene only when necessary, based        tiple domains. This section provides a succinct
+on the expected utility of intervention. Meanwhile,     summary of previous studies, categorizing them ac-
+NLSOM [100],leverages natural language collabo-         cording to their applications in three distinct areas:
+ration between agents, dynamically adjusting roles,     social science, natural science, and engineering (see
+tasks, and relationships based on feedback to solve     the left part of Figure 5 for a global overview).
+problems beyond the scope of a single agent.
+Remark. Upon comparing the aforementioned strate-       3.1   Social Science
+gies for agent capability acquisition, we can find    Social science is one of the branches of science, de-
+that the fine-tuning method improves the agent ca-    voted to the study of societies and the relationships
+pability by adjusting model parameters, which can     among individuals within those societies. LLM-
+incorporate a large amount of task-specific knowl-    based autonomous agents can promote this domain
+edge, but is only suitable for open-source LLMs.      by leveraging their impressive human-like under-
+The method without fine-tuning usually enhances       standing, thinking and task solving capabilities. In
+the agent capability based on delicate prompting      the following, we discuss several key areas that can
+strategies or mechanism engineering. They can         be affected by LLM-based autonomous agents.
+be used for both open- and closed-source LLMs.           Psychology: For the domain of psychology, LLM-
+However, due to the limitation of the input context   based agents can be leveraged for conducting simu-
+window of LLMs, they cannot incorporate too much      lation experiments, providing mental health support
+task information. In addition, the designing spaces   and so on [101–104]. For example, in [101], the
+of the prompts and mechanisms are extremely large,    authors assign LLMs with different profiles, and
+which makes it not easy to find optimal solutions.    let them complete psychology experiments. From
+   In the above sections, we have detailed the con- the results, the authors find that LLMs are capa-
+struction of LLM-based agents, where we focus on ble of generating results that align with those from
+two aspects including the architecture design and ca- studies involving human participants. Additionally,
+pability acquisition. We present the correspondence it was observed that larger models tend to deliver
+between existing work and the above taxonomy in more accurate simulation results compared to their
+Table 1. It should be noted that, for the sake of smaller counterparts. An interesting discovery is
+integrity, we have also incorporated several studies, that, in many experiments, models like ChatGPT
+which do not explicitly mention LLM-based agents and GPT-4 can provide too perfect estimates (called
+22                                               Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+     Social Science        Ø Psychology                       Ø Jurisprudence
+                                                                                                                Subjective Evaluation
+                           Ø Political Science and Economy    Ø Social Science
+                           Ø Social Simulation                Ø Research Assistant                               Ø Human Annotation
+                                                                                                                 Ø Turing Test
+
+
+
+
+                                                                                     Application
+     Natural Science        Ø Documentation and Data Management
+
+
+                                                                                                   Evaluation
+                            Ø Natural Science Experiment Assistant
+                            Ø Natural Science Education                                                         Objective Evaluation
+
+                                                                                                                 Ø Evaluation Metric
+     Engineering      Ø Civil Engineering           Ø Industrial Automation                                      Ø Evaluation Protocol
+                      Ø Computer Science            Ø Robotics & Embodied AI                                     Ø Evaluation Benchmark
+                      Ø Aerospace Engineering
+
+
+                      Fig. 5 The applications (left) and evaluation strategies (right) of LLM-based agents.
+
+
+“hyper-accuracy distortion”), which may influence 106–109]. For example, Social Simulacra [80] sim-
+the downstream applications. In [103], the authors ulates an online social community and explores
+systematically analyze the effectiveness of LLM- the potential of utilizing agent-based simulations
+based conversation agents for mental well-being to aid decision-makers to improve community regu-
+support. They collect 120 posts from Reddit, and lations. [106,107] investigates the potential impacts
+find that such agents can help users cope with anx- of different behavioral characteristics of LLM-based
+ieties, social isolation and depression on demand. agents in social networks. Generative Agents [20]
+At the same time, they also find that the agents may and AgentSims [34] construct multiple agents in a
+produce harmful contents sometimes.                    virtual town to simulate the human daily life. So-
+   Political Science and Economy: LLM-based cialAI School [108] employs LLM-based agents to
+agents can also be utilized to study political science simulate and investigate the fundamental social cog-
+and economy [29, 104, 105]. In [29], LLM-based nitive skills during the course of child development.
+                                                         3
+agents are utilized for ideology detection and pre- S [78] builds a social network simulator, focusing
+dicting voting patterns. In [104], the authors focuses on the propagation of information, emotion and atti-
+on understanding the discourse structure and per- tude. CGMI [110] is a framework for multi-agent
+suasive elements of political speech through the simulation. CGMI maintains the personality of the
+assistance of LLM-based agents. In [105], LLM- agents through a tree structure and constructs a cog-
+based agents are provided with specific traits such nitive model. The authors simulated a classroom
+as talents, preferences, and personalities to explore scenario using CGMI.
+human economic behaviors in simulated scenarios.                          Jurisprudence: LLM-based agents can serve as
+  Social Simulation: Previously, conducting ex-                        aids in legal decision-making processes, facilitat-
+periments with human societies is often expensive,                     ing more informed judgements [111, 112]. Blind
+unethical, or even infeasible. With the ever pros-                     Judgement [112] employs several language mod-
+pering of LLMs, many people explore to build vir-                      els to simulate the decision-making processes of
+tual environment with LLM-based agents to sim-                         multiple judges. It gathers diverse opinions and
+ulate social phenomena, such as the propagation                        consolidates the outcomes through a voting mech-
+of harmful information, and so on [20, 34, 78, 80,                     anism. ChatLaw [111] is a prominent Chinese le-
+                Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                     23
+
+
+gal model based on LLM. It adeptly supports both of time and human resources. LLM-based agents
+database and keyword search strategies, specifically have shown strong capabilities on language under-
+designed to mitigate the hallucination issue preva- standing and employing tools such as the internet
+lent in such models. In addition, this model also and databases for text processing. These capabil-
+employs self-attention mechanism to enhance the ities empower the agent to excel in tasks related
+LLM’s capability via mitigating the impact of refer- to documentation and data management. In [114],
+ence inaccuracies.                                      the agent can efficiently query and utilize internet
+   Research Assistant: Beyond their application in information to complete tasks such as question an-
+specialized domains, LLM-based agents are increas- swering and experiment planning. ChatMOF [115]
+ingly adopted as versatile assistants in the broad utilizes LLMs to extract important information from
+field of social science research [104, 113]. In [104], text descriptions written by humans. It then for-
+LLM-based agents offer multifaceted assistance, mulates a plan to apply relevant tools for predict-
+ranging from generating concise article abstracts ing the properties and structures of metal-organic
+and extracting pivotal keywords to crafting detailed frameworks. ChemCrow [76] utilizes chemistry-
+scripts for studies, showcasing their ability to enrich related databases to both validate the precision of
+and streamline the research process. Meanwhile, compound representations and identify potentially
+in [113], LLM-based agents serve as a writing assis- dangerous substances. This functionality enhances
+tant, demonstrating their capability to identify novel the reliability and comprehensiveness of scientific
+research inquiries for social scientists, thereby open- inquiries by ensuring the accuracy of the data in-
+ing new avenues for exploration and innovation in volved.
+the field. These examples highlight the potential
+                                                           Experiment Assistant: LLM-based agents have
+of LLM-based agents in enhancing the efficiency,
+                                                        the ability to independently conduct experiments,
+creativity, and breadth of social science research.
+                                                        making them valuable tools for supporting scien-
+                                                        tists in their research projects [76,114]. For instance,
+3.2 Natural Science
+                                                        [114] introduces an innovative agent system that uti-
+Natural science is one of the branches of science lizes LLMs for automating the design, planning, and
+concerned with the description, understanding and execution of scientific experiments. This system,
+prediction of natural phenomena, based on empir- when provided with the experimental objectives as
+ical evidence from observation and experimenta- input, accesses the Internet and retrieves relevant
+tion. With the ever prospering of LLMs, the ap- documents to gather the necessary information. It
+plication of LLM-based agents in natural sciences subsequently utilizes Python code to conduct essen-
+becomes more and more popular. In the follow- tial calculations and carry out the following exper-
+ing, we present many representative areas, where iments. ChemCrow [76] incorporates 17 carefully
+LLM-based agents can play important roles.              developed tools that are specifically designed to as-
+   Documentation and Data Management: Natu- sist researchers in their chemical research. Once the
+ral scientific research often involves the collection, input objectives are received, ChemCrow provides
+organization, and synthesis of substantial amounts valuable recommendations for experimental proce-
+of literature, which requires a significant dedication dures, while also emphasizing any potential safety
+24                                  Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+risks associated with the proposed experiments.        gineering, LLM-based agents offer potential for
+   Natural Science Education: LLM-based agents automating coding, testing, debugging, and doc-
+can communicate with humans fluently, often being umentation generation [18, 23, 24, 126–128]. Chat-
+utilized to develop agent-based educational tools. Dev [18] proposes an end-to-end framework, where
+For example, [114] develops agent-based education multiple agent roles communicate and collaborate
+systems to facilitate students learning of experimen- through natural language conversations to complete
+tal design, methodologies, and analysis. The objec- the software development life cycle. This frame-
+tive of these systems is to enhance students’ critical work demonstrates efficient and cost-effective gener-
+thinking and problem-solving skills, while also fos- ation of executable software systems. MetaGPT [23]
+tering a deeper comprehension of scientific princi- abstracts multiple roles, such as product managers,
+ples. Math Agents [116] can assist researchers in architects, project managers, and engineers, to su-
+exploring, discovering, solving and proving mathe- pervise code generation process and enhance the
+matical problems. Additionally, it can communicate quality of the final output code. This enables low-
+with humans and aids them in understanding and cost software development. [24] presents a self-
+using mathematics. [117] utilize the capabilities collaboration framework for code generation us-
+of CodeX [118] to automatically solve and explain ing LLMs. In this framework, multiple LLMs are
+university-level mathematical problems, which can assumed to be distinct "experts" for specific sub-
+be used as education tools to teach students and re- tasks. They collaborate and interact according to
+searchers. CodeHelp [119] is an education agent for specified instructions, forming a virtual team that
+programming. It offers many useful features, such facilitates each other’s work. Ultimately, the vir-
+as setting course-specific keywords, monitoring stu- tual team collaboratively addresses code genera-
+dent queries, and providing feedback to the sys- tion tasks without requiring human intervention.
+tem. EduChat [87] is an LLM-based agent designed LLIFT [141] employs LLMs to assist in conducting
+specifically for the education domain. It provides static analysis, specifically for identifying potential
+personalized, equitable, and empathetic educational code vulnerabilities. This approach effectively man-
+support to teachers, students, and parents through ages the trade-off between accuracy and scalability.
+dialogue. FreeText [120] is an agent that utilizes ChatEDA [123] is an agent developed for electronic
+LLMs to automatically assess students’ responses design automation (EDA) to streamline the design
+to open-ended questions and offer feedback.            process by integrating task planning, script gener-
+                                                       ation, and execution. CodeHelp [119] is an agent
+3.3 Engineering                                        designed to assist students and developers in debug-
+                                                       ging and testing their code. Its features include pro-
+LLM-based autonomous agents have shown great
+                                                       viding detailed explanations of error messages, sug-
+potential in assisting and enhancing engineering
+                                                       gesting potential fixes, and ensuring the accuracy
+research and applications. In this section, we re-
+                                                       of the code. Pentest [125] is a penetration testing
+view and summarize the applications of LLM-based
+                                                       tool based on LLMs, which can effectively identify
+agents in several major engineering domains.
+                                                       common vulnerabilities, and interpret source code
+   Computer Science & Software Engineering:
+                                                       to develop exploits. D-Bot [122] utilizes the capa-
+In the field of computer science and software en-
+                    Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                                       25
+
+Table 2   Representative applications of LLM-based autonomous agents.
+
+                              Domain                           Work
+
+                              Psychology                       TE [101], Akata et al. [102], Ziems et al. [104], Ma et al. [103]
+
+                              Political Science and Economy    Argyle et al. [29], Horton [105], Ziems et al. [104]
+
+                                                               Social Simulacra [80], Generative Agents [20], SocialAI
+                              Social Simulation                School [108], AgentSims [34], S3 [78], Williams et al. [109], Li
+  Social Science
+                                                               et al. [106], Chao et al. [107]
+
+                              Jurisprudence                    ChatLaw [111], Blind Judgement [112]
+
+                              Research Assistant               Ziems et al. [104], Bail et al. [113]
+                              Documentation and
+                                                               ChemCrow [76], ChatMOF [115], Boiko et al. [114]
+                              Data Management
+
+  Natural Science             Experiment Assistant             ChemCrow [76], Boiko et al. [114], Grossmann et al. [121]
+
+                                                               ChemCrow [76], CodeHelp [119], Boiko et al. [114], MathA-
+                              Natural Science Education
+                                                               gent [116], Drori et al. [117], EduChat [87], FreeText [120]
+
+                                                               RestGPT [71], Self-collaboration [24], SQL-PALM [89],
+                                                               RAH [91], D-Bot [122], RecMind [53], ChatEDA [123],
+                              CS & SE
+                                                               InteRecAgent [124], PentestGPT [125], CodeHelp [119],
+                                                               SmolModels [126], DemoGPT [127], GPTEngineer [128]
+
+  Engineering                 Industrial Automation            GPT4IA [129], IELLM [130]
+
+                                                              ProAgent [131], LLM4RL [132], PET [133], REMEM-
+                                                              BERER [134], DEPS [33], Unified Agent [135], SayCan [79],
+                              Robotics & Embodied AI
+                                                              TidyBot [136], RoCo [92], SayPlan [31], TaPA [137], Dasgupta
+                                                              et al. [138], DECKARD [139], Dialogue shaping [140]
+
+
+
+bilities of LLMs to systematically assess potential based on the information provided by digital twins.
+root causes of anomalies in databases. Through the These agents can coordinate a series of atomic func-
+implementation of a tree of thought approach, D- tionalities and skills to complete production tasks
+Bot enables LLMs to backtrack to previous steps at different levels. This research demonstrates the
+in case the current step proves unsuccessful, thus potential of integrating LLMs into industrial au-
+enhancing the accuracy of the diagnosis process.    tomation systems, providing innovative solutions
+   Industrial Automation: In the field of indus- for more agile, flexible and adaptive production pro-
+trial automation, LLM-based agents can be used to cesses. IELLM [130] showcases a case study on
+achieve intelligent planning and control of produc- LLMs’ role in the oil and gas industry, covering
+tion processes. [129] proposes a novel framework applications like factory automation and PLC pro-
+that integrates LLMs with digital twin systems to gramming.
+accommodate flexible production needs. The frame-               Robotics & Embodied Artificial Intelligence:
+work leverages prompt engineering techniques to               Recent works have advanced the development of
+create LLM agents that can adapt to specific tasks            more efficient reinforcement learning agents for
+26                                Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+robotics and embodied artificial intelligence [16, according to their customized requirements [19, 82,
+38, 79, 132–135, 137–140]. These efforts focus on 127, 142–155]. For example, LangChain [147] is an
+enhancing autonomous agents’ capabilities in plan- open-source framework that automates coding, test-
+ning, reasoning, and collaboration within embod- ing, debugging, and documentation generation tasks.
+ied environments. For instance, [138] proposes the By integrating language models with data sources
+Planner-Actor-Reporter paradigm for embodied rea- and facilitating interaction with the environment,
+soning and task planning. DECKARD [139] intro- LangChain enables efficient and cost-effective soft-
+duces the Planner-Actor-Reporter paradigm, which ware development through natural language com-
+facilitates embodied reasoning and task planning munication and collaboration among multiple agent
+by decoupling the agent’s planning, execution, and roles. Based on LangChain, XLang [145] provides
+reporting processes. TaPA [137] constructs a multi- a comprehensive set of tools and a fully integrated
+modal dataset comprising multi-view RGB images user interface. It focuses on executable language
+of indoor scenes, human instructions, and corre- grounding, enabling the conversion of natural lan-
+sponding plans to fine-tune LLMs. The fine-tuned guage instructions into code or action sequences
+models align visual perception with task planning, that interact seamlessly with various environments,
+enabling them to generate more executable plans including databases, web applications, and physi-
+and significantly improving their performance in cal robots. AutoGPT [82] is an agent that is fully
+visually grounded tasks.                              automated. It sets one or more goals, breaks them
+   To overcome the physical constraints, the agents down into corresponding tasks, and cycles through
+can generate executable plans and accomplish long- the tasks until the goal is achieved. WorkGPT [148]
+term tasks by leveraging multiple skills. In terms is an agent framework similar to AutoGPT and
+of control policies, SayCan [79] focuses on investi- LangChain. By providing it with an instruction
+gating a wide range of manipulation and navigation and a set of APIs, it engages in back-and-forth
+skills utilizing a mobile manipulator robot. Tak- conversations with AI until the instruction is com-
+ing inspiration from typical tasks encountered in a pleted. GPT-Engineer [128] and DemoGPT [127]
+kitchen environment, it presents a comprehensive are open-source projects that focus on automating
+set of 551 skills that cover seven skill families and code generation through prompts to complete de-
+17 objects. These skills encompass various actions velopment tasks. SmolModels [126] offers a family
+such as picking, placing, grasping, and manipulat- of compact language models suitable for various
+ing objects, among others. TidyBot [136] is an tasks. AGiXT [144] is a dynamic AI automation
+embodied agent designed to personalize household platform that efficiently manages instructions and
+cleanup tasks. It can learn users’ preferences on ob- executes complex tasks across various AI providers,
+ject placement and manipulation methods through integrating adaptive memory, smart features, and
+textual examples.                                     a versatile plugin system. AgentVerse [156] is a
+                                                      versatile framework that facilitates researchers in
+   To promote the application of LLM-based au-
+                                                      creating customized LLM-based agent simulations
+tonomous agents, researchers have also introduced
+                                                      efficiently. GPT Researcher [150] is an experimen-
+many open-source libraries, based on which the de-
+                                                      tal application that leverages LLMs to efficiently
+velopers can quickly implement and evaluate agents
+               Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                     27
+
+
+develop research questions, trigger web crawls to      methods. For a comprehensive overview, please
+gather information, summarize sources, and aggre-      refer to the right portion of Figure 5.
+gate summaries. BMTools [151] provides a plat-
+form for community-driven tool building and shar-      4.1   Subjective Evaluation
+ing. It supports various types of tools, enables si-   Subjective evaluation measures the agent capabili-
+multaneous task execution using multiple tools, and    ties based on human judgements [20,22,29,80,157].
+offers a simple interface for loading plugins via      It is suitable for the scenarios where there are no
+URLs, fostering easy development and contribution      evaluation datasets or it is very hard to design quan-
+to the BMTools ecosystem.                              titative metrics, for example, evaluating the agent’s
+Remark. Utilization of LLM-based agents in sup-        intelligence or user-friendliness. In the following,
+porting above applications may also entail risks and   we present two commonly used strategies for sub-
+challenges. On one hand, LLMs themselves may           jective evaluation.
+be susceptible to illusions and other issues, occa-       Human Annotation: This evaluation method in-
+sionally providing erroneous answers, leading to in-   volves human evaluators directly scoring or ranking
+correct conclusions, experimental failures, or even    the outputs generated by various agents [22,29,104].
+posing risks to human safety in hazardous exper-       For example, in [20], the authors engage numerous
+iments. Therefore, during experimentation, users       annotators by asking 25 questions that explore their
+must possess the necessary expertise and knowledge     abilities across five key areas directly related to
+to exercise appropriate caution. On the other hand,    agent capabilities. In [80], annotators are asked to
+LLM-based agents could potentially be exploited        determine whether the specifically designed models
+for malicious purposes, such as the development of     can significantly enhance the development of rules
+chemical weapons, necessitating the implementa-        within online communities.
+tion of security measures, such as human alignment,       Turing Test: This evaluation strategy necessi-
+to ensure responsible and ethical use.                 tates that human evaluators differentiate between
+   In summary, in the above sections, we introduce     outputs produced by agents and those created by hu-
+the typical applications of LLM-based autonomous       mans. If, in a given task, the evaluators cannot sep-
+agents in three important domains. To facilitate       arate the agent and human results, it demonstrates
+a clearer understanding, we have summarized the        that the agent can achieve human-like performance
+relationship between previous studies and their re-    on this task. For instance, researchers in [29] con-
+spective applications in Table 2.                      duct experiments on free-form Partisan text, and the
+                                                       human evaluators are asked to guess whether the
+                                                       responses are from human or LLM-based agent.
+4 LLM-based Autonomous Agent Eval-
+                                   Remark. LLM-based agents are usually designed
+  uation
+                                                       to serve humans. Thus, subjective agent evaluation
+Similar to LLMs themselves, evaluating the effec-      plays a critical role, since it reflects human criterion.
+tiveness of LLM-based autonomous agents is a chal-     However, this strategy also faces issues such as high
+lenging task. This section outlines two prevalent      costs, inefficiency, and population bias. To address
+approaches to evaluation: subjective and objective     these issues, a growing number of researchers are in-
+28                                 Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+vestigating the use of LLMs themselves as interme- metrics: These metrics measure how well an agent
+diaries for carrying out these subjective assessments. can complete tasks and achieve goals. Common
+For example, in ChemCrow [76], researchers assess metrics include success rate [12, 22, 58, 60], re-
+the experimental results using GPT. They consider ward/score [22, 60, 161], coverage [16], and ac-
+both the completion of tasks and the accuracy of curacy/error rate [18, 40, 80, 101]. Depending on
+the underlying processes. Similarly, ChatEval [158] the scenario, accuracy may reflect aspects such as
+introduces a novel approach by employing multiple program executability [18] or task validity [101].
+agents to critique and assess the results generated Higher values across these task success metrics in-
+by various candidate models in a structured debate dicate greater task completion ability. (2) Human
+format. This innovative use of LLMs for evaluation similarity metrics: These metrics quantify the de-
+purposes holds promise for enhancing both the cred- gree to which the agent behaviors closely resembles
+ibility and applicability of subjective assessments in those of humans by emphasizing various aspects
+the future. As LLM technology continues to evolve, related to human traits, such as coherent [104], flu-
+it is anticipated that these methods will become in- ent [104], dialogue similarities with human [80]
+creasingly reliable and find broader applications, and human acceptance rate [101]. Higher similar-
+thereby overcoming the current limitations of direct ity suggests better human simulation performance.
+human evaluation.                                      (3) Efficiency metrics: In contrast to the aforemen-
+                                                       tioned metrics used to evaluate the agent effective-
+4.2 Objective Evaluation                               ness, these metrics aim to assess the efficiency of
+                                                       agent. Commonly considered metrics encompass
+Objective evaluation refers to assessing the capabili-
+                                                       the cost associated with development [18] and train-
+ties of LLM-based autonomous agents using quanti-
+                                                       ing efficiency [16, 38].
+tative metrics that can be computed, compared and
+tracked over time. In contrast to subjective eval-        Protocols: In addition to the evaluation metrics,
+uation, objective metrics aim to provide concrete, another important aspect for objective evaluation
+measurable insights into the agent performance. For is how to leverage these metrics. In the previous
+conducting objective evaluation, there are three im- work, we can identify the following commonly used
+portant aspects, that is, the evaluation metrics, pro- evaluation protocols: (1) Real-world simulation: In
+tocols and benchmarks. In the following, we intro- this method, the agents are evaluated within immer-
+duce these aspects more in detail.                     sive environments like games and interactive sim-
+   Metrics: In order to objectively evaluate the ef- ulators. The agents are required to perform tasks
+fectiveness of the agents, designing proper met- autonomously, and then metrics like task success
+rics is significant, which may influence the eval- rate and human similarity are leveraged to evaluate
+uation accuracy and comprehensiveness. Ideal eval- the capability of the agents based on their trajec-
+uation metrics should precisely reflect the quality tories and completed objectives [12, 16, 22, 33, 38,
+of the agents, and align with the human feelings 60, 86, 161, 164, 168]. By simulating real-world
+when using them in real-world scenarios. In ex- scenarios, this approach aims to provide a compre-
+isting work, we can conclude the following rep- hensive evaluation of the agents’ practical capabil-
+resentative evaluation metrics. (1) Task success ities. (2) Social evaluation: This method utilizes
+                  Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                                29
+
+Table 3 For subjective evaluation, we use ① and ② to represent human annotation and the Turing test, respectively. For
+objective evaluation, we use ①, ②, ③, and ④ to represent real-world simulation, social evaluation, multi-task evaluation, and
+software testing, respectively. “✓” indicates that the evaluations are based on benchmarks.
+  Model                              Subjective              Objective             Benchmark                 Time
+  WebShop [86]                           -                     ①③                      ✓                    07/2022
+  Social Simulacra [80]                  ①                      ②                      -                    08/2022
+  TE [101]                               -                      ②                      -                    08/2022
+  LIBRO [159]                            -                      ④                      -                    09/2022
+  ReAct [60]                             -                      ①                      ✓                    10/2022
+  Argyle et al. [29]                     ②                     ②③                      -                    02/2023
+  DEPS [33]                              -                      ①                      ✓                    02/2023
+  Jalil et al. [160]                     -                      ④                      -                    02/2023
+  Reflexion [12]                         -                     ①③                      -                    03/2023
+  IGLU [161]                             -                      ①                      ✓                    04/2023
+  Generative Agents [20]                 ①                       -                     -                    04/2023
+  ToolBench [151]                        -                      ③                      ✓                    04/2023
+  GITM [16]                              -                      ①                      ✓                    05/2023
+  Two-Failures [162]                     -                      ③                      -                    05/2023
+  Voyager [38]                           -                      ①                      ✓                    05/2023
+  SocKET [163]                           -                     ②③                      ✓                    05/2023
+  MobileEnv [164]                        -                     ①③                      ✓                    05/2023
+  Clembench [165]                        -                     ①③                      ✓                    05/2023
+  Dialop [166]                           -                      ③                      ✓                    06/2023
+  Feldt et al. [167]                     -                      ④                      -                    06/2023
+  CO-LLM [22]                            ①                      ①                      -                    07/2023
+  Tachikuma [168]                        ①                     ①③                      ✓                    07/2023
+  RocoBench [92]                         -                     ①③                      ✓                    07/2023
+  AgentSims [34]                         -                      ②                      -                    08/2023
+  AgentBench [169]                       -                      ③                      ✓                    08/2023
+  BOLAA [170]                            -                      ③                      ✓                    08/2023
+  Gentopia [171]                         -                      ③                      ✓                    08/2023
+  EmotionBench [172]                     ①                       -                     ✓                    08/2023
+  PTB [125]                              -                      ④                      -                    08/2023
+
+
+
+metrics to assess social intelligence based on the              (3) Multi-task evaluation: In this method, people
+agent interactions in simulated societies. Various              use a set of diverse tasks from different domains to
+approaches have been adopted, such as collabora-                evaluate the agent, which can effectively measure
+tive tasks to evaluate teamwork skills, debates to              the agent generalization capability in open-domain
+analyze argumentative reasoning, and human stud-                environments [12,29,86,151,162–164,169,170]. (4)
+ies to measure social aptitude [34, 80, 101, 163].              Software testing: In this method, researchers evalu-
+These approaches analyze qualities such as coher-               ate the agents by letting them conduct tasks such as
+ence, theory of mind, and social IQ to assess agents’           software testing tasks, such as generating test cases,
+capabilities in areas including cooperation, com-               reproducing bugs, debugging code, and interacting
+munication, empathy, and mimicking human social                 with developers and external tools [159, 160, 167].
+behavior. By subjecting agents to complex inter-                Then, one can use metrics like test coverage and
+active settings, social evaluation provides valuable            bug detection rate to measure the effectiveness of
+insights into agents’ higher-level social cognition.            LLM-based agents.
+30                                 Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+   Benchmarks: Given the metrics and protocols, comprehensive website environment that spans mul-
+a crucial aspect of evaluation is the selection of tiple domains. Its purpose is to evaluate agents in an
+appropriate benchmarks. Over time, various bench- end-to-end fashion and determine the accuracy of
+marks have been introduced to assess the capa- their completed tasks. GentBench [171] is crafted
+bilities of LLM-based agents across diverse do- to evaluate the agent capabilities, including their
+mains and scenarios. Many studies employ envi- reasoning, safety, and efficiency, when utilizing
+ronments such as ALFWorld [60], IGLU [161], tools to complete complex tasks. RocoBench [92]
+and Minecraft [16, 33, 38] to evaluate agent ca- comprises six tasks that evaluate multi-agent col-
+pabilities in interactive and task-oriented simula- laboration across diverse scenarios, emphasizing
+tions. Tachikuma [168] evaluates LLMs’ ability to communication and coordination strategies to as-
+infer and understand complex interactions involv- sess adaptability and generalization in cooperative
+ing multiple characters and novel objects through robotics. EmotionBench [172] evaluates the emo-
+TRPG game logs. AgentBench [169] provides a tion appraisal ability of LLMs, i.e., how their feel-
+comprehensive framework for evaluating LLMs as ings change when presented with specific situations.
+autonomous agents across diverse environments. It It collects over 400 situations that elicit eight nega-
+represents the first systematic assessment of LLMs tive emotions and measures the emotional states of
+as agents on real-world challenges across diverse LLMs and human subjects using self-report scales.
+domains. SocKET [163] is a comprehensive bench- PEB [125] is tailored for assessing LLM-based
+mark for evaluating the social capabilities of LLMs agents in penetration testing scenarios, comprising
+across 58 tasks covering five categories of social 13 diverse targets from leading platforms. It of-
+information such as humor and sarcasm, emotions fers a structured evaluation across varying difficulty
+and feelings, credibility, etc. AgentSims [34] is levels, reflecting real-world challenges for agents.
+a versatile framework for evaluating LLM-based ClemBench [165] contains five Dialogue Games to
+agents, where one can flexibly design the agent plan- assess LLMs’ ability as a player. E2E [174] serves
+ning, memory and action strategies, and measure as an end-to-end benchmark for testing the accuracy
+the effectiveness of different agent modules in inter- and usefulness of chatbots.
+active environments. ToolBench [151] focuses on
+                                                       Remark. Objective evaluation facilitates the quanti-
+assessing and enhancing language models’ ability
+                                                       tative analysis of capabilities in LLM-based agents
+to use tools, featuring 16,464 real-world RESTful
+                                                       through a variety of metrics. While current tech-
+APIs and diverse instructions tailored for single-
+                                                       niques can not perfectly measure all types of agent
+and multi-tool scenarios. WebShop [86] develops
+                                                       capabilities, objective evaluation provides essen-
+a benchmark for evaluating LLM-based agents in
+                                                       tial insights that complement subjective assessment.
+terms of their capabilities for product search and
+                                                       Continued advancements in benchmarks and method-
+retrieval, which is constructed using a collection of
+                                                       ologies for objective evaluation will enhance the
+1.18 million real-world items. Mobile-Env [164]
+                                                       development and understanding of LLM-based au-
+serves as an extendable interactive platform de-
+                                                       tonomous agents further.
+signed to evaluate the multi-step interaction capabil-
+                                                          In the above sections, we introduce both sub-
+ities of LLM-based agents. WebArena [173] offers a
+                                                       jective and objective strategies for LLM-based au-
+                Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                   31
+
+
+tonomous agent evaluation. The evaluation of the        to evaluate, and how to assess their performance
+agents play significant roles in this domain. How-      in downstream tasks and societal impact. [181]
+ever, both subjective and objective evaluation have     also discusses the capabilities and limitations of
+their own strengths and weakness. Maybe, in prac-       LLMs in various downstream tasks. The afore-
+tice, they should be combined to comprehensively        mentioned research encompasses various aspects
+evaluate the agents. We summarize the correspon-        of large models, including training, application, and
+dence between the previous work and these evalua-       evaluation. However, prior to this paper, no work
+tion strategies in Table 3.                             has specifically focused on the rapidly emerging
+                                                        and highly promising field of LLM-based Agents.
+5   Related Surveys                                     In this study, we have compiled 100 relevant works
+                                                        on LLM-based Agents, covering their construction,
+With the vigorous development of large language
+                                                        applications, and evaluation processes.
+models, a variety of comprehensive surveys have
+emerged, providing detailed insights into various
+aspects. [175] extensively introduces the back- 6 Challenges
+ground, main findings, and mainstream technolo-
+                                                    While previous work on LLM-based autonomous
+gies of LLMs, encompassing a vast array of existing
+                                                    agent has obtained many remarkable successes, this
+works. On the other hand, [176] primarily focus
+                                                    field is still at its initial stage, and there are several
+on the applications of LLMs in various downstream
+                                                    significant challenges that need to be addressed in
+tasks and the challenges associated with their de-
+                                                    its development. In the following, we present many
+ployment. Aligning LLMs with human intelligence
+                                                    representative challenges.
+is an active area of research to address concerns
+such as biases and illusions. [177] have compiled
+                                                    6.1 Role-playing Capability
+existing techniques for human alignment, including
+data collection and model training methodologies. Different from traditional LLMs, autonomous agent
+Reasoning is a crucial aspect of intelligence, in- usually has to play as specific roles (e.g., program
+fluencing decision-making, problem-solving, and coder, researcher and chemist) for accomplishing
+other cognitive abilities. [178] presents the cur- different tasks. Thus, the capability of the agent
+rent state of research on LLMs’ reasoning abili- for role-playing is very important. Although LLMs
+ties, exploring approaches to improve and evaluate can effectively simulate many common roles such
+their reasoning skills. [179] propose that language as movie reviewers, there are still various roles and
+models can be enhanced with reasoning capabilities aspects that they struggle to capture accurately. To
+and the ability to utilize tools, termed Augmented begin with, LLMs are usually trained based on web-
+Language Models (ALMs). They conduct a com- corpus, thus for the roles which are seldom dis-
+prehensive review of the latest advancements in cussed on the web or the newly emerging roles,
+ALMs. As the utilization of large-scale models be- LLMs may not simulate them well. In addition, pre-
+comes more prevalent, evaluating their performance vious research [30] has shown that existing LLMs
+is increasingly critical. [180] shed light on eval- may not well model the human cognitive psychol-
+uating LLMs, addressing what to evaluate, where ogy characters, leading to the lack of self-awareness
+32                                  Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+in conversation scenarios. Potential solution to these an important problem for agent-based simulation
+problems may include fine-tuning LLMs or care- is how to conduct generalized human alignment,
+fully designing the agent prompts/architectures [182]. that is, for different purposes and applications, the
+For example, one can firstly collect real-human data agent should be able to align with diverse human
+for uncommon roles or psychology characters, and values. However, existing powerful LLMs includ-
+then leverage it to fine-tune LLMs. However, how ing ChatGPT and GPT-4 are mostly aligned with
+to ensure that fine-tuned model still perform well unified human values. Thus, an interesting direc-
+for the common roles may pose further challenges. tion is how to “realign” these models by designing
+Beyond fine-tuning, one can also design tailored proper prompting strategies.
+agent prompts/architectures to enhance the capa-
+bility of LLM on role-playing. However, finding 6.3 Prompt Robustness
+the optimal prompts/architectures is not easy, since To ensure rational behavior in agents, it’s a com-
+their designing spaces are too large.                  mon practice for designers to embed supplemen-
+                                                         tary modules, such as memory and planning mod-
+6.2   Generalized Human Alignment                        ules, into LLMs. However, the inclusion of these
+Human alignment has been discussed a lot for tradi-      modules necessitates the development of more com-
+tional LLMs. In the field of LLM-based autonomous        plex prompts in order to facilitate consistent op-
+agent, especially when the agents are leveraged          eration and effective communication. Previous re-
+for simulation, we believe this concept should be        search [183, 184] has highlighted the lack of robust-
+discussed more in depth. In order to better serve        ness in prompts for LLMs, as even minor alterations
+human-beings, traditional LLMs are usually fine-         can yield substantially different outcomes. This is-
+tuned to be aligned with correct human values, for       sue becomes more pronounced when constructing
+example, the agent should not plan to make a bomb        autonomous agents, as they encompass not a sin-
+for avenging society. However, when the agents are       gle prompt but a prompt framework that considers
+leveraged for real-world simulation, an ideal simula-    all modules, wherein the prompt for one module
+tor should be able to honestly depict diverse human      has the potential to influence others. Moreover, the
+traits, including the ones with incorrect values. Ac-    prompt frameworks can vary significantly across dif-
+tually, simulating the human negative aspects can        ferent LLMs. The development of a unified and re-
+be even more important, since an important goal of       silient prompt framework applicable across diverse
+simulation is to discover and solve problems, and        LLMs remains a critical and unresolved challenge.
+without negative aspects means no problem to be          There are two potential solutions to the aforemen-
+solved. For example, to simulate the real-world          tioned problems: (1) manually crafting the essential
+society, we may have to allow the agent to plan          prompt elements through trial and error, or (2) auto-
+for making a bomb, and observe how it will act to        matically generating prompts using GPT.
+implement the plan as well as the influence of its
+                                                         6.4   Hallucination
+behaviors. Based on these observations, people can
+make better actions to stop similar behaviors in real-   Hallucination poses a fundamental challenge for
+world society. Inspired by the above case, maybe         LLMs, characterized by the models’ tendency to
+               Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                33
+
+
+produce false information with a high level of confi- strategies, LLMs may make decisions based on
+dence. This challenge is not limited to LLMs alone their extensive knowledge, even though real-world
+but is also a significant concern in the domain of users would not have access to the contents of these
+autonomous agents. For instance, in [185], it was movies beforehand. Based on the above example,
+observed that when confronted with simplistic in- we may conclude that for building believable agent
+structions during code generation tasks, the agent simulation environment, an important problem is
+may exhibit hallucinatory behavior. Hallucination how to constrain the utilization of user-unknown
+can lead to serious consequences such as incorrect knowledge of LLM.
+or misleading code, security risks, and ethical is-
+sues [185]. To mitigate this issue, incorporating 6.6 Efficiency
+human correction feedback directly into the itera-
+                                                      Due to their autoregressive architecture, LLMs typ-
+tive process of human-agent interaction presents
+                                                      ically have slow inference speeds. However, the
+a viable approach [23]. More discussions on the
+                                                      agent may need to query LLMs for each action
+hallucination problem can be seen in [175].
+                                                      multiple times, such as extracting information from
+                                                      memory, make plans before taking actions and so
+6.5 Knowledge Boundary
+                                                      on. Consequently, the efficiency of agent actions is
+A pivotal application of LLM-based autonomous greatly affected by the speed of LLM inference.
+agents lies in simulating diverse real-world human
+behaviors [20]. The study of human simulation has
+                                                      7 Conclusion
+a long history, and the recent surge in interest can
+be attributed to the remarkable advancements made In this survey, we systematically summarize exist-
+by LLMs, which have demonstrated significant ca- ing research in the field of LLM-based autonomous
+pabilities in simulating human behavior. However, agents. We present and review these studies from
+it is important to recognize that the power of LLMs three aspects including the construction, application,
+may not always be advantageous. Specifically, an and evaluation of the agents. For each of these as-
+ideal simulation should accurately replicate human pects, we provide a detailed taxonomy to draw con-
+knowledge. In this context, LLMs may display nections among the existing research, summarizing
+overwhelming capabilities, being trained on a vast the major techniques and their development histo-
+corpus of web knowledge that far exceeds what ries. In addition to reviewing the previous work, we
+an average individual might know. The immense also propose several challenges in this field, which
+capabilities of LLMs can significantly impact the are expected to guide potential future directions.
+effectiveness of simulations. For instance, when
+attempting to simulate user selection behaviors for
+                                                      Acknowledgement
+various movies, it is crucial to ensure that LLMs
+assume a position of having no prior knowledge This work is supported in part by National Natu-
+of these movies. However, there is a possibility ral Science Foundation of China (No. 62102420),
+that LLMs have already acquired information about Beijing Outstanding Young Scientist Program NO.
+these movies. Without implementing appropriate BJJWZYJH012019100020098, Intelligent Social
+34                                         Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+Governance Platform, Major Innovation & Plan-                      10. Touvron H, Martin L, Stone K, Albert P, Almahairi A,
+ning Interdisciplinary Platform for the "Double-                       Babaei Y, Bashlykov N, Batra S, Bhargava P, Bhosale
+                                                                       S, others . Llama 2: Open foundation and fine-tuned
+First Class" Initiative, Renmin University of China,                   chat models. arXiv preprint arXiv:2307.09288, 2023
+Public Computing Cloud, Renmin University of                       11. Chen X, Li S, Li H, Jiang S, Qi Y, Song L. Genera-
+                                                                       tive adversarial user model for reinforcement learning
+China, fund for building world-class universities
+                                                                       based recommendation system. In: International Con-
+(disciplines) of Renmin University of China, Intelli-                  ference on Machine Learning. 2019, 1052–1061
+gent Social Governance Platform.                                   12. Shinn N, Cassano F, Gopinath A, Narasimhan K, Yao S.
+                                                                       Reflexion: Language agents with verbal reinforcement
+                                                                       learning. Advances in Neural Information Processing
+                                                                       Systems, 2024, 36
+References                                                         13. Shen Y, Song K, Tan X, Li D, Lu W, Zhuang Y. Hug-
+                                                                       ginggpt: Solving ai tasks with chatgpt and its friends
+     1. Mnih V, Kavukcuoglu K, Silver D, Rusu A A, Veness              in hugging face. Advances in Neural Information Pro-
+        J, Bellemare M G, Graves A, Riedmiller M, Fidjeland            cessing Systems, 2024, 36
+        A K, Ostrovski G, others . Human-level control through     14. Qin Y, Liang S, Ye Y, Zhu K, Yan L, Lu Y, Lin Y,
+        deep reinforcement learning. nature, 2015, 518(7540):          Cong X, Tang X, Qian B, others . Toolllm: Facilitating
+        529–533                                                        large language models to master 16000+ real-world
+     2. Lillicrap T P, Hunt J J, Pritzel A, Heess N, Erez              apis. arXiv preprint arXiv:2307.16789, 2023
+        T, Tassa Y, Silver D, Wierstra D. Continuous con-          15. Schick T, Dwivedi-Yu J, Dessì R, Raileanu R, Lomeli
+        trol with deep reinforcement learning. arXiv preprint          M, Hambro E, Zettlemoyer L, Cancedda N, Scialom T.
+        arXiv:1509.02971, 2015                                         Toolformer: Language models can teach themselves to
+     3. Schulman J, Wolski F, Dhariwal P, Radford A, Klimov            use tools. Advances in Neural Information Processing
+        O. Proximal policy optimization algorithms. arXiv              Systems, 2024, 36
+        preprint arXiv:1707.06347, 2017                            16. Zhu X, Chen Y, Tian H, Tao C, Su W, Yang C, Huang
+     4. Haarnoja T, Zhou A, Abbeel P, Levine S. Soft actor-            G, Li B, Lu L, Wang X, others . Ghost in the minecraft:
+        critic: Off-policy maximum entropy deep reinforce-             Generally capable agents for open-world enviroments
+        ment learning with a stochastic actor. In: International       via large language models with text-based knowledge
+        conference on machine learning. 2018, 1861–1870                and memory. arXiv preprint arXiv:2305.17144, 2023
+     5. Brown T, Mann B, Ryder N, Subbiah M, Kaplan J D,           17. Sclar M, Kumar S, West P, Suhr A, Choi Y, Tsvetkov
+        Dhariwal P, Neelakantan A, Shyam P, Sastry G, Askell           Y. Minding language models’(lack of) theory of mind:
+        A, others . Language models are few-shot learners.             A plug-and-play multi-character belief tracker. arXiv
+        Advances in neural information processing systems,             preprint arXiv:2306.00924, 2023
+        2020, 33: 1877–1901                                        18. Qian C, Cong X, Yang C, Chen W, Su Y, Xu J, Liu Z,
+     6. Radford A, Wu J, Child R, Luan D, Amodei D,                    Sun M. Communicative agents for software develop-
+        Sutskever I, others . Language models are unsuper-             ment. arXiv preprint arXiv:2307.07924, 2023
+        vised multitask learners. OpenAI blog, 2019, 1(8):         19. al. e C. Agentverse. https://github.com/
+        9                                                              OpenBMB/AgentVerse, 2023
+     7. Achiam J, Adler S, Agarwal S, Ahmad L, Akkaya I,           20. Park J S, O’Brien J, Cai C J, Morris M R, Liang P,
+        Aleman F L, Almeida D, Altenschmidt J, Altman S,               Bernstein M S. Generative agents: Interactive simu-
+        Anadkat S, others . Gpt-4 technical report. arXiv              lacra of human behavior. In: Proceedings of the 36th
+        preprint arXiv:2303.08774, 2023                                Annual ACM Symposium on User Interface Software
+     8. Anthropic .       Model card and evaluations for               and Technology. 2023, 1–22
+        claude models.              https://www-files.             21. Wang L, Zhang J, Chen X, Lin Y, Song R, Zhao
+        anthropic.com/production/images/                               W X, Wen J R. Recagent: A novel simulation
+        Model-Card-Claude-2.pdf?ref=                                   paradigm for recommender systems. arXiv preprint
+        maginative.com, 2023                                           arXiv:2306.02552, 2023
+     9. Touvron H, Lavril T, Izacard G, Martinet X, Lachaux        22. Zhang H, Du W, Shan J, Zhou Q, Du Y, Tenenbaum
+        M A, Lacroix T, Rozière B, Goyal N, Hambro E, Azhar            J B, Shu T, Gan C. Building cooperative embodied
+        F, others . Llama: Open and efficient foundation lan-          agents modularly with large language models. arXiv
+        guage models. arXiv preprint arXiv:2302.13971, 2023
+                  Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                               35
+
+
+      preprint arXiv:2307.02485, 2023                                 dama T, Deguchi J. Simplyretrieve: A private and
+23.   Hong S, Zheng X, Chen J, Cheng Y, Wang J, Zhang C,              lightweight retrieval-centric generative ai tool. arXiv
+      Wang Z, Yau S K S, Lin Z, Zhou L, others . Metagpt:             preprint arXiv:2308.03983, 2023
+      Meta programming for multi-agent collaborative frame-     37.   Huang Z, Gutierrez S, Kamana H, MacNeil S. Memory
+      work. arXiv preprint arXiv:2308.00352, 2023                     sandbox: Transparent and interactive memory manage-
+24.   Dong Y, Jiang X, Jin Z, Li G. Self-collaboration                ment for conversational agents. In: Adjunct Proceed-
+      code generation via chatgpt.           arXiv preprint           ings of the 36th Annual ACM Symposium on User
+      arXiv:2304.07590, 2023                                          Interface Software and Technology. 2023, 1–3
+25.   Safdari M, Serapio-García G, Crepy C, Fitz S, Romero      38.   Wang G, Xie Y, Jiang Y, Mandlekar A, Xiao C, Zhu
+      P, Sun L, Abdulhai M, Faust A, Matarić M. Person-              Y, Fan L, Anandkumar A. Voyager: An open-ended
+      ality traits in large language models. arXiv preprint           embodied agent with large language models. arXiv
+      arXiv:2307.00184, 2023                                          preprint arXiv:2305.16291, 2023
+26.   Johnson J A. Measuring thirty facets of the five factor   39.   Zhong W, Guo L, Gao Q, Wang Y. Memorybank: En-
+      model with a 120-item public domain inventory: De-              hancing large language models with long-term memory.
+      velopment of the ipip-neo-120. Journal of research in           arXiv preprint arXiv:2305.10250, 2023
+      personality, 2014, 51: 78–89                              40.   Hu C, Fu J, Du C, Luo S, Zhao J, Zhao H. Chatdb: Aug-
+27.   John O P, Donahue E M, Kentle R L. Big five inventory.          menting llms with databases as their symbolic memory.
+      Journal of Personality and Social Psychology, 1991              arXiv preprint arXiv:2306.03901, 2023
+28.   Deshpande A, Murahari V, Rajpurohit T, Kalyan             41.   Modarressi A, Imani A, Fayyaz M, Schütze H. Ret-
+      A, Narasimhan K. Toxicity in chatgpt: Analyzing                 llm: Towards a general read-write memory for large
+      persona-assigned language models. arXiv preprint                language models. arXiv preprint arXiv:2305.14322,
+      arXiv:2304.05335, 2023                                          2023
+29.   Argyle L P, Busby E C, Fulda N, Gubler J R, Rytting C,    42.   Schuurmans D. Memory augmented large language
+      Wingate D. Out of one, many: Using language models              models are computationally universal. arXiv preprint
+      to simulate human samples. Political Analysis, 2023,            arXiv:2301.04589, 2023
+      31(3): 337–351                                            43.   Zhao A, Huang D, Xu Q, Lin M, Liu Y J, Huang G.
+30.   Fischer K A. Reflective linguistic programming (rlp):           Expel: Llm agents are experiential learners. arXiv
+      A stepping stone in socially-aware agi (socialagi).             preprint arXiv:2308.10144, 2023
+      arXiv preprint arXiv:2305.12647, 2023                     44.   Huang W, Abbeel P, Pathak D, Mordatch I. Language
+31.   Rana K, Haviland J, Garg S, Abou-Chakra J, Reid I,              models as zero-shot planners: Extracting actionable
+      Suenderhauf N. Sayplan: Grounding large language                knowledge for embodied agents. In: International Con-
+      models using 3d scene graphs for scalable robot task            ference on Machine Learning. 2022, 9118–9147
+      planning. In: 7th Annual Conference on Robot Learn-       45.   Wei J, Wang X, Schuurmans D, Bosma M, Xia F, Chi E,
+      ing. 2023                                                       Le Q V, Zhou D, others . Chain-of-thought prompting
+32.   Zhu A, Martin L, Head A, Callison-Burch C. Calypso:             elicits reasoning in large language models. Advances
+      Llms as dungeon master’s assistants. In: Proceedings            in Neural Information Processing Systems, 2022, 35:
+      of the AAAI Conference on Artificial Intelligence and           24824–24837
+      Interactive Digital Entertainment. 2023, 380–390          46.   Kojima T, Gu S S, Reid M, Matsuo Y, Iwasawa Y. Large
+33.   Wang Z, Cai S, Chen G, Liu A, Ma X, Liang Y. De-                language models are zero-shot reasoners. Advances
+      scribe, explain, plan and select: Interactive planning          in neural information processing systems, 2022, 35:
+      with large language models enables open-world multi-            22199–22213
+      task agents. arXiv preprint arXiv:2302.01560, 2023        47.   Raman S S, Cohen V, Rosen E, Idrees I, Paulius D,
+34.   Lin J, Zhao H, Zhang A, Wu Y, Ping H, Chen Q.                   Tellex S. Planning with large language models via
+      Agentsims: An open-source sandbox for large language            corrective re-prompting. In: NeurIPS 2022 Foundation
+      model evaluation. arXiv preprint arXiv:2308.04026,              Models for Decision Making Workshop. 2022
+      2023                                                      48.   Xu B, Peng Z, Lei B, Mukherjee S, Liu Y, Xu D. Re-
+35.   Liang X, Wang B, Huang H, Wu S, Wu P, Lu L, Ma Z,               woo: Decoupling reasoning from observations for ef-
+      Li Z. Unleashing infinite-length input capacity for             ficient augmented language models. arXiv preprint
+      large-scale language models with self-controlled mem-           arXiv:2305.18323, 2023
+      ory system. arXiv preprint arXiv:2304.13343, 2023         49.   Lin B Y, Fu Y, Yang K, Brahman F, Huang S, Bhaga-
+36.   Ng Y, Miyashita D, Hoshi Y, Morioka Y, Torii O, Ko-             vatula C, Ammanabrolu P, Choi Y, Ren X. Swiftsage:
+36                                        Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+       A generative agent with fast and slow thinking for com-         rence P, Zeng A, Tompson J, Mordatch I, Chebotar
+       plex interactive tasks. Advances in Neural Information          Y, others . Inner monologue: Embodied reasoning
+       Processing Systems, 2024, 36                                    through planning with language models. arXiv preprint
+ 50.   Evans J S B, Stanovich K E. Dual-process theories of            arXiv:2207.05608, 2022
+       higher cognition: Advancing the debate. Perspectives      63.   Madaan A, Tandon N, Gupta P, Hallinan S, Gao L,
+       on psychological science, 2013, 8(3): 223–241                   Wiegreffe S, Alon U, Dziri N, Prabhumoye S, Yang
+ 51.   Wang X, Wei J, Schuurmans D, Le Q, Chi E, Narang                Y, others . Self-refine: Iterative refinement with self-
+       S, Chowdhery A, Zhou D. Self-consistency improves               feedback. Advances in Neural Information Processing
+       chain of thought reasoning in language models. arXiv            Systems, 2024, 36
+       preprint arXiv:2203.11171, 2022                           64.   Miao N, Teh Y W, Rainforth T. Selfcheck: Using llms
+ 52.   Yao S, Yu D, Zhao J, Shafran I, Griffiths T, Cao Y,             to zero-shot check their own step-by-step reasoning.
+       Narasimhan K. Tree of thoughts: Deliberate problem              In: The Twelfth International Conference on Learning
+       solving with large language models. Advances in Neu-            Representations. 2023
+       ral Information Processing Systems, 2024, 36              65.   Chen P L, Chang C S. Interact: Exploring the poten-
+ 53.   Wang Y, Jiang Z, Chen Z, Yang F, Zhou Y, Cho E,                 tials of chatgpt as a cooperative agent. arXiv preprint
+       Fan X, Huang X, Lu Y, Yang Y. Recmind: Large                    arXiv:2308.01552, 2023
+       language model powered agent for recommendation.          66.   Chen Z, Zhou K, Zhang B, Gong Z, Zhao W X, Wen
+       arXiv preprint arXiv:2308.14296, 2023                           J R. Chatcot: Tool-augmented chain-of-thought rea-
+ 54.   Besta M, Blach N, Kubicek A, Gerstenberger R,                   soning on\\chat-based large language models. arXiv
+       Gianinazzi L, Gajda J, Lehmann T, Podstawski M,                 preprint arXiv:2305.14323, 2023
+       Niewiadomski H, Nyczyk P, others . Graph of thoughts:     67.   Nakano R, Hilton J, Balaji S, Wu J, Ouyang L, Kim
+       Solving elaborate problems with large language mod-             C, Hesse C, Jain S, Kosaraju V, Saunders W, others
+       els. arXiv preprint arXiv:2308.09687, 2023                      . Webgpt: Browser-assisted question-answering with
+ 55.   Sel B, Al-Tawaha A, Khattar V, Wang L, Jia R, Jin               human feedback. arXiv preprint arXiv:2112.09332,
+       M. Algorithm of thoughts: Enhancing exploration                 2021
+       of ideas in large language models. arXiv preprint         68.   Ruan J, Chen Y, Zhang B, Xu Z, Bao T, Du G, Shi S,
+       arXiv:2308.10379, 2023                                          Mao H, Zeng X, Zhao R. TPTU: Task planning and
+ 56.   Gramopadhye M, Szafir D. Generating executable ac-              tool usage of large language model-based AI agents.
+       tion plans with environmentally-aware language mod-             arXiv preprint arXiv:2308.03427, 2023
+       els. In: 2023 IEEE/RSJ International Conference on        69.   Patil S G, Zhang T, Wang X, Gonzalez J E. Gorilla:
+       Intelligent Robots and Systems (IROS). 2023, 3568–              Large language model connected with massive apis.
+       3575                                                            arXiv preprint arXiv:2305.15334, 2023
+ 57.   Hao S, Gu Y, Ma H, Hong J J, Wang Z, Wang D Z,            70.   Li M, Song F, Yu B, Yu H, Li Z, Huang F, Li Y. Api-
+       Hu Z. Reasoning with language model is planning with            bank: A benchmark for tool-augmented llms. arXiv
+       world model. arXiv preprint arXiv:2305.14992, 2023              preprint arXiv:2304.08244, 2023
+ 58.   Liu B, Jiang Y, Zhang X, Liu Q, Zhang S, Biswas J,        71.   Song Y, Xiong W, Zhu D, Li C, Wang K, Tian Y,
+       Stone P. LLM+P: Empowering large language mod-                  Li S. Restgpt: Connecting large language models with
+       els with optimal planning proficiency. arXiv preprint           real-world applications via restful apis. arXiv preprint
+       arXiv:2304.11477, 2023                                          arXiv:2306.06624, 2023
+ 59.   Dagan G, Keller F, Lascarides A. Dynamic planning         72.   Liang Y, Wu C, Song T, Wu W, Xia Y, Liu Y, Ou Y,
+       with a llm. arXiv preprint arXiv:2308.06391, 2023               Lu S, Ji L, Mao S, others . Taskmatrix. ai: Completing
+ 60.   Yao S, Zhao J, Yu D, Du N, Shafran I, Narasimhan                tasks by connecting foundation models with millions
+       K, Cao Y. React: Synergizing reasoning and acting               of apis. Intelligent Computing, 2024, 3: 0063
+       in language models. In: The Twelfth International         73.   Karpas E, Abend O, Belinkov Y, Lenz B, Lieber O,
+       Conference on Learning Representations. 2023                    Ratner N, Shoham Y, Bata H, Levine Y, Leyton-Brown
+ 61.   Song C H, Wu J, Washington C, Sadler B M, Chao W L,             K, others . Mrkl systems: A modular, neuro-symbolic
+       Su Y. Llm-planner: Few-shot grounded planning for               architecture that combines large language models, ex-
+       embodied agents with large language models. In: Pro-            ternal knowledge sources and discrete reasoning. arXiv
+       ceedings of the IEEE/CVF International Conference               preprint arXiv:2205.00445, 2022
+       on Computer Vision. 2023, 2998–3009                       74.   Ge Y, Hua W, Mei K, Tan J, Xu S, Li Z, Zhang Y, others
+ 62.   Huang W, Xia F, Xiao T, Chan H, Liang J, Flo-                   . Openagi: When llm meets domain experts. Advances
+                  Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                              37
+
+
+      in Neural Information Processing Systems, 2024, 36           88. Deng X, Gu Y, Zheng B, Chen S, Stevens S, Wang
+75.   Surís D, Menon S, Vondrick C. Vipergpt: Visual infer-            B, Sun H, Su Y. Mind2web: Towards a generalist
+      ence via python execution for reasoning. arXiv preprint          agent for the web. Advances in Neural Information
+      arXiv:2303.08128, 2023                                           Processing Systems, 2024, 36
+76.   Bran A M, Cox S, White A D, Schwaller P. Chem-               89. Sun R, Arik S O, Nakhost H, Dai H, Sinha R,
+      crow: Augmenting large-language models with chem-                Yin P, Pfister T. Sql-palm: Improved large lan-
+      istry tools. arXiv preprint arXiv:2304.05376, 2023               guage modeladaptation for text-to-sql. arXiv preprint
+77.   Yang Z, Li L, Wang J, Lin K, Azarnasab E, Ahmed F,               arXiv:2306.00739, 2023
+      Liu Z, Liu C, Zeng M, Wang L. Mm-react: Prompting            90. Yao W, Heinecke S, Niebles J C, Liu Z, Feng Y, Xue
+      chatgpt for multimodal reasoning and action. arXiv               L, Murthy R, Chen Z, Zhang J, Arpit D, Xu R, Mui
+      preprint arXiv:2303.11381, 2023                                  P, Wang H, Xiong C, Savarese S. Retroformer: Ret-
+78.   Gao C, Lan X, Lu Z, Mao J, Piao J, Wang H, Jin D,                rospective large language agents with policy gradient
+      Li Y. S3: Social-network simulation system with large            optimization, 2023
+      language model-empowered agents. arXiv preprint              91. Shu Y, Gu H, Zhang P, Zhang H, Lu T, Li D, Gu N.
+      arXiv:2307.14984, 2023                                           Rah! recsys-assistant-human: A human-central rec-
+79.   Ahn M, Brohan A, Brown N, Chebotar Y, Cortes O,                  ommendation framework with large language models.
+      David B, Finn C, Fu C, Gopalakrishnan K, Hausman K,              arXiv preprint arXiv:2308.09904, 2023
+      others . Do as i can, not as i say: Grounding language in    92. Mandi Z, Jain S, Song S. Roco: Dialectic multi-
+      robotic affordances. arXiv preprint arXiv:2204.01691,            robot collaboration with large language models. arXiv
+      2022                                                             preprint arXiv:2307.04738, 2023
+80.   Park J S, Popowski L, Cai C, Morris M R, Liang P,            93. Zhang C, Liu L, Wang J, Wang C, Sun X, Wang H, Cai
+      Bernstein M S. Social simulacra: Creating populated              M. Prefer: Prompt ensemble learning via feedback-
+      prototypes for social computing systems. In: Proceed-            reflect-refine. arXiv preprint arXiv:2308.12033, 2023
+      ings of the 35th Annual ACM Symposium on User                94. Du Y, Li S, Torralba A, Tenenbaum J B, Mordatch
+      Interface Software and Technology. 2022, 1–18                    I. Improving factuality and reasoning in language
+81.   Li G, Hammoud H A A K, Itani H, Khizbullin D,                    models through multiagent debate. arXiv preprint
+      Ghanem B. Camel: Communicative agents for" mind"                 arXiv:2305.14325, 2023
+      exploration of large scale language model society.           95. Yang Z, Liu J, Han Y, Chen X, Huang Z, Fu B, Yu G.
+      arXiv preprint arXiv:2303.17760, 2023                            Appagent: Multimodal agents as smartphone users.
+82.   al. e T. Auto-GPT. https://github.com/                           arXiv preprint arXiv:2312.13771, 2023
+      Significant-Gravitas/Auto-GPT, 2023                          96. Madaan A, Tandon N, Clark P, Yang Y. Memory-
+83.   Liu R, Yang R, Jia C, Zhang G, Zhou D, Dai A M, Yang             assisted prompt editing to improve GPT-3 after de-
+      D, Vosoughi S. Training socially aligned language                ployment. In: Proceedings of the 2023 Conference on
+      models in simulated human society. arXiv preprint                Empirical Methods in Natural Language Processing.
+      arXiv:2305.16960, 2023                                           2022
+84.   Chen L, Wang L, Dong H, Du Y, Yan J, Yang F, Li S,           97. Colas C, Teodorescu L, Oudeyer P Y, Yuan X, Côté
+      Zhao P, Qin S, Rajmohan S, others . Introspective tips:          M A. Augmenting autotelic agents with large language
+      Large language model for in-context decision making.             models. arXiv preprint arXiv:2305.12487, 2023
+      arXiv preprint arXiv:2305.11598, 2023                        98. Nascimento N, Alencar P, Cowan D. Self-adaptive
+85.   Liu H, Sferrazza C, Abbeel P. Chain of hindsight                 large language model (llm)-based multiagent systems.
+      aligns language models with feedback. In: The Twelfth            In: 2023 IEEE International Conference on Autonomic
+      International Conference on Learning Representations.            Computing and Self-Organizing Systems Companion
+      2023                                                             (ACSOS-C). 2023, 104–109
+86.   Yao S, Chen H, Yang J, Narasimhan K. Webshop:                99. Saha S, Hase P, Bansal M. Can language models teach
+      Towards scalable real-world web interaction with                 weaker agents? teacher explanations improve students
+      grounded language agents. Advances in Neural Infor-              via theory of mind. arXiv preprint arXiv:2306.09299,
+      mation Processing Systems, 2022, 35: 20744–20757                 2023
+87.   Dan Y, Lei Z, Gu Y, Li Y, Yin J, Lin J, Ye L, Tie Z, Zhou   100. Zhuge M, Liu H, Faccio F, Ashley D R, Csordás R,
+      Y, Wang Y, others . Educhat: A large-scale language              Gopalakrishnan A, Hamdi A, Hammoud H A A K,
+      model-based chatbot system for intelligent education.            Herrmann V, Irie K, others . Mindstorms in natu-
+      arXiv preprint arXiv:2308.02773, 2023                            ral language-based societies of mind. arXiv preprint
+38                                        Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+       arXiv:2305.17066, 2023                                            predicting and generating metal-organic frameworks.
+101.   Aher G V, Arriaga R I, Kalai A T. Using large language            arXiv preprint arXiv:2308.01423, 2023
+       models to simulate multiple humans and replicate hu-       116.   Swan M, Kido T, Roland E, Santos R P d. Math agents:
+       man subject studies. In: International Conference on              Computational infrastructure, mathematical embed-
+       Machine Learning. 2023, 337–371                                   ding, and genomics. arXiv preprint arXiv:2307.02502,
+102.   Akata E, Schulz L, Coda-Forno J, Oh S J, Bethge M,                2023
+       Schulz E. Playing repeated games with large language       117.   Drori I, Zhang S, Shuttleworth R, Tang L, Lu A, Ke E,
+       models. arXiv preprint arXiv:2305.16867, 2023                     Liu K, Chen L, Tran S, Cheng N, others . A neural
+103.   Ma Z, Mei Y, Su Z. Understanding the benefits and                 network solves, explains, and generates university math
+       challenges of using large language model-based con-               problems by program synthesis and few-shot learning
+       versational agents for mental well-being support. In:             at human level. Proceedings of the National Academy
+       AMIA Annual Symposium Proceedings. 2023, 1105                     of Sciences, 2022, 119(32): e2123433119
+104.   Ziems C, Held W, Shaikh O, Chen J, Zhang Z, Yang D.        118.   Chen M, Tworek J, Jun H, Yuan Q, Pinto H P d O,
+       Can large language models transform computational                 Kaplan J, Edwards H, Burda Y, Joseph N, Brockman
+       social science? arXiv preprint arXiv:2305.03514, 2023             G, others . Evaluating large language models trained
+105.   Horton J J. Large language models as simulated eco-               on code. arXiv preprint arXiv:2107.03374, 2021
+       nomic agents: What can we learn from homo silicus?         119.   Liffiton M, Sheese B E, Savelka J, Denny P. Codehelp:
+       Technical report, National Bureau of Economic Re-                 Using large language models with guardrails for scal-
+       search, 2023                                                      able support in programming classes. In: Proceedings
+106.   Li S, Yang J, Zhao K. Are you in a masquerade? explor-            of the 23rd Koli Calling International Conference on
+       ing the behavior and impact of large language model               Computing Education Research. 2023, 1–11
+       driven social bots in online social networks. arXiv        120.   Matelsky J K, Parodi F, Liu T, Lange R D, Kording
+       preprint arXiv:2307.10337, 2023                                   K P. A large language model-assisted education tool
+107.   Li C, Su X, Fan C, Han H, Xue C, Zheng C. Quantify-               to provide feedback on open-ended responses. arXiv
+       ing the impact of large language models on collective             preprint arXiv:2308.02439, 2023
+       opinion dynamics. arXiv preprint arXiv:2308.03313,         121.   Grossmann I, Feinberg M, Parker D C, Christakis N A,
+       2023                                                              Tetlock P E, Cunningham W A. Ai and the trans-
+108.   Kovač G, Portelas R, Dominey P F, Oudeyer P Y. The               formation of social science research. Science, 2023,
+       socialai school: Insights from developmental psychol-             380(6650): 1108–1109
+       ogy towards artificial socio-cultural agents. arXiv        122.   Zhou X, Li G, Liu Z. Llm as dba. arXiv preprint
+       preprint arXiv:2307.07871, 2023                                   arXiv:2308.05481, 2023
+109.   Williams R, Hosseinichimeh N, Majumdar A, Ghaf-            123.   He Z, Wu H, Zhang X, Yao X, Zheng S, Zheng H, Yu B.
+       farzadegan N. Epidemic modeling with generative                   Chateda: A large language model powered autonomous
+       agents. arXiv preprint arXiv:2307.04986, 2023                     agent for eda. In: 2023 ACM/IEEE 5th Workshop on
+110.   Jinxin S, Jiabao Z, Yilei W, Xingjiao W, Jiawen L,                Machine Learning for CAD (MLCAD). 2023, 1–6
+       Liang H. Cgmi: Configurable general multi-agent in-        124.   Huang X, Lian J, Lei Y, Yao J, Lian D, Xie X. Rec-
+       teraction framework. arXiv preprint arXiv:2308.12503,             ommender ai agent: Integrating large language mod-
+       2023                                                              els for interactive recommendations. arXiv preprint
+111.   Cui J, Li Z, Yan Y, Chen B, Yuan L. Chatlaw: Open-                arXiv:2308.16505, 2023
+       source legal large language model with integrated exter-   125.   Deng G, Liu Y, Mayoral-Vilches V, Liu P, Li Y, Xu Y,
+       nal knowledge bases. arXiv preprint arXiv:2306.16092,             Zhang T, Liu Y, Pinzger M, Rass S. Pentestgpt: An llm-
+       2023                                                              empowered automatic penetration testing tool. arXiv
+112.   Hamilton S.         Blind judgement: Agent-based                  preprint arXiv:2308.06782, 2023
+       supreme court modelling with gpt. arXiv preprint           126.   al. e S. Smolmodels. https://github.com/
+       arXiv:2301.05327, 2023                                            smol-ai/developer, 2023
+113.   Bail C A. Can generative ai improve social science?        127.   al. e M U. DemoGPT. https://github.com/
+       2023                                                              melih-unsal/DemoGPT, 2023
+114.   Boiko D A, MacKnight R, Gomes G. Emergent au-              128.   al. e A O. GPT engineer. https://github.com/
+       tonomous scientific research capabilities of large lan-           AntonOsika/gpt-engineer, 2023
+       guage models. arXiv preprint arXiv:2304.05332, 2023        129.   Xia Y, Shenoy M, Jazdi N, Weyrich M. Towards au-
+115.   Kang Y, Kim J. Chatmof: An autonomous ai system for               tonomous system: flexible modular production system
+                   Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                                  39
+
+
+       enhanced with large language model agents. arXiv                  eumemic/ai-legion, 2023
+       preprint arXiv:2304.14721, 2023                            144.   al. e J X.        Agixt.    https://github.com/
+130.   Ogundare O, Madasu S, Wiggins N. Industrial engi-                 Josh-XT/AGiXT, 2023
+       neering with large language models: A case study of        145.   al. e C.         Xlang.     https://github.com/
+       chatgpt’s performance on oil & gas problems. arXiv                xlang-ai/xlang, 2023
+       preprint arXiv:2304.14354, 2023                            146.   al. e N. Babyagi. https://github.com/
+131.   Zhang C, Yang K, Hu S, Wang Z, Li G, Sun Y, Zhang C,              yoheinakajima, 2023
+       Zhang Z, Liu A, Zhu S C, others . Proagent: Building       147.   Chase H. langchain. https://docs.langchain.
+       proactive cooperative ai with large language models.              com/docs/, 2023
+       arXiv preprint arXiv:2308.11339, 2023                      148.   al. e A M. WorkGPT. https://github.com/
+132.   Hu B, Zhao C, others . Enabling intelligent interactions          team-openpm/workgpt, 2023
+       between an agent and an llm: A reinforcement learning      149.   al. e F R. LoopGPT. https://github.com/
+       approach. arXiv:2306.03604, 2023                                  farizrahman4u/loopgpt, 2023
+133.   Wu Y, Min S Y, Bisk Y, Salakhutdinov R, Azaria A,          150.   al. e A E. GPT-researcher. https://github.
+       Li Y, Mitchell T, Prabhumoye S. Plan, eliminate, and              com/assafelovic/gpt-researcher, 2023
+       track–language models are good teachers for embodied       151.   Qin Y, Hu S, Lin Y, Chen W, Ding N, Cui G, Zeng Z,
+       agents. arXiv preprint arXiv:2305.02412, 2023                     Huang Y, Xiao C, Han C, others . Tool learning with
+134.   Zhang D, Chen L, Zhang S, Xu H, Zhao Z, Yu K.                     foundation models. arXiv preprint arXiv:2304.08354,
+       Large language models are semi-parametric reinforce-              2023
+       ment learning agents. Advances in Neural Information       152.   Face H.             transformers-agent.       https:
+       Processing Systems, 2024, 36                                      //huggingface.co/docs/transformers/
+135.   Di Palo N, Byravan A, Hasenclever L, Wulfmeier M,                 transformers_agents, 2023
+       Heess N, Riedmiller M. Towards a unified agent with        153.   al. e E.       Miniagi.     https://github.com/
+       foundation models. In: Workshop on Reincarnating                  muellerberndt/mini-agi, 2023
+       Reinforcement Learning at ICLR 2023. 2023                  154.   al. e T. Superagi. https://github.com/
+136.   Wu J, Antonova R, Kan A, Lepert M, Zeng A, Song S,                TransformerOptimus/SuperAGI, 2023
+       Bohg J, Rusinkiewicz S, Funkhouser T. Tidybot: Per-        155.   Wu Q, Bansal G, Zhang J, Wu Y, Zhang S, Zhu E,
+       sonalized robot assistance with large language models.            Li B, Jiang L, Zhang X, Wang C. Autogen: Enabling
+       arXiv preprint arXiv:2305.05658, 2023                             next-gen llm applications via multi-agent conversation
+137.   Wu Z, Wang Z, Xu X, Lu J, Yan H. Embodied task                    framework. arXiv preprint arXiv:2308.08155, 2023
+       planning with large language models. arXiv preprint        156.   Chen W, Su Y, Zuo J, Yang C, Yuan C, Qian C, Chan
+       arXiv:2307.01848, 2023                                            C M, Qin Y, Lu Y, Xie R, others . Agentverse: Facilitat-
+138.   Dasgupta I, Kaeser-Chen C, Marino K, Ahuja A,                     ing multi-agent collaboration and exploring emergent
+       Babayan S, Hill F, Fergus R. Collaborating with lan-              behaviors in agents. arXiv preprint arXiv:2308.10848,
+       guage models for embodied reasoning. arXiv preprint               2023
+       arXiv:2302.00763, 2023                                     157.   Lee M, Srivastava M, Hardy A, Thickstun J, Durmus E,
+139.   Nottingham K, Ammanabrolu P, Suhr A, Choi Y, Ha-                  Paranjape A, Gerard-Ursin I, Li X L, Ladhak F, Rong F,
+       jishirzi H, Singh S, Fox R. Do embodied agents dream              others . Evaluating human-language model interaction.
+       of pixelated sheep?: Embodied decision making using               arXiv preprint arXiv:2212.09746, 2022
+       language guided world modelling. In: Workshop on           158.   Chan C M, Chen W, Su Y, Yu J, Xue W, Zhang S,
+       Reincarnating Reinforcement Learning at ICLR 2023.                Fu J, Liu Z. Chateval: Towards better llm-based
+       2023                                                              evaluators through multi-agent debate. arXiv preprint
+140.   Zhou W, Peng X, Riedl M. Dialogue shaping: Empow-                 arXiv:2308.07201, 2023
+       ering agents through npc interaction. arXiv preprint       159.   Kang S, Yoon J, Yoo S. Large language models are
+       arXiv:2307.15833, 2023                                            few-shot testers: Exploring llm-based general bug re-
+141.   Li H, Hao Y, Zhai Y, Qian Z. The hitchhiker’s guide               production. In: 2023 IEEE/ACM 45th International
+       to program analysis: A journey with large language                Conference on Software Engineering (ICSE). 2023,
+       models. arXiv preprint arXiv:2308.00245, 2023                     2312–2323
+142.   al. e R. AgentGPT. https://github.com/                     160.   Jalil S, Rafi S, LaToza T D, Moran K, Lam W. Chatgpt
+       reworkd/AgentGPT, 2023                                            and software testing education: Promises & perils. In:
+143.   al. e E. Ai-legion. https://github.com/                           2023 IEEE International Conference on Software Test-
+40                                        Front. Comput. Sci., 2025, 0(0): 1–42
+
+
+       ing, Verification and Validation Workshops (ICSTW).               preprint arXiv:2308.03656, 2023
+       2023, 4130–4137                                            173.   Zhou S, Xu F F, Zhu H, Zhou X, Lo R, Sridhar A,
+161.   Mehta N, Teruel M, Sanz P F, Deng X, Awadallah                    Cheng X, Bisk Y, Fried D, Alon U, others . Webarena:
+       A H, Kiseleva J. Improving grounded language under-               A realistic web environment for building autonomous
+       standing in a collaborative environment by interacting            agents. arXiv preprint arXiv:2307.13854, 2023
+       with agents through help feedback. arXiv preprint          174.   Banerjee D, Singh P, Avadhanam A, Srivastava S.
+       arXiv:2304.10750, 2023                                            Benchmarking llm powered chatbots: methods and
+162.   Chen A, Phang J, Parrish A, Padmakumar V, Zhao C,                 metrics. arXiv preprint arXiv:2308.04624, 2023
+       Bowman S R, Cho K. Two failures of self-consistency        175.   Zhao W X, Zhou K, Li J, Tang T, Wang X, Hou Y, Min
+       in the multi-step reasoning of llms. arXiv preprint               Y, Zhang B, Zhang J, Dong Z, others . A survey of large
+       arXiv:2305.14279, 2023                                            language models. arXiv preprint arXiv:2303.18223,
+163.   Choi M, Pei J, Kumar S, Shu C, Jurgens D. Do llms                 2023
+       understand social knowledge? evaluating the sociabil-      176.   Yang J, Jin H, Tang R, Han X, Feng Q, Jiang H, Zhong
+       ity of large language models with socket benchmark.               S, Yin B, Hu X. Harnessing the power of llms in
+       arXiv preprint arXiv:2305.14938, 2023                             practice: A survey on chatgpt and beyond. ACM Trans-
+164.   Zhang D, Chen L, Zhao Z, Cao R, Yu K. Mobile-env:                 actions on Knowledge Discovery from Data, 2023
+       An evaluation platform and benchmark for interactive       177.   Wang Y, Zhong W, Li L, Mi F, Zeng X, Huang
+       agents in llm era. arXiv preprint arXiv:2305.08144,               W, Shang L, Jiang X, Liu Q. Aligning large lan-
+       2023                                                              guage models with human: A survey. arXiv preprint
+165.   Chalamalasetti K, Götze J, Hakimov S, Madureira B,                arXiv:2307.12966, 2023
+       Sadler P, Schlangen D. clembench: Using game play          178.   Huang J, Chang K C C. Towards reasoning in
+       to evaluate chat-optimized language models as con-                large language models: A survey. arXiv preprint
+       versational agents. arXiv preprint arXiv:2305.13455,              arXiv:2212.10403, 2022
+       2023                                                       179.   Mialon G, Dessì R, Lomeli M, Nalmpantis C, Pasunuru
+166.   Lin J, Tomlin N, Andreas J, Eisner J. Decision-oriented           R, Raileanu R, Rozière B, Schick T, Dwivedi-Yu J,
+       dialogue for human-ai collaboration. arXiv preprint               Celikyilmaz A, others . Augmented language models:
+       arXiv:2305.20076, 2023                                            a survey. arXiv preprint arXiv:2302.07842, 2023
+167.   Feldt R, Kang S, Yoon J, Yoo S. Towards autonomous         180.   Chang Y, Wang X, Wang J, Wu Y, Yang L, Zhu K, Chen
+       testing agents via conversational large language models.          H, Yi X, Wang C, Wang Y, others . A survey on evalu-
+       arXiv preprint arXiv:2306.05152, 2023                             ation of large language models. ACM Transactions on
+168.   Liang Y, Zhu L, Yang Y. Tachikuma: Understading                   Intelligent Systems and Technology, 2023
+       complex interactions with multi-character and novel        181.   Chang T A, Bergen B K. Language model behavior:
+       objects by large language models. arXiv preprint                  A comprehensive survey. Computational Linguistics,
+       arXiv:2307.12573, 2023                                            2024, 1–58
+169.   Liu X, Yu H, Zhang H, Xu Y, Lei X, Lai H, Gu Y, Ding       182.   Li C, Wang J, Zhu K, Zhang Y, Hou W, Lian J, Xie
+       H, Men K, Yang K, others . Agentbench: Evaluating                 X. Emotionprompt: Leveraging psychology for large
+       llms as agents. arXiv preprint arXiv:2308.03688, 2023             language models enhancement via emotional stimulus.
+170.   Liu Z, Yao W, Zhang J, Xue L, Heinecke S, Murthy                  arXiv e-prints, 2023, arXiv–2307
+       R, Feng Y, Chen Z, Niebles J C, Arpit D, others . Bo-      183.   Zhuo T Y, Li Z, Huang Y, Shiri F, Wang W, Haffari G,
+       laa: Benchmarking and orchestrating llm-augmented                 Li Y F. On robustness of prompt-based semantic pars-
+       autonomous agents. arXiv preprint arXiv:2308.05960,               ing with large pre-trained language model: An empiri-
+       2023                                                              cal study on codex. arXiv preprint arXiv:2301.12868,
+171.   Xu B, Liu X, Shen H, Han Z, Li Y, Yue M, Peng Z,                  2023
+       Liu Y, Yao Z, Xu D. Gentopia. ai: A collaborative          184.   Gekhman Z, Oved N, Keller O, Szpektor I, Reichart R.
+       platform for tool-augmented llms. In: Proceedings of              On the robustness of dialogue history representation in
+       the 2023 Conference on Empirical Methods in Natural               conversational question answering: a comprehensive
+       Language Processing: System Demonstrations. 2023,                 study and a new prompt-based method. Transactions of
+       237–245                                                           the Association for Computational Linguistics, 2023,
+172.   Huang J t, Lam M H, Li E J, Ren S, Wang W, Jiao                   11: 351–366
+       W, Tu Z, Lyu M R. Emotionally numb or empathetic?          185.   Ji Z, Lee N, Frieske R, Yu T, Su D, Xu Y, Ishii E, Bang
+       evaluating how llms feel using emotionbench. arXiv                Y J, Madotto A, Fung P. Survey of hallucination in
+           Lei Wang et al. A Survey on Large Language Model based Autonomous Agents                        41
+
+
+natural language generation. ACM Computing Surveys,                        Jingsen Zhang is currently study-
+2023, 55(12): 1–38                                                         ing for a Ph.D. degree at Ren-
+                                                                           min University of China, Beijing,
+                                                                           China. His research interests in-
+                                                                           clude recommender system.
+               Lei Wang is a Ph.D. candidate
+               at Renmin University of China,
+               Beijing. His research focuses on
+               recommender systems and agent-
+               based large language models.
+                                                                           Zhi-Yuan Chen is pursuing his
+                                                                           Ph.D. in Gaoling school of Arti-
+                                                                           ficial Intelligence, Renmin Univer-
+               Chen Ma is currently pursuing a
+                                                                           sity of China. His research mainly
+               Master’s degree at Renmin Uni-
+                                                                           focuses on language model reason-
+               versity of China, Beijing, China.
+                                                                           ing and agent based on large lan-
+               His research interests include rec-
+                                                                           guage model.
+               ommender system, agent based on
+               large language model.
+
+
+                                                                           Jiakai Tang is currently pursuing a
+               Xueyang Feng is currently study-
+                                                                           Master’s degree at Renmin Univer-
+               ing for a Ph.D. degree at Ren-
+                                                                           sity of China, Beijing, China. His
+               min University of China, Beijing,
+                                                                           research interests include recom-
+               China. His research interests in-
+                                                                           mender system.
+               clude recommender system, agent
+               based on large language model.
+
+
+
+               Zeyu Zhang is currently pursuing
+               a Master’s degree at Renmin Uni-
+               versity of China, Beijing, China.                           Xu Chen obtained his PhD degree
+
+               His research interests include rec-                         from Tsinghua University, China.
+
+               ommender system, causal infer-                              Before joining Renmin University
+
+               ence, agent based on large lan-                             of China, he was a postdoc re-
+
+               guage model.                                                searcher at University College Lon-
+                                                                           don, UK. In the period from March
+                                                                           to September of 2017, he was
+               Hao Yang is currently studying for
+                                                                           studying at Georgia Institute of
+               a Ph.D. degree at Renmin Univer-
+                                                      Technology, USA, as a visiting scholar. His research
+               sity of China, Beijing, China. His
+                                                      mainly focuses on the recommender system, reinforce-
+               research interests include recom-
+                                                      ment learning and causal inference.
+               mender system, causal inference.
+42                                    Front. Comput. Sci., 2025, 0(0): 1–42
+
+                     Yankai Lin received his B.E. and                            Zhewei Wei received his Ph.D. of
+                     Ph.D. degrees from Tsinghua Uni-                            Computer Science and Engineer-
+                     versity in 2014 and 2019.       Af-                         ing from Hong Kong University of
+                     ter that, he worked as a senior re-                         Science and Technology. He did
+                     searcher in Tencent WeChat, and                             postdoctoral research in Aarhus
+                     joined Renmin University of China                           University from 2012 to 2014, and
+in 2022 as a tenure-track assistant professor. His main                          joined Renmin University of China
+research interests are pretrained models and natural lan-                        in 2014.
+guage processing.
+
+                     Wayne Xin Zhao received his Ph.D.
+                     in Computer Science from Peking                             Ji-Rong Wen is a full professor, the
+                     University in 2014. His research                            executive dean of Gaoling School
+                     interests include data mining, natu-                        of Artificial Intelligence, and the
+                     ral language processing and infor-                          dean of School of Information at
+                     mation retrieval in general. The                            Renmin University of China. He
+                     main goal is to study how to orga-                          has been working in the big data
+                     nize, analyze and mine user gener-     and AI areas for many years, and publishing extensively
+                     ated data for improving the service    on prestigious international conferences and journals.
+                     of real-world applications.
+

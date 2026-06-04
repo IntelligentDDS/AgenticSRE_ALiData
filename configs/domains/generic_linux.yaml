@@ -1,0 +1,70 @@
+# ──────────────────────────────────────────────
+# AgenticSRE Domain Profile — Generic Linux
+# ──────────────────────────────────────────────
+
+domain_name: generic_linux
+
+agent_context_hints:
+  metric_agent: >
+    You are analyzing a traditional Linux server environment (non-containerized).
+    Focus on host-level metrics: CPU usage per core, memory/swap usage, disk I/O (iowait),
+    network throughput/errors, load average, and process-level resource consumption.
+    Use node_exporter metrics if available.
+  log_agent: >
+    You are analyzing Linux system and application logs. Check /var/log/syslog,
+    /var/log/messages, journalctl output, and application-specific log files.
+    Look for: segfault, oom-killer, disk I/O errors, service failures, authentication
+    failures, and kernel panics.
+  trace_agent: >
+    You are analyzing application traces in a traditional Linux environment.
+    Focus on service-to-service communication (HTTP/gRPC/TCP), database query latency,
+    connection pool exhaustion, and file descriptor limits.
+  event_agent: >
+    You are analyzing system events on Linux servers. Check systemd service status,
+    cron job failures, package manager events, firewall rule changes, and hardware
+    events (MCE, disk SMART warnings).
+  correlation_agent: >
+    You are correlating signals from a Linux server environment. Consider that high
+    iowait may cause application timeouts, memory pressure triggers OOM killer which
+    kills processes, and network issues cause service-to-service failures.
+  hypothesis_agent: >
+    You are generating root cause hypotheses for a Linux server incident. Common fault
+    patterns include: disk full, memory leak / OOM, CPU spike from runaway process,
+    network partition, DNS resolution failure, NFS/mount issues, and misconfigured services.
+
+log_error_keywords:
+  - "error"
+  - "fatal"
+  - "panic"
+  - "segfault"
+  - "oom-killer"
+  - "Out of memory"
+  - "I/O error"
+  - "connection refused"
+  - "timeout"
+  - "permission denied"
+  - "disk full"
+  - "No space left on device"
+  - "too many open files"
+  - "service failed"
+  - "kernel panic"
+  - "hardware error"
+
+event_patterns:
+  - "systemd.*failed"
+  - "oom-killer"
+  - "segfault"
+  - "kernel.*error"
+  - "disk.*error"
+  - "link.*down"
+  - "temperature.*critical"
+
+thresholds:
+  cpu_high: 0.90
+  memory_high: 0.85
+  swap_usage_high: 0.50
+  disk_usage_high: 0.90
+  load_average_factor: 2.0
+  iowait_high: 0.30
+  error_rate_high: 0.03
+  open_files_pct: 0.80

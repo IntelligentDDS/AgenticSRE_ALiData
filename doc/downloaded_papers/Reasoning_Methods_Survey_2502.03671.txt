@@ -1,0 +1,582 @@
+                                           Advancing Reasoning in Large Language Models:
+                                                 Promising Methods and Approaches
+                                                                      1st Avinash Patil                                       2nd Aryan Jadon
+                                                                  Juniper Networks Inc.                                    Juniper Networks Inc.
+                                                                    Sunnyvale, USA                                           Sunnyvale, USA
+                                                                   patila@juniper.net                                       aryanj@juniper.net
+                                                               ORCID: 0009-0002-6004-370X                               ORCID: 0000-0002-2991-9913
+
+
+
+
+arXiv:2502.03671v2 [cs.CL] 28 May 2025
+                                            Abstract—Large Language Models (LLMs) have succeeded              edge synthesis, reasoning requires multi-step logical transfor-
+                                         remarkably in various natural language processing (NLP) tasks,       mations, contextual generalization, and structured problem-
+                                         yet their reasoning capabilities remain a fundamental challenge.     solving. Classical AI approaches have addressed reasoning
+                                         While LLMs exhibit impressive fluency and factual recall, their
+                                         ability to perform complex reasoning—spanning logical deduc-         through rule-based symbolic systems [9] [10], yet integrating
+                                         tion, mathematical problem-solving, commonsense inference, and       such structured reasoning with the data-driven paradigm of
+                                         multi-step reasoning—often falls short of human expectations.        LLMs remains an ongoing challenge.
+                                         This survey provides a comprehensive review of emerging tech-
+                                         niques enhancing reasoning in LLMs. We categorize existing              Recent research has explored diverse methodologies to en-
+                                         methods into key approaches, including prompting strategies          hance the reasoning abilities of LLMs. These approaches can
+                                         (e.g., Chain-of-Thought reasoning, Self-Consistency, and Tree-       categorized into three domains: (1) Prompting Strategies, such
+                                         of-Thought reasoning), architectural innovations (e.g., retrieval-   as Chain-of-Thought (CoT) reasoning [11], Self-Consistency
+                                         augmented models, modular reasoning networks, and neuro-             [12], and Tree-of-Thought [13] methods, which leverage struc-
+                                         symbolic integration), and learning paradigms (e.g., fine-tuning
+                                         with reasoning-specific datasets, reinforcement learning, and        tured prompts to guide step-by-step reasoning; (2) Architec-
+                                         self-supervised reasoning objectives). Additionally, we explore      tural Innovations, including retrieval-augmented models [14],
+                                         evaluation frameworks used to assess reasoning in LLMs and           neuro-symbolic hybrid frameworks [15], and modular reason-
+                                         highlight open challenges, such as hallucinations, robustness, and   ing architectures that integrate structured knowledge and logic
+                                         reasoning generalization across diverse tasks. By synthesizing       [16]; and (3) Learning Paradigms, involving fine-tuning with
+                                         recent advancements, this survey aims to provide insights into
+                                         promising directions for future research and practical applica-      specialized datasets [17], reinforcement learning for reasoning
+                                         tions of reasoning-augmented LLMs.                                   consistency [18], and self-supervised objectives that encourage
+                                            Index Terms—Large Language Models (LLMs), Reasoning,              logical generalization [19].
+                                         Logical Deduction, Mathematical Problem-Solving, Common-
+                                         sense Inference, Multi-Step Reasoning, Prompting Strategies,            Among recent advancements, the newly released LLM
+                                         Chain-of-Thought Reasoning, Self-Consistency, Tree-of-Thought        DeepSeek-R1 [18] has demonstrated superior reasoning per-
+                                         Reasoning, Retrieval-Augmented Models, Modular Reasoning             formance, particularly in complex domains such as math-
+                                         Networks, Neuro-Symbolic Integration, Reinforcement Learning,        ematics and coding. By effectively simulating human-like
+                                         Self-Supervised Learning, Hallucinations, AI Reasoning.              analytical thinking, DeepSeek-R1 enhances multi-step rea-
+                                                                                                              soning in mathematical problem-solving, logical inference,
+                                                               I. I NTRODUCTION                               and programming tasks, showcasing the potential of fine-
+                                            Large Language Models (LLMs) have revolutionized the              tuned architectures and novel training paradigms to improve
+                                         field of Natural Language Processing (NLP), enabling break-          structured reasoning in LLMs. This survey systematically
+                                         throughs in machine translation, text generation, question-          reviews these advancements in LLM reasoning, assessing their
+                                         answering, and other complex linguistic tasks. Despite their         effectiveness, limitations, and applications. It covers evaluation
+                                         remarkable fluency and knowledge retention, these models             benchmarks, key challenges like adversarial robustness, cross-
+                                         often struggle with systematic reasoning—an essential capa-          domain generalization, and reasoning biases. By synthesizing
+                                         bility for tasks requiring logical inference, problem-solving,       recent progress, we provide a comprehensive overview of
+                                         and decision-making [1]. While LLMs can generate plausible-          promising techniques and future research directions.
+                                         sounding responses, they frequently exhibit reasoning errors,           The paper is structured as follows: Section 2 covers the
+                                         inconsistencies, and hallucinations, limiting their reliability in   foundations of reasoning, while Section 3 explores prompt-
+                                         critical domains such as scientific discovery, law, and medicine     based reasoning enhancements. Section 4 discusses architec-
+                                         [2] [3].                                                             tural innovations, and Section 5 examines learning-based ap-
+                                            Reasoning in AI broadly encompasses multiple cognitive            proaches. Section 6 focuses on evaluation and benchmarking,
+                                         processes, including deductive, inductive, abductive, and com-       Section 7 highlights challenges and open research directions,
+                                         monsense reasoning [4]–[8]. Unlike retrieval-based knowl-            and Section 8 concludes the paper.
+   II. F OUNDATIONS OF R EASONING IN AI AND LLM S                      • Statistical Learning vs. Symbolic Logic: Unlike sym-
+A. Definitions and Types of Reasoning                                    bolic AI, which follows explicit logical rules, LLMs
+                                                                         learn probabilistic patterns in language data, making their
+   Reasoning is the cognitive process of deriving conclusions            reasoning implicit and non-deterministic.
+from premises or evidence. It can classified into the following        • Emergent Reasoning Abilities: Studies suggest that
+types:                                                                   scaling LLMs improves their ability to perform multi-
+   • Deductive Reasoning: Drawing specific conclusions                   step reasoning tasks despite the lack of explicit logical
+     from general premises. If the premises are true, the                constraints.
+     conclusion must be true. This method is fundamental in            • Contextual and Prompt-Driven Reasoning: LLMs rely
+     formal logic and automated theorem proving.                         heavily on context windows and external prompt engi-
+   • Inductive Reasoning: Deriving general principles from               neering techniques (e.g., Chain-of-Thought prompting) to
+     specific examples or observations. This approach is com-            generate reasoned responses.
+     mon in machine learning for pattern recognition and
+     forecasting.                                                    D. Challenges of Reasoning in LLMs
+   • Abductive Reasoning: Inferring the most likely expla-
+                                                                        Despite their progress, LLMs face several challenges when
+     nation for a given set of observations, frequently used in      it comes to robust and reliable reasoning [20]–[22]:
+     diagnostics and hypothesis formation.
+                                                                        • Hallucinations: LLMs sometimes generate plausible but
+   • Commonsense Reasoning: Applying general world
+     knowledge to infer reasonable conclusions is crucial for             incorrect information, leading to unreliable reasoning.
+                                                                        • Lack of Explicit Memory: Unlike knowledge graphs
+     understanding implicit meanings in human communica-
+     tion.                                                                or rule-based systems, LLMs lack structured long-term
+   • Probabilistic Reasoning: Handling uncertainty in logical
+                                                                          memory, making reasoning consistency difficult.
+                                                                        • Difficulty with Multi-Step Reasoning: Although tech-
+     inference using probability theory, often implemented in
+     Bayesian networks and Markov models.                                 niques like Chain-of-Thought prompting help, LLMs
+                                                                          often fail to follow multi-step logical structures correctly.
+B. Classical AI Approaches to Reasoning                                 • Bias and Interpretability Issues: Since LLMs train on
+
+   Traditional AI research has long focused on formal reason-             vast text corpora, they inherit biases from data, which can
+ing techniques incorporating structured knowledge representa-             influence reasoning outputs in unpredictable ways.
+                                                                        • Limitations in Logical Deduction: While LLMs excel at
+tions. Some of the key classical approaches include [9], [10]:
+                                                                          recognizing language patterns, they struggle with formal
+   • Symbolic Logic: Formal rule-based systems that use
+                                                                          logic, mathematical proofs, and systematically verifying
+     first-order logic (FOL) and propositional logic to derive
+                                                                          conclusions.
+     conclusions.
+                                                                        • Limited Generalization Across Domains: LLMs trained
+   • Rule-Based Systems: AI models that apply predefined
+                                                                          on diverse datasets still struggle with transferring rea-
+     rules to infer logical conclusions, used in expert systems
+                                                                          soning skills across vastly different domains (e.g., legal
+     and decision trees.
+                                                                          reasoning vs. scientific inference).
+   • Knowledge Graphs: Structured representations of enti-
+     ties and their relationships, supporting reasoning through      E. Bridging the Gap Between AI Reasoning and LLMs
+     graph traversal and inference mechanisms.
+   • Automated Theorem Proving (ATP): Algorithms de-
+                                                                        To enhance reasoning in LLMs, recent research [14], [15],
+     signed to prove mathematical theorems using logical de-         [18], [23] has explored hybrid models that integrate traditional
+     duction, such as the resolution principle in propositional      reasoning techniques with deep learning. Key directions in-
+     logic.                                                          clude :
+   • Bayesian Networks: Probabilistic graphical models that             • Fine-Tuning with Structured Reasoning Data: Training
+     enable reasoning under uncertainty by representing de-               LLMs on specialized datasets that explicitly focus on
+     pendencies between variables.                                        logical inference and mathematical problem-solving.
+                                                                        • Retrieval-Augmented Reasoning: Enhancing LLMs
+   While these classical approaches provide strong logical
+foundations, they struggle with scalability and adaptability              with knowledge retrieval mechanisms, allowing them to
+when applied to open-ended, unstructured problems such as                 ground their responses in external facts.
+                                                                        • Neuro-Symbolic AI: Combining neural networks with
+natural language understanding.
+                                                                          symbolic reasoning frameworks to leverage the strengths
+C. Reasoning in Large Language Models                                     of both approaches.
+   Large Language Models (LLMs) such as GPT-4, PaLM, and                • Self-Supervised and Reinforcement Learning Tech-
+
+LLaMA utilize deep learning architectures, primarily trans-               niques: Encouraging models to refine their reasoning
+formers, to process and generate human-like text. However,                through iterative self-training and reward mechanisms.
+their reasoning capabilities differ significantly from traditional      These advancements aim to push LLMs toward more reli-
+AI approaches [4]–[8]:                                               able, explainable, and human-like reasoning capabilities.
+  III. P ROMPTING -BASED R EASONING E NHANCEMENT                     • Structured Exploration: The model explores different
+   Large Language Models (LLMs) demonstrate emergent                   paths in a tree-like structure, selecting the optimal rea-
+reasoning through structured prompts, bypassing the need for           soning route.
+                                                                     • Decision Evaluation & Pruning: ToT reasoning is par-
+fine-tuning [2], [24]. This section examines key prompting
+techniques, illustrated in Figure 1 and summarized in Table I.         ticularly effective in combinatorial and planning tasks.
+                                                                     • Final Answer Selection: The best reasoning path is
+A. Chain-of-Thought (CoT) Reasoning                                    selected based on a scoring or majority selection process
+                                                                       [13].
+   Chain-of-Thought (CoT) reasoning is a prompting technique
+used in large language models (LLMs) to improve their ability      D. Program-aided Language Models (PAL)
+to solve complex reasoning problems. It involves breaking             Program-Aided Language Models (PAL) is a technique that
+down a problem into a series of intermediate steps, allowing       enhances a language model’s reasoning capabilities by allow-
+the model to reason more effectively and arrive at accurate        ing it to call external computational tools—such as Python
+conclusions [11]. This technique has been particularly effective   or symbolic solvers—to perform calculations, execute logic-
+for complex mathematical problem-solving, logical reasoning,       based steps, or verify solutions. Instead of relying purely on
+and commonsense inference.                                         internal token-based reasoning, PAL leverages external code
+   • Step-by-Step Reasoning: Instead of answering immedi-          execution for improved accuracy and reliability [25].
+     ately, the model generates a sequence of logical steps to        • Execution-Based Verification: The model generates rea-
+     work through the problem, improving accuracy in multi-              soning steps in code format, which is executed to verify
+     step problem-solving.                                               correctness.
+   • Intermediate Reasoning: The approach mimics hu-
+                                                                      • Higher Accuracy in Mathematical Reasoning: PAL
+     man problem-solving by considering subproblems before               has demonstrated superior performance in tasks requiring
+     reaching the final answer.                                          precise calculations.
+   • Performance Gains: Studies show that CoT prompting
+                                                                      • Dependence on External Tools: This approach requires
+     improves performance on arithmetic and logical tasks                integration with external computing environments, limit-
+     compared to standard prompting [11].                                ing its scalability [25].
+   • Limitations: While CoT enhances interpretability, its
+                                                                      Empirical studies indicate that CoT and self-consistency
+     effectiveness depends on prompt design and model size.
+                                                                   prompting significantly improve reasoning performance, par-
+     In some cases, models may still generate incorrect inter-
+                                                                   ticularly in structured domains such as mathematics and logic
+     mediate steps [12].
+                                                                   [11], [12].
+B. Self-Consistency Prompting                                         IV. A RCHITECTURAL I NNOVATIONS FOR E NHANCED
+   Self-Consistency prompting is an advanced prompting tech-                           R EASONING
+nique that improves reasoning accuracy by generating multiple         While prompting-based techniques have improved the rea-
+diverse reasoning paths and selecting the most consistent          soning capabilities of Large Language Models (LLMs), ar-
+answer [12]. This method is useful in complex reasoning tasks      chitectural innovations play a crucial role in enhancing their
+where a single Chain-of-Thought (CoT) might be prone to            ability to perform structured and complex reasoning. This
+errors. This technique reduces variability in responses and        section explores various model architectures and modifications
+increases accuracy by aggregating outputs.                         to improve logical inference, multi-step reasoning, and knowl-
+   • Multiple Reasoning Paths: Instead of generating a sin-        edge integration.
+     gle step-by-step solution, the model produces multiple
+     different reasoning chains.                                   A. Retrieval-Augmented Generation (RAG)
+   • Diverse Thought Processes: Each reasoning chain might            Retrieval-Augmented Generation (RAG) is an AI framework
+     follow a different logical approach, reducing biases in a     that combines information retrieval with text generation. It
+     single trajectory.                                            enhances LLM reasoning by incorporating external knowledge
+   • Majority Voting on Final Answer: The final response           sources. This approach improves the accuracy, relevance, and
+     is determined based on the most frequently occurring          factual grounding of responses compared to relying solely on
+     correct answer across generated samples.                      parametric memory [14].
+                                                                      • Query Processing: The input query is processed and
+C. Tree-of-Thought (ToT) Reasoning                                      embedded into a vector space. The model searches for
+  Tree-of-Thought (ToT) reasoning is an advanced problem-               relevant documents using a retrieval system (e.g., dense
+solving framework that extends CoT reasoning by exploring               passage retrieval, BM25). The retrieved documents are
+multiple possible reasoning paths in a tree-like structure [13].        appended to the input.
+Instead of following a single linear reasoning path, ToT allows       • Knowledge-Enhanced Reasoning: RAG-based models
+branching and evaluation at each step, leading to more robust           supplement their reasoning process based on both the
+and optimal solutions.                                                  query and retrieved information.
+                                          Fig. 1. Approaches to Prompting-Based Reasoning Enhancement.
+
+                                                                   TABLE I
+ C OMPARISON OF C HAIN - OF -T HOUGHT (C OT), S ELF -C ONSISTENCY C OT (SC-C OT), T REE - OF -T HOUGHT (T OT), AND P ROGRAM -A IDED L ANGUAGE
+                                                                M ODELS (PAL)
+
+   Feature                         CoT                     SC-CoT                         ToT                              PAL
+   Reasoning Structure     Linear step-by-step     Multiple CoTs with voting       Tree-like branching         Reasoning via code execution
+   Error Handling         Can propagate errors       Averages out mistakes          Prunes weak paths             Uses external execution
+   Reasoning Diversity       Single trajectory     Multiple independent paths           Branching            Uses symbolic computation or code
+   Answer Selection       Direct from one chain          Majority vote            Best branch selection        Extracted from program output
+   Best Use Case          Logical/math problems    High-confidence reasoning    Multi-step decision-making     Numerical/symbolic problems
+   Execution Source           Within LLM                 Within LLM              Evaluates multiple paths        Uses external computation
+
+
+
+  •   Reduction of Hallucinations: By grounding responses                 dynamically. MANNs can read from and write to an external
+      in external data, RAG helps mitigate hallucinations often           memory module, making them more adaptable for reasoning
+      observed in purely generative models [26].                          consistency over long sequences, lifelong learning, and few-
+                                                                          shot learning tasks [21].
+B. Neuro-Symbolic Hybrid Models
+                                                                            • Controller (Neural Network Core): A neural network
+  Neuro-Symbolic Hybrid Models combine neural networks                         (typically an RNN or Transformer) that processes in-
+(which excel at pattern recognition and learning from data)                    puts and manages interactions with memory, determining
+with symbolic AI (which enables reasoning, logic, and explicit                 when and how to read/write data.
+knowledge representation). This fusion aims to create more                  • External Memory Storage: A structured memory com-
+explainable, generalizable, and robust AI systems [15].                        ponent (e.g., a differentiable memory matrix or key-value
+  • Integration of Logic and Learning: These models use                        store) that holds information over time. Unlike standard
+     neural networks to process unstructured text while em-                    RNNs, which rely only on hidden states, MANNs explic-
+     ploying symbolic logic for rule-based reasoning. Neural                   itly retrieve and update memory.
+     models extract features, while symbolic systems provide                • Memory Access Mechanism: Read/write operations in
+     logical inference.                                                        memory-augmented neural networks are typically dif-
+  • Enhanced Interpretability: Symbolic components im-                         ferentiable, enabling gradient-based learning. Addressing
+     prove transparency, making reasoning steps more explain-                  mechanisms include content-based addressing, which re-
+     able. Rule-based systems, knowledge graphs, and formal                    trieves memory by assessing similarity to stored data, and
+     logic enable structured reasoning.                                        location-based addressing, which accesses memory based
+                                                                               on positional or sequential order.
+C. Memory-Augmented Neural Networks
+  Memory-Augmented Neural Networks (MANNs) are AI                         D. Graph Neural Networks (GNNs) and Knowledge Graphs
+models that integrate external memory with neural networks,                 Graph Neural Networks (GNNs) offer a structured frame-
+enabling them to store, retrieve, and manipulate information              work for reasoning by explicitly representing entities and
+their relationships, enabling logical inference and multi-hop         A. Supervised Fine-Tuning on Reasoning-Specific Datasets
+question-answering.                                                     Fine-tuning LLMs on high-quality reasoning datasets allows
+   • Structured Representation: Graph Neural Networks are             models to improve their logical, mathematical, and common-
+     neural models designed to operate on graph-structured            sense reasoning capabilities.
+     data. Unlike traditional deep learning models (which               • Mathematical and Logical Reasoning: Fine-tuning on
+     work on grids like images or sequences like text), GNNs               datasets such as MATH and GSM8K enhances mathe-
+     can model complex relationships between interconnected                matical problem-solving and logical inference skills [31],
+     entities [27].                                                        [32].
+   • Reasoning over Knowledge Graphs: Knowledge                         • Commonsense and Causal Reasoning: Datasets like
+     Graphs represent facts as entities and relationships in a             SWAG and Abductive NLI (aNLI) help models learn
+     structured format, typically as a triple (subject, predicate,         commonsense reasoning and abductive inference [6],
+     object). When GNNs are applied to Knowledge Graphs,                   [33].
+     they enable reasoning, inference, and discovery of hidden          • Scientific and Multi-Hop Reasoning: Fine-tuning on
+     relationships. [28].                                                  datasets like ARC and HotpotQA improves multi-step
+   • Improvements in Explainability: Knowledge graph-                      reasoning and question-answering [34], [35].
+     based reasoning enhances transparency by making infer-             While fine-tuning can significantly improve model perfor-
+     ence paths explicit.                                             mance, it requires careful dataset curation to prevent overfitting
+                                                                      and ensure generalizability.
+E. Tool-Use and API Augmentations
+   LLMs can be augmented with external tools and APIs to              B. Reinforcement Learning from Human Feedback
+improve reasoning capabilities, leveraging specialized compu-            Methods such as Reinforcement Learning from Human
+tational resources beyond language modeling [29].                     Feedback (RLHF) train models to align their reasoning with
+   • Programmatic Reasoning: Models invoke external cal-
+                                                                      human preferences [36]. A PPO-based RLHF training algo-
+     culators, theorem solvers, or search engines to validate         rithm is Algorithm 1.
+     reasoning steps.                                                    • Reward Models for Logical Consistency: RLHF opti-
+
+   • Dynamic Data Integration: As illustrated in Table II,                 mizes model outputs based on human evaluators’ feed-
+     APIs enable real-time access to updated knowledge, im-                back, reducing errors in logical reasoning [37].
+     proving the factual accuracy of reasoning [30].                     • Reward Model (RM) Training: Human annotators as-
+
+   • Limitations: Dependence on external services introduces               sess multiple model outputs based on preference. A
+     latency and requires access control mechanisms.                       dedicated neural network, known as the Reward Model, is
+                                                                           trained on these rankings to capture human preferences.
+                                                                           The models generate and assess their reasoning steps,
+                           TABLE II
+             C OMMON API T YPES U SED IN AI S YSTEMS                       refining correct solutions through iterative learning [17].
+                                                                         • Reinforcement Learning via Proximal Policy Opti-
+ API Type              Example Use Cases                                   mization (PPO): PPO, a reinforcement learning algo-
+                                                                           rithm, is used to optimize the model while preventing
+ Web Search APIs       Bing, Google, Weather API for live information
+                                                                           drastic deviations from its base performance [18].
+ Computation APIs      Wolfram Alpha for advanced mathematical reasoning
+ Database APIs         SQL, NoSQL for structured queries                 C. Self-Supervised and Contrastive Learning for Reasoning
+ Cloud Services APIs   AWS, Google Cloud, OpenAI API for cloud             Self-supervised learning (SSL) and contrastive learning
+ Automation APIs       Zapier, IFTTT for automating workflows            (CL) have gained traction as effective ways to train large-scale
+ Financial APIs        Stock market APIs (Alpha Vantage, Yahoo Finance)
+                                                                      language models for reasoning tasks. Unlike supervised learn-
+                                                                      ing, which relies on human-labeled data, SSL and CL leverage
+  Empirical results suggest that retrieval-augmented and              inherent structures in data to create useful representations and
+neuro-symbolic models outperform standard transformer ar-             improve reasoning capabilities [19].
+chitectures in structured reasoning tasks [14], [15].                    • Contrastive Learning for Logical Inference: By train-
+                                                                           ing models to distinguish between valid and invalid rea-
+   V. L EARNING -BASED A PPROACHES FOR R EASONING
+                                                                           soning chains, contrastive learning improves logical con-
+   Beyond prompting and architectural innovations, learning-               sistency [38]. Contrastive learning optimizes a contrastive
+based approaches are critical in improving reasoning capa-                 loss, such as InfoNCE (Noise Contrastive Estimation) or
+bilities in Large Language Models (LLMs). These approaches                 Triplet Loss, which encourages correct reasoning pairs to
+involve training paradigms such as fine-tuning with reasoning-             have higher similarity scores. The InfoNCE loss function
+specific datasets, reinforcement learning for consistency, and             is defined as:
+self-supervised learning for logical inference. This section
+                                                                                                      exp sim(xi , x+
+                                                                                                                            
+explores various learning-based methodologies that enhance                                                           i )/τ
+                                                                                            X
+                                                                                    L=−         log P
+the reasoning abilities of LLMs.                                                              i        j exp (sim(xi , xj )/τ )
+Algorithm 1 RLHF Training Pipeline using PPO                           • Secondary Verification Models: A separate model eval-
+  1: Input:   Pre-trained language model M, Supervised                   uates the reasoning output of an LLM, filtering out
+     fine-tuning dataset DSFT , Reward model dataset DRM ,               incorrect inferences.
+     Learning rate α, Temperature τ                                    • Formal Proof Checking: Integration with theorem
+
+  2: Output: RLHF-tuned model MRLHF                                      provers allows models to verify logical deductions rig-
+  3:                                                                     orously [40].
+  4: Step 1: Supervised Fine-Tuning (SFT)                              • Limitations: Automated verification remains challenging
+
+  5: Load pre-trained language model M                                   due to the difficulty of formalizing natural language
+  6: Load supervised fine-tuning dataset DSFT                            reasoning.
+  7: Train M on DSFT using cross-entropy loss
+                                                                     VI. E VALUATION AND B ENCHMARKING OF R EASONING IN
+  8: Save fine-tuned model as MSFT
+                                                                                            LLM S
+   9: Step 2: Train Reward Model
+  10: Initialize reward model R                                         Assessing the reasoning capabilities of Large Language
+  11: Load ranked preference dataset DRM                             Models (LLMs) requires systematic evaluation using standard-
+  12: Train R to predict reward scores from human-ranked             ized benchmarks and performance metrics. This section ex-
+     data                                                            plores various evaluation methodologies, including reasoning
+  13: Save trained reward model as Rtrained                          benchmarks, key performance metrics, comparative analysis
+  14: Step 3: Reinforcement Learning with PPO                        with human reasoning, and limitations of current evaluation
+  15: Initialize PPO agent using MSFT                                strategies.
+  16: Set up PPO hyperparameters: batch size B,          policy      A. Popular Reasoning Benchmarks
+      update steps K
+  17: for each training iteration do
+                                                                       Several benchmarks have been developed to assess different
+  18:   Sample batch {xi } ∈ DSFT                                    aspects of reasoning in LLMs, ranging from mathematical
+  19:   Generate responses yi = MSFT (xi )                           problem-solving to logical inference and commonsense rea-
+  20:   Compute rewards ri = Rtrained (yi )                          soning.
+  21:   Update policy πθ using PPO objective:                          • ARC (AI2 Reasoning Challenge) – Measures common-
+                                                                          sense and logical inference abilities by requiring multi-
+        LPPO = Et [min (rt (θ)At , clip(rt (θ), 1 − ϵ, 1 + ϵ)At )]        step reasoning across different knowledge domains [34].
+                                                                       • LogiQA – A dataset evaluating logical reasoning skills,
+
+  22:   Perform gradient updates on MSFT                                  particularly in deductive and abductive reasoning scenar-
+  23: end for                                                             ios [41].
+                                                                       • GSM8K – A dataset focused on grade-school mathemat-
+  24: Save final RLHF-trained model as MRLHF
+                                                                          ical reasoning problems, evaluating multi-step arithmetic
+                                                                          reasoning capabilities [31].
+                                                                       • MATH – A benchmark designed to test models on
+    where:
+                                                                          high-school and competition-level mathematics, assessing
+      – xi is the anchor sample,                                          formal mathematical reasoning [32].
+      – x+ i is the positive (similar) sample,                         • BIG-Bench – A broad dataset covering a variety of
+      – xj represents all samples in the denominator, includ-             reasoning tasks, including logical reasoning, abstraction,
+         ing both positive and negative samples,                          and multi-hop inference [42].
+      – sim(·, ·) denotes a similarity function (e.g., cosine          • ProofWriter – Evaluates the model’s ability to perform
+         similarity),                                                     automated theorem proving and logical deduction [39].
+      – τ is the temperature parameter.                                • HotpotQA – A dataset focused on multi-hop question-
+  • Self-Training with Synthetic Data: Models generate                    answering requiring models to combine information from
+    synthetic reasoning paths and verify their correctness,               multiple sources for reasoning [35].
+    iteratively refining their reasoning abilities [17].               • HumanEval – Evaluates the code-generating abilities
+  • Zero-Shot and Few-Shot Reasoning Improvement:                         of LLMs. It evaluates models’ capacity to understand
+    Self-supervised learning enhances a model’s ability to                programming-related tasks and generate syntactically cor-
+    generalize to novel reasoning tasks by enabling it to                 rect and functionally accurate code according to the
+    extract abstract reasoning patterns directly from raw data            provided specifications. [43]
+    [19].                                                              • ANLI (Adversarial NLI) – Designed to test models on
+                                                                          natural language inference through adversarially gener-
+D. Automated Verifiers and Critic Models                                  ated reasoning tasks [44].
+  To further enhance reasoning accuracy, LLMs can be paired            • HellaSwag – A benchmark designed to test common-
+with automated verifiers that critically assess their outputs             sense natural language inference. It requires the model to
+[39].                                                                     predict the most likely ending of a sentence. [33].
+  •   Measuring Massive Multitask Language Understand-                 • Fact-Checking Mechanisms: Existing fact-checking
+      ing (MMLU) – Evaluates general knowledge and                       techniques fail to filter misinformation in multi-step rea-
+      problem-solving abilities across 57 subjects, including            soning tasks [30].
+      elementary mathematics, US history, computer science,            • Open Research Direction: Developing automated veri-
+      and law. [45].                                                     fiers and integrating LLMs with structured databases to
+                                                                         improve factual accuracy.
+B. Metrics for Measuring Reasoning Performance
+  Evaluating reasoning in LLMs involves multiple perfor-             B. Generalization Across Domains
+mance metrics tailored to different reasoning tasks.                   LLMs often struggle to generalize reasoning capabilities
+  • Accuracy: Measures the correctness of model responses,           across different domains, limiting their adaptability to novel
+    often evaluated using Exact Match (EM) and F1-score,             scenarios [49].
+    particularly in mathematical and logical reasoning tasks           • Domain-Specific Overfitting: Fine-tuning on specific
+    [32].                                                                 reasoning datasets may improve performance in targeted
+  • Logical Consistency: Assesses whether a model’s rea-                  tasks but hinders adaptability to unseen domains [32].
+    soning follows coherent logical steps across multiple              • Cross-Domain Transfer Learning: Current transfer
+    queries. Often evaluated using theorem-proving datasets               learning approaches have limitations in maintaining rea-
+    such as ProofWriter [39].                                             soning coherence across diverse contexts [19].
+  • Explainability and Interpretability: Evaluates the trans-          • Open Research Direction: Investigating meta-learning
+    parency of reasoning steps, especially in Chain-of-                   and continual learning strategies for cross-domain gener-
+    Thought (CoT) models, by assessing the faithfulness of                alization.
+    intermediate steps to the final answer [11].
+  • Self-Consistency: Measures reasoning reliability by gen-         C. Robustness to Adversarial Attacks
+    erating multiple independent responses to the same query           LLMs are vulnerable to adversarial perturbations that ex-
+    and assessing agreement among outputs [12].                      ploit reasoning weaknesses, leading to incorrect or misleading
+  • Multi-Hop Reasoning Score: Used in datasets like Hot-
+                                                                     outputs [44].
+    potQA to assess the model’s ability to integrate multiple
+                                                                       • Sensitivity to Input Variations: Small modifications
+    pieces of evidence in complex reasoning tasks [35].
+                                                                           in prompts can lead to significantly different reasoning
+  • Adversarial Robustness: Tests the model’s ability to
+                                                                           outputs, impacting reliability.
+    maintain reasoning accuracy under adversarial perturba-
+                                                                       • Adversarial Robustness Testing: Existing benchmarks
+    tions, as evaluated in the ANLI dataset [44].
+                                                                           do not sufficiently evaluate LLMs against adversarial
+  • Faithfulness and Verifiability: Measures whether the
+                                                                           reasoning challenges [27].
+    model-generated reasoning steps can be independently
+                                                                       • Open Research Direction: Developing robust adversarial
+    verified and logically aligned with the final answer [40].
+                                                                           training techniques to improve resistance to input manip-
+ • Confidence Calibration: Evaluates whether the model’s
+                                                                           ulations.
+    confidence in its predictions correlates with correctness,
+    commonly measured using log-likelihood scores and                D. Integrating Symbolic and Neural Reasoning
+    Brier Score [46].
+ • Reasoning Generalization: Assesses how well the model
+                                                                        LLMs rely on statistical pattern recognition rather than for-
+    performs on out-of-distribution (OOD) reasoning tasks,           mal logical reasoning, leading to errors in complex inferencing
+    testing adaptability beyond its training data [47].              tasks [15].
+                                                                        • Limitations of Purely Neural Approaches: LLMs strug-
+  VII. C HALLENGES AND O PEN R ESEARCH D IRECTIONS                        gle with structured logic, formal proofs, and abstract
+   Despite significant advancements in enhancing the reason-              symbolic reasoning [40].
+ing capabilities of Large Language Models (LLMs), several               • Neuro-Symbolic AI: Combining neural networks with
+challenges persist. These limitations hinder their reliability,           symbolic reasoning frameworks enhances logical consis-
+robustness, and applicability in high-stakes domains. This                tency and interpretability [15].
+section discusses key challenges and proposes open research             • Open Research Direction: Advancing hybrid neuro-
+directions to address them.                                               symbolic architectures for reasoning-augmented AI mod-
+                                                                          els.
+A. Hallucinations and Misinformation
+  One of the critical challenges in LLM reasoning is the                                  VIII. C ONCLUSION
+generation of hallucinated or factually incorrect information           Advancing reasoning in Large Language Models (LLMs)
+[20].                                                                is a key milestone in AI development. Despite improvements
+  • Unverified Reasoning Steps: LLMs sometimes generate              in prompting, architecture, and learning-based methods, chal-
+      plausible but incorrect reasoning chains, leading to logical   lenges remain in logical consistency, generalization, robust-
+      inconsistencies [48].                                          ness, and interpretability. This survey reviews key approaches
+to enhancing LLM reasoning, categorized into prompting tech-                  [2] T. Brown et al., “Language models are few-shot learners,” Advances in
+niques, architectural innovations, and learning-driven strate-                    Neural Information Processing Systems, 2020.
+                                                                              [3] T. Kojima, S. S. Gu, M. Reid, Y. Matsuo, and Y. Iwasawa, “Large lan-
+gies.                                                                             guage models are zero-shot reasoners,” Advances in neural information
+A. Summary of Key Findings                                                        processing systems, vol. 35, pp. 22 199–22 213, 2022.
+                                                                              [4] P. Clark, O. Tafjord, and K. Richardson, “Transformers as soft reason-
+   The key takeaways from this survey can be summarized as                        ers over language,” in Proceedings of the Twenty-Ninth International
+follows:                                                                          Conference on International Joint Conferences on Artificial Intelligence,
+                                                                                  2021, pp. 3882–3890.
+   • Prompting Strategies: Techniques such as Chain-of-                       [5] Z. Yang, L. Dong, X. Du, H. Cheng, E. Cambria, X. Liu, J. Gao, and
+     Thought (CoT) prompting, Self-Consistency, and Tree-                         F. Wei, “Language models as inductive reasoners,” in Proceedings of
+     of-Thought (ToT) reasoning have shown significant im-                        the 18th Conference of the European Chapter of the Association for
+                                                                                  Computational Linguistics (Volume 1: Long Papers), 2024, pp. 209–225.
+     provements in structured problem-solving, logical infer-                 [6] C. Bhagavatula, R. L. Bras, C. Malaviya, K. Sakaguchi, A. Holtzman,
+     ence, and multi-step reasoning [11]–[13].                                    H. Rashkin, D. Downey, S. W.-t. Yih, and Y. Choi, “Abductive com-
+   • Architectural Innovations: Enhancements such as
+                                                                                  monsense reasoning,” arXiv preprint arXiv:1908.05739, 2019.
+                                                                              [7] X. Zhou, Y. Zhang, L. Cui, and D. Huang, “Evaluating commonsense in
+     Retrieval-Augmented Generation (RAG), Neuro-                                 pre-trained language models,” in Proceedings of the AAAI Conference
+     Symbolic AI, Memory-Augmented Models, and Graph                              on Artificial Intelligence, vol. 34, no. 05, 2020, pp. 9733–9740.
+     Neural Networks (GNNs) contribute to better structured                   [8] Q. Liu, H. Jiang, A. Evdokimov, Z.-H. Ling, X. Zhu, S. Wei, and Y. Hu,
+                                                                                  “Probabilistic reasoning via deep learning: Neural association models,”
+     and explainable reasoning [14], [15].                                        arXiv preprint arXiv:1603.07704, 2016.
+   • Learning-Based Approaches: Fine-tuning on reasoning-                     [9] R. R. Yager, “Approximate reasoning as a basis for rule-based expert
+     specific datasets, Reinforcement Learning from Human                         systems,” IEEE Transactions on Systems, Man, and Cybernetics, no. 4,
+                                                                                  pp. 636–643, 1984.
+     Feedback (RLHF), self-supervised learning, and auto-                    [10] R. Sun, “Robust reasoning: integrating rule-based and similarity-based
+     mated verifiers improve logical consistency and gener-                       reasoning,” Artificial Intelligence, vol. 75, no. 2, pp. 241–295, 1995.
+     alization [17], [32], [37].                                             [11] J. Wei, X. Wang, D. Schuurmans, M. Bosma, F. Xia, E. Chi, Q. V. Le,
+                                                                                  D. Zhou et al., “Chain-of-thought prompting elicits reasoning in large
+   • Evaluation and Benchmarking: Current benchmarks                              language models,” Advances in neural information processing systems,
+     such as GSM8K, MATH, LogiQA, and ARC provide                                 vol. 35, pp. 24 824–24 837, 2022.
+     valuable insights into LLM reasoning capabilities, but ex-              [12] X. Wang et al., “Self-consistency improves chain of thought reasoning
+                                                                                  in language models,” arXiv preprint arXiv:2203.11171, 2022.
+     isting evaluation methodologies require improvements in                 [13] S. Yao, D. Yu, J. Zhao, I. Shafran, T. Griffiths, Y. Cao, and
+     adversarial robustness and dynamic reasoning assessment                      K. Narasimhan, “Tree of thoughts: Deliberate problem solving with large
+     [31], [32], [41].                                                            language models,” Advances in Neural Information Processing Systems,
+                                                                                  vol. 36, 2024.
+   • Challenges and Open Research Directions: Key chal-                      [14] P. Lewis et al., “Retrieval-augmented generation for knowledge-intensive
+     lenges include hallucinations, reasoning generalization,                     nlp tasks,” Advances in Neural Information Processing Systems, 2020.
+     adversarial robustness, computational efficiency, ethical               [15] A. d. Garcez and L. C. Lamb, “Neurosymbolic ai: The 3 rd wave,”
+                                                                                  Artificial Intelligence Review, vol. 56, no. 11, pp. 12 387–12 406, 2023.
+     considerations, and the need for explainable reasoning                  [16] A. Santoro, D. Raposo, D. G. Barrett, M. Malinowski, R. Pascanu,
+     models [15], [20], [49].                                                     P. Battaglia, and T. Lillicrap, “A simple neural network module for
+                                                                                  relational reasoning,” in Advances in Neural Information Processing
+B. Final Thoughts                                                                 Systems, I. Guyon, U. V. Luxburg, S. Bengio, H. Wallach, R. Fergus,
+   The future of AI reasoning depends on developing models                        S. Vishwanathan, and R. Garnett, Eds., vol. 30. Curran Associates,
+                                                                                  Inc., 2017.
+that generate fluent text while ensuring robust, verifiable,                 [17] E. Zelikman, Y. Wu, J. Mu, and N. Goodman, “Star: Bootstrapping
+and adaptable reasoning across domains. Advancements in                           reasoning with reasoning,” Advances in Neural Information Processing
+prompting, architecture, and learning can bring LLMs closer                       Systems, vol. 35, pp. 15 476–15 488, 2022.
+                                                                             [18] D. Guo, D. Yang, H. Zhang, J. Song, R. Zhang, R. Xu, Q. Zhu, L. Li,
+to human-like reasoning. However, addressing challenges re-                       Z. Shao, P. Wang et al., “Deepseek-r1: Incentivizing reasoning capability
+quires collaboration among AI researchers, cognitive scien-                       in llms via reinforcement learning,” arXiv preprint arXiv:2501.12948,
+tists, ethicists, and domain experts. The goal is to create AI                    2025.
+                                                                             [19] A. Talmor, O. Tafjord, P. Clark, Y. Goldberg, and J. Berant, “Leap-
+systems that reason accurately, ethically, and transparently for                  of-thought: Teaching pre-trained models to systematically reason over
+safer real-world deployment.                                                      implicit knowledge,” Advances in Neural Information Processing Sys-
+                                                                                  tems, vol. 33, pp. 20 227–20 237, 2020.
+                 IX. ACKNOWLEDGMENTS                                         [20] L. Huang, W. Yu, W. Ma, W. Zhong, Z. Feng, H. Wang, Q. Chen,
+   We thank the research community for their contributions                        W. Peng, X. Feng, B. Qin et al., “A survey on hallucination in large
+                                                                                  language models: Principles, taxonomy, challenges, and open questions,”
+to reasoning in LLMs and developing benchmarking datasets.                        ACM Transactions on Information Systems, 2024.
+This survey has been informed by a wide range of studies,                    [21] W. Wang, L. Dong, H. Cheng, X. Liu, X. Yan, J. Gao, and F. Wei,
+and we acknowledge the valuable work that has advanced the                        “Augmenting language models with long-term memory,” Advances in
+                                                                                  Neural Information Processing Systems, vol. 36, 2024.
+field.                                                                       [22] Z. C. Lipton, “The mythos of model interpretability: In machine
+                                                                                  learning, the concept of interpretability is both important and slippery.”
+                            R EFERENCES                                           Queue, vol. 16, no. 3, pp. 31–57, 2018.
+ [1] Z. Wu, L. Qiu, A. Ross, E. Akyürek, B. Chen, B. Wang, N. Kim, J. An-   [23] A. Kumar, V. Zhuang, R. Agarwal, Y. Su, J. D. Co-Reyes, A. Singh,
+     dreas, and Y. Kim, “Reasoning or reciting? exploring the capabilities        K. Baumli, S. Iqbal, C. Bishop, R. Roelofs et al., “Training lan-
+     and limitations of language models through counterfactual tasks,” in         guage models to self-correct via reinforcement learning,” arXiv preprint
+     Proceedings of the 2024 Conference of the North American Chapter             arXiv:2409.12917, 2024.
+     of the Association for Computational Linguistics: Human Language        [24] J. Wei et al., “Emergent abilities of large language models,” arXiv
+     Technologies (Volume 1: Long Papers), 2024, pp. 1819–1862.                   preprint arXiv:2206.07682, 2022.
+[25] L. Gao, A. Madaan, S. Zhou, U. Alon, P. Liu, Y. Yang, J. Callan,                  Computational Linguistics. Association for Computational Linguistics,
+     and G. Neubig, “Pal: Program-aided language models,” in International             2020.
+     Conference on Machine Learning. PMLR, 2023, pp. 10 764–10 799.               [45] D. Hendrycks, C. Burns, S. Basart, A. Zou, M. Mazeika, D. Song, and
+[26] K. Shuster, S. Poff, M. Chen, D. Kiela, and J. Weston, “Retrieval                 J. Steinhardt, “Measuring massive multitask language understanding,”
+     augmentation reduces hallucination in conversation,” in Findings of the           arXiv preprint arXiv:2009.03300, 2020.
+     Association for Computational Linguistics: EMNLP 2021, 2021, pp.             [46] C. Guo, G. Pleiss, Y. Sun, and K. Q. Weinberger, “On calibration
+     3784–3803.                                                                        of modern neural networks,” in International Conference on Machine
+[27] S. Ji, S. Pan, E. Cambria, P. Marttinen, and S. Y. Philip, “A survey on           Learning (ICML), 2017, pp. 1321–1330.
+     knowledge graphs: Representation, acquisition, and applications,” IEEE       [47] B. Lake and M. Baroni, “Generalization without systematicity: On the
+     transactions on neural networks and learning systems, vol. 33, no. 2,             compositional skills of sequence-to-sequence recurrent networks,” in
+     pp. 494–514, 2021.                                                                International conference on machine learning. PMLR, 2018, pp. 2873–
+[28] W. L. Hamilton et al., “Inductive representation learning on large                2882.
+     graphs,” Advances in Neural Information Processing Systems, 2017.            [48] M. Mitchell and D. C. Krakauer, “The debate over understanding in
+[29] T. Schick, J. Dwivedi-Yu, R. Dessı̀, R. Raileanu, M. Lomeli, E. Hambro,           ai’s large language models,” Proceedings of the National Academy of
+     L. Zettlemoyer, N. Cancedda, and T. Scialom, “Toolformer: Language                Sciences, vol. 120, no. 13, p. e2215907120, 2023.
+     models can teach themselves to use tools,” Advances in Neural Infor-         [49] R. Bommasani, D. A. Hudson, E. Adeli, R. Altman, S. Arora, S. von
+     mation Processing Systems, vol. 36, pp. 68 539–68 551, 2023.                      Arx, M. S. Bernstein, J. Bohg, A. Bosselut, E. Brunskill et al.,
+[30] G. Mialon, R. Dessi, M. Lomeli, C. Nalmpantis, R. Pasunuru,                       “On the opportunities and risks of foundation models,” arXiv preprint
+     R. Raileanu, B. Roziere, T. Schick, J. Dwivedi-Yu, A. Celikyilmaz,                arXiv:2108.07258, 2021.
+     E. Grave, Y. LeCun, and T. Scialom, “Augmented language models:
+     a survey,” Transactions on Machine Learning Research, 2023,
+     survey Certification. [Online]. Available: https://openreview.net/forum?
+     id=jh7wH2AzKK
+[31] K. Cobbe et al., “Training verifiers to solve math word problems,” arXiv
+     preprint arXiv:2110.14168, 2021.
+[32] D. Hendrycks, C. Burns, S. Kadavath, A. Arora, S. Basart, E. Tang,
+     D. Song, and J. Steinhardt, “Measuring mathematical problem solving
+     with the math dataset,” Sort, vol. 2, no. 4, pp. 0–6, 2021.
+[33] R. Zellers, Y. Bisk, R. Schwartz, and Y. Choi, “Swag: A large-scale
+     adversarial dataset for grounded commonsense inference,” arXiv preprint
+     arXiv:1808.05326, 2018.
+[34] P. Clark, I. Cowhey, O. Etzioni, T. Khot, A. Sabharwal, C. Schoenick,
+     and O. Tafjord, “Think you have solved question answering? try arc,
+     the ai2 reasoning challenge,” arXiv preprint arXiv:1803.05457, 2018.
+[35] Z. Yang, P. Qi, S. Zhang, Y. Bengio, W. Cohen, R. Salakhutdinov, and
+     C. D. Manning, “Hotpotqa: A dataset for diverse, explainable multi-
+     hop question answering,” in Proceedings of the 2018 Conference on
+     Empirical Methods in Natural Language Processing, 2018, pp. 2369–
+     2380.
+[36] J. Achiam, S. Adler, S. Agarwal, L. Ahmad, I. Akkaya, F. L. Aleman,
+     D. Almeida, J. Altenschmidt, S. Altman, S. Anadkat et al., “Gpt-4
+     technical report,” arXiv preprint arXiv:2303.08774, 2023.
+[37] L. Ouyang, J. Wu, X. Jiang, D. Almeida, C. Wainwright, P. Mishkin,
+     C. Zhang, S. Agarwal, K. Slama, A. Ray et al., “Training language
+     models to follow instructions with human feedback,” Advances in neural
+     information processing systems, vol. 35, pp. 27 730–27 744, 2022.
+[38] C. Durkan, I. Murray, and G. Papamakarios, “On contrastive learning
+     for likelihood-free inference,” in International conference on machine
+     learning. PMLR, 2020, pp. 2771–2781.
+[39] O. Tafjord, B. Dalvi, and P. Clark, “Proofwriter: Generating implications,
+     proofs, and abductive statements over natural language,” in Findings
+     of the Association for Computational Linguistics: ACL-IJCNLP 2021,
+     2021, pp. 3621–3634.
+[40] E. First, M. N. Rabe, T. Ringer, and Y. Brun, “Baldur: Whole-proof
+     generation and repair with large language models,” in Proceedings of
+     the 31st ACM Joint European Software Engineering Conference and
+     Symposium on the Foundations of Software Engineering, 2023, pp.
+     1229–1241.
+[41] J. Liu, L. Cui, H. Liu, D. Huang, Y. Wang, and Y. Zhang, “Logiqa:
+     a challenge dataset for machine reading comprehension with logical
+     reasoning,” in Proceedings of the Twenty-Ninth International Conference
+     on International Joint Conferences on Artificial Intelligence, 2021, pp.
+     3622–3628.
+[42] A. Srivastava et al., “Beyond the imitation game: Quantifying and
+     extrapolating the capabilities of language models,” arXiv preprint
+     arXiv:2206.04615, 2022.
+[43] M. Chen, J. Tworek, H. Jun, Q. Yuan, H. P. D. O. Pinto, J. Kaplan,
+     H. Edwards, Y. Burda, N. Joseph, G. Brockman et al., “Evaluating large
+     language models trained on code,” arXiv preprint arXiv:2107.03374,
+     2021.
+[44] Y. Nie, A. Williams, E. Dinan, M. Bansal, J. Weston, and D. Kiela,
+     “Adversarial nli: A new benchmark for natural language understanding,”
+     in Proceedings of the 58th Annual Meeting of the Association for
+

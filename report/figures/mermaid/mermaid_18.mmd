@@ -1,0 +1,32 @@
+flowchart TB
+    Incident["故障事件<br/>异常窗口 + 初始信号"] --> Context["上下文检索<br/>历史规则 / 故障指纹 / 专家反馈"]
+    Context --> Hypotheses["候选假设集合<br/>H1, H2, H3..."]
+    Hypotheses --> PlanInvest["调查计划生成<br/>每个假设的判别性问题"]
+    PlanInvest --> Parallel["并行证据采集"]
+
+    subgraph Evidence["领域证据池"]
+        MetricE["指标证据<br/>PromQL / 时序异常"]
+        LogE["日志证据<br/>错误模式 / 堆栈"]
+        TraceE["Trace 证据<br/>P95/P99 / 关键路径"]
+        EventE["事件证据<br/>K8s Warning / 变更"]
+    end
+
+    Parallel --> MetricE
+    Parallel --> LogE
+    Parallel --> TraceE
+    Parallel --> EventE
+
+    MetricE --> Update["证据-假设匹配<br/>支持 / 反驳 / 无关"]
+    LogE --> Update
+    TraceE --> Update
+    EventE --> Update
+
+    Update --> ReRank["假设重排序<br/>置信度更新"]
+    ReRank --> Stop{置信度达标<br/>或达到最大轮次?}
+    Stop -- 否 --> PlanInvest
+    Stop -- 是 --> Correlate["跨信号关联<br/>时间 / 服务 / 拓扑"]
+    Correlate --> GraphRCA["图推理 RCA<br/>异常传播排序"]
+    GraphRCA --> Final["最终根因报告<br/>根因 / 证据 / 影响 / 建议"]
+    Final --> Quality["RCAJudge<br/>质量评分与风险标记"]
+    Quality --> Learn["合格轨迹学习<br/>规则提炼 / 记忆更新"]
+    Quality --> Audit["低分结果<br/>人工审核 / 不入库"]

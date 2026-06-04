@@ -1,0 +1,1635 @@
+                                                PlanGenLLMs: A Modern Survey of LLM Planning Capabilities
+
+                                                                   Hui Wei,† Zihao Zhang,‡ Shenghua He,§ Tian Xia,§
+                                                                                 Shijia Pan,† Fei Liu‡
+                                                            †
+                                                       University of California, Merced ‡ Emory University § PAII Inc.
+                                                                    {huiwei2, span24}@ucmerced.edu
+                                             {zihao.zhang, fei.liu}@emory.edu {shenghh2015, TianXia0209}@gmail.com
+
+
+                                                                Abstract                                  A comprehensive survey of LLM planners would
+                                                                                                       significantly propel research in this field. Prior stud-
+                                             LLMs have immense potential for generating
+                                                                                                       ies have explored planning methods and evaluation
+
+
+
+
+arXiv:2502.11221v3 [cs.AI] 23 Jun 2025
+                                             plans, transforming an initial world state into
+                                             a desired goal state. A large body of research
+                                                                                                       benchmarks (Huang et al., 2024c; Li et al., 2024d).
+                                             has explored the use of LLMs for various plan-            Huang et al. (2024c) categorized planning methods
+                                             ning tasks, from web navigation to travel plan-           into decomposition, plan selection, external mod-
+                                             ning and database querying. However, many of              ules, reflection, and memory, while Li et al. (2024d)
+                                             these systems are tailored to specific problems,          reviewed evaluation benchmarks across various do-
+                                             making it challenging to compare them or de-              mains. However, many of these benchmarks and
+                                             termine the best approach for new tasks. There            systems are tailored to specific problems, making it
+                                             is also a lack of clear and consistent evaluation
+                                                                                                       hard to compare LLM planners across domains or
+                                             criteria. Our survey aims to offer a comprehen-
+                                             sive overview of current LLM planners to fill             determine the best planner for new tasks. Further,
+                                             this gap. It builds on foundational work by Kar-          there is a lack of clear and consistent evaluation
+                                             tam and Wilkins (1990) and examines six key               criteria. We believe this gap may hinder the devel-
+                                             performance criteria: completeness, executabil-           opment of advanced LLM planners.
+                                             ity, optimality, representation, generalization,             Our survey builds on the foundational work of
+                                             and efficiency. For each, we provide a thorough           Kartam and Wilkins (1990) to address key evalua-
+                                             analysis of representative works and highlight
+                                                                                                       tion criteria for LLM planners. The original paper
+                                             their strengths and weaknesses. Our paper also
+                                             identifies crucial future directions, making it
+                                                                                                       highlighted challenges in evaluating early AI plan-
+                                             a valuable resource for both practitioners and            ning systems, which relied on heuristics and were
+                                             newcomers interested in leveraging LLM plan-              confined to research labs. The initial criteria were
+                                             ning to support agentic workflows.1                       categorized into performance, representation, and
+                                                                                                       communication issues. With more advanced LLM
+                                                                                                       planning, we reexamine this critical framework and
+                                         1   Introduction
+                                                                                                       focus on six key evaluation criteria: completeness,
+                                         Planning, which involves generating a sequence of             executability, optimality, representation, general-
+                                         actions to reach a desired goal state (Newell et al.,         ization, and efficiency. For each criterion, we pro-
+                                         1958; Kartam and Wilkins, 1990), is fundamental               vide a thorough analysis of representative works,
+                                         to human intelligence. For example, when planning             highlighting their strengths and weaknesses.
+                                         a trip to San Francisco, one would search for flights,           We contribute to the literature by addressing key
+                                         book tickets based on budget and schedule, arrange            research questions in LLM planning: What founda-
+                                         local transportation to the airport, and consider al-         tional capabilities distinguish them from earlier AI
+                                         ternatives in case of cancellations. These planning           planners? How can we comprehensively measure
+                                         tasks require complex reasoning, world knowledge,             their performance? We examine the datasets, evalu-
+                                         decision-making, and the ability to adapt, making             ation methods, and metrics available to the commu-
+                                         them a significant challenge for humans. To date,             nity. We also highlight crucial areas where research
+                                         there has been a growing focus on developing LLM              is still lacking, including representation, hallucina-
+                                         planners to automate these complex tasks.                     tion, alignment, multi-agent planning, connections
+                                            1
+                                                                                                       to agentic workflows, aiming to fill these gaps and
+                                              A curated list of papers and resources related to this
+                                         survey are available at https://github.com/wll199566/         advance the field. Figure 1 presents a taxonomy
+                                         Awesome-LLM-Planning-Capability.                              of six key performance criteria and representative
+                                                         DEPS (Wang et al., 2023b); ProgPrompt (Singh et al., 2023); Wu et al. (2024);
+                             Task Decomposition
+                                                         AdaPlanner (Sun et al., 2024); SelfGoal (Yang et al., 2024); ADaPT (Prasad et al., 2023).
+
+                                                         LLM+P (Liu et al., 2023a); LLM-DP (Dagan et al., 2023); Guan et al. (2023);
+                             LLM+Classical Planner
+                                                         LATS (Zhou et al., 2023a); (Valmeekam et al., 2023b); SimPlan (Hirsch et al., 2024); Tree Search (Koh et al., 2024).
+               Foundation
+                  (§2)                                   Tree of Thought (Yao et al., 2024); Thought of Search (Katz et al., 2024); LLM-MCTS (Zhao et al., 2024);
+                             Search Algorithm            RAP (Hao et al., 2023); LATS (Zhou et al., 2023a); SimPlan (Hirsch et al., 2024); Tree Search (Koh et al., 2024);
+                                                         MC-DML (Shi et al., 2025); ARMAP (Chen et al., 2025).
+
+                                                         Jansen (2020); RobLM (Chalvatzaki et al., 2023); ETO (Song et al., 2024); Agent-FLAN (Chen et al., 2024b);
+                             Fine-tuning
+                                                         AgentOhana (Zhang et al., 2024); NAT(Wang et al., 2024).
+
+                                                    Plan Correctness               Guan et al. (2023); Hao et al. (2024a).
+                             Completeness (§3)
+                                                    Plan Achievability             PPNL (Aghzal et al., 2023); Valmeekam et al. (2024).
+
+                                                                                   AdaPlanner (Sun et al., 2024); Inner Monologue (Huang et al., 2022b);
+                                                                                   SayCan (Ahn et al., 2022); LLM-Planner (Song et al., 2023); LLP (Sharma et al., 2021);
+                                                    Object Grounding
+                                                                                   ADaPT (Prasad et al., 2023); LLM-DP (Dagan et al., 2023); LLM-MCTS (Zhao et al., 2024);
+                                                                                   G-PlanE (Lin et al., 2023a).
+
+                                                                                   LLM-Planner (Song et al., 2023); BrainBoday-LLM (Bhat et al., 2024);
+                                                    Action Grounding
+                             Executability (§4)                                    Corrective Re-prompting (Raman et al., 2022); SayCanPay (Hazra et al., 2024).
+
+                                                    Sample-then-Filter             CLP (Yuan et al., 2023); PLASMA (Brahman et al., 2024); PRoC3S (Curtis et al., 2024).
+
+                                                                                   Corrective Re-prompting (Raman et al., 2022); ProgPrompt (Singh et al., 2023);
+                                                    Closed-Loop Systems            ADaPT (Prasad et al., 2023); SelfGoal (Yang et al., 2024); AdaPlanner (Sun et al., 2024);
+                                                                                   ISR-LLM (Zhou et al., 2024).
+
+                                                    LLM + Optimizer                TTG (Ju et al., 2024); LLMFP (Hao et al., 2024b).
+                             Optimality (§5)
+               Performance                                                         ToolChain* (Zhuang et al., 2023); SayCanPay (Hazra et al., 2024);
+                                                    A* Search-Based Methods
+                                                                                   Beyond A* (Lehnert et al., 2024).
+                 Criteria
+                 (§3 - §8)                                                         LLM-GoalTrans (Xie et al., 2023); ISR-LLM (Zhou et al., 2024); Adaplanner (Sun et al., 2024);
+                                                    LLM-as-a-Translator            LLM-GenPlan (Silver et al., 2024); LLM+P (Liu et al., 2023a); Pan et al. (2023);
+                                                                                   LLM-DP (Dagan et al., 2023); Guan et al. (2023).
+                             Representation (§6)
+                                                                                   G-PlanET (Lin et al., 2023a); Chain-of-symbols (Hu et al., 2024); PPNL (Aghzal et al., 2023);
+
+
+
+LLM Planning
+                                                                                   Adaplanner (Sun et al., 2024); PLaG (Lin et al., 2024); SayCan (Ahn et al., 2022);
+                                                    LLM-as-a-Planner
+                                                                                   Wu et al. (2024); LLM-GenPlan (Silver et al., 2024);
+                                                                                   ProgPrompt (Singh et al., 2023); LID (Li et al., 2022).
+
+                                                                                   RobLM (Chalvatzaki et al., 2023); Agent-FLAN (Chen et al., 2024b); ETO (Song et al., 2024);
+                                                    Fine-tuning
+                                                                                   AgentOhana (Zhang et al., 2024); NAT (Wang et al., 2024); (Jansen, 2020).
+                             Generalization (§7)    Generalized Planning           LLM-GenPlan (Silver et al., 2024).
+
+                                                    Skill Storage                  VOYAGER (Wang et al., 2023a).
+
+                                                    Reduced LLM and                AdaPlanner (Sun et al., 2024); Query-Efficient Planning (Gonzalez-Pumariega et al., 2024);
+                                                    World Model Calls              Thought of Search (Katz et al., 2024); Tree-Planner (Hu et al., 2023b).
+
+                             Efficiency (§8)                                       Chain-of-Symbols (Hu et al., 2024); Beyond A* (Lehnert et al., 2024);
+                                                    Shorter Inputs and Outputs
+                                                                                   DEPS (Wang et al., 2023b); LLM-DP (Dagan et al., 2023).
+
+                                                    Smaller Model Size             PLASMA (Brahman et al., 2024).
+
+                                                                    Embodied Environment: BlocksWorld; Logistics; PlanBench (Valmeekam et al., 2023a);
+                                                                    ALFRED (Shridhar et al., 2020a); VirtualHome (Puig et al., 2018); ALFWorld (Shridhar et al., 2020b);
+                                                                    Embodied Agent Interface (Li et al., 2024f); Open Grounded Planning (Guo et al., 2024);
+                                                                    PPNL(Aghzal et al., 2023); AsyncHow(Lin et al., 2024); Planetarium (Zuo et al., 2024);
+                                                                    PARTNR (Chang et al., 2024); Robotouille (Gonzalez-Pumariega et al., 2025).
+                                           Planning-Focused
+                                                                    Task Scheduling: TravelPlanner (Xie et al., 2024); Natural Plan (Zheng et al., 2024).
+                                                                    Game: MineCraft; SmartPlay (Wu et al., 2023a); AUCARENA (Chen et al., 2023b);
+                                                                    GAMA-Bench (Huang et al., 2024b).
+                                                                    Task Decomposition: TaskLAMA (Yuan et al., 2024); CoScript (Yuan et al., 2023);
+                             Datasets                               WORLDAPIS (Ou et al., 2024).
+
+                                                                    Reasoning: PrOntoQA (Saparov and He, 2022); GSM8K (Cobbe et al., 2021);
+                                                                    AGENTBENCH (Liu et al., 2023b); SWE-BENCH (Jimenez et al., 2023).
+                                                                    Tool Usage: ToolBench (Xu et al., 2023); API-Bank (Li et al., 2023); TPTU (Ruan et al., 2023).
+                                           Downstream Tasks         Programming: CodePlan (Bairi et al., 2023); Spider (Yu et al., 2018); Bird (Li et al., 2024e).
+                                                                    Web: WEBARENA (Zhou et al., 2023b); Mind2Web (Deng et al., 2024).
+                                                                    Generation: Videodirectorgpt (Lin et al., 2023b); DiagrammerGPT (Zala et al., 2023);
+                                                                    Step-by-Step (Moryossef et al., 2019).
+               Evaluation
+                                                                    Verifier: VAL (Howey et al., 2004); BUTLER (Shridhar et al., 2020b).
+                  (§9)                     Verifier; Groundtruth
+                                                                    Groundtruth: Natural Plan (Zheng et al., 2024); PPNL (Aghzal et al., 2023); (Sharma et al., 2021).
+                             Methods       Human Evaluation         PLASMA (Brahman et al., 2024); CAPE (Raman et al., 2024); TaPA (Wu et al., 2023b); TIP (Lu et al., 2023).
+
+                                           LLM-as-a-Judge           Open Grounded Planning (Guo et al., 2024); BioPlanner (O’Donoghue et al., 2023).
+
+                                           Success Rate (Valmeekam et al., 2023b); Goal Condition Recall (Hu et al., 2023b); Step Success Rate (Deng et al., 2023);
+                                           Exact Match Score (Aghzal et al., 2024); True Negative Rate and False Negative Rate (Valmeekam et al., 2023b);
+                                           Unreachable Accuracy (Aghzal et al., 2023); Optimality Rate (Lehnert et al., 2024); Executability Rate (Hazra et al., 2024);
+                             Metrics       Constraint Pass Rate (Xie et al., 2024); Inference Time (Brahman et al., 2024);
+                                           Number of Output and Input Tokens (Hu et al., 2024); Number of Plan Steps (Raman et al., 2022);
+                                           Number of LLM and World Model Calls (Sun et al., 2024); Model Size (Brahman et al., 2024);
+                                           Number of Parseable Problems (Zuo et al., 2024).
+
+
+                                                           Figure 1: Taxonomy of LLM Planning
+techniques. For those new to LLM planning, we            representations or generate initial plans. For exam-
+recommend a thorough read, while experts can fo-         ple, LLM+P (Liu et al., 2023a), LLM-DP (Dagan
+cus on specific sections. Each section offers clear      et al., 2023), and Guan et al. (2023) use LLMs
+definitions, relevant works, and includes links to ta-   to convert planning problems into PDDL (McDer-
+bles in the Appendix. We will dive into the details      mott et al., 1998), solved by Fast Downward or
+in the following sections.                               BFS(f) (Lipovetzky et al., 2014). Valmeekam et al.
+                                                         (2023b) employs LLMs to generate an initial plan,
+2   LLM Planning Foundations (Tables 1-3)                guiding the LPG planner (Gerevini et al., 2002),
+                                                         which iteratively refines it until a correct solution
+We begin by exploring LLM planning foundations,
+                                                         is found.
+covering widely-used paradigms to provide back-
+                                                         Search Algorithm Search algorithms, includ-
+ground for readers unfamiliar with the field. It is
+                                                         ing Breadth-First Search, Depth-First Search (Yao
+broken down into four parts.
+                                                         et al., 2024; Katz et al., 2024), Monte Carlo Tree
+Task Decomposition Task decomposition breaks             Search (Hao et al., 2023; Zhou et al., 2023a; Zhao
+down abstract goals into specific, manageable sub-       et al., 2024; Shi et al., 2025), and Greedy Best-
+goals. It helps mitigate errors by enabling verifica-    First Search (Koh et al., 2024; Hirsch et al., 2024),
+tion at each step and makes LLM reasoning more           have been applied to improve LLM-based plan-
+tractable by narrowing the knowledge space.              ning. These algorithms treat planning as a search
+   Task decomposition can be performed sequen-           problem, using search policy to guide the explo-
+tially, in parallel, or asynchronously. Specifically,    ration of various possibilities. Search algorithms
+sequential decomposition (Wang et al., 2023b;            excel in planning problems by offering systematic
+Singh et al., 2023; Sun et al., 2024; Wu et al.,         exploration, optimality guarantees, and formal veri-
+2024) requires that the precondition of the subse-       fication without requiring extensive domain knowl-
+quent subgoal is the effect of the preceding subgoal.    edge, though they may be computationally inten-
+In contrast, parallel decomposition (Yang et al.,        sive compared to more specialized methods like
+2024) involves subgoals that share the same pre-         task decomposition.
+condition and effect, where achieving the final goal        All search algorithms consist of four core com-
+requires completing only one of these subgoals.          ponents: (1) Search Policy determines node explo-
+Asynchronous decomposition (Lin et al., 2024) in-        ration order, which are defined by the underlying
+volves parallelizing subgoals as well. However,          search algorithm and are independent of LLMs.
+these subgoals in distinct branches have unique          (2) Expansion generates possible actions from a
+preconditions and effects. Asynchronous decom-           state, often using LLMs to propose actions based
+position requires the completion of all subgoals to      on user instructions and current environment. (3)
+achieve the overall goal.                                World Models define state transitions based on ac-
+   Moreover, task decomposition can be performed         tion preconditions and effects, using LLMs (Hao
+recursively, applying any of the above three ap-         et al., 2023), classical planners (Hirsch et al., 2024),
+proaches at each step. For example, Prasad et al.        or external environment simulators (Zhou et al.,
+(2023) recursively break down the goal until each        2023a; Zhao et al., 2024; Koh et al., 2024). (4)
+subgoal can be easily executed in the environment.       Evaluation assesses state progress toward the goal
+LLM + Classical Planner Studies (Valmeekam               via scores computed by predefined functions (Katz
+et al., 2023b; Kambhampati, 2024; Kambhampati            et al., 2024), LLM/LVM ratings (Yao et al., 2024;
+et al., 2024) show that LLMs struggle with inde-         Hao et al., 2023; Zhou et al., 2023a), log-likelihood
+pendent planning. Classical planners, such as Fast       scores (Hirsch et al., 2024), voting (Yao et al.,
+Downward (Helmert, 2006), ensure correct plans           2024), self-consistency scores (Zhou et al., 2023a)
+but depend on experts to translate user queries into     or reward models (Chen et al., 2025).
+formal representations, limiting scalability. A hy-      Fine-tuning Current LLMs are not specifically
+brid approach integrating LLMs with classical plan-      trained for agentic tasks like planning, and prompt-
+ners combines the world knowledge of LLMs with           based methods, which do not update model param-
+the precision and reliability of classical methods,      eters, cannot fundamentally improve performance
+addressing their individual limitations.                 in these areas (Chen et al., 2023a; Wang et al.,
+   When integrated with classical planners, LLMs         2024). Fine-tuning, either focused on planning-
+translate natural language problems into formal          specific tasks or broader agentic capabilities, en-
+hances planning correctness by directly updating         4   Criterion II: Executability (Tables 5-6)
+LLM parameters.
+                                                         Executability checks if a plan can be carried out in a
+   Planning-specific fine-tuning involves training
+                                                         given environment while meeting all constraints. A
+a pretrained model on planning-focused tasks
+                                                         executable plan must use only allowed actions and
+(e.g., Blocksworld or ALFWorld (Shridhar et al.,
+                                                         recognizable objects. Beyond basic precondition
+2020b)), to improve planning performance. For ex-
+                                                         and postcondition rules, planners must consider ex-
+ample, Jansen (2020) and Chalvatzaki et al. (2023)
+                                                         tra constraints, such as avoiding sugar when baking
+fine-tuned GPT-2 (Radford et al., 2019) on ALF-
+                                                         a cake for diabetics (Yuan et al., 2023). Importantly,
+World, demonstrating its effectiveness in robotics
+                                                         executability and correctness are orthogonal: an
+planning.
+                                                         executable plan isn’t necessarily correct, since it
+   Generalized agentic fine-tuning optimizes mod-
+                                                         might be grounded and follow all constraints but
+els using datasets that include both general tasks
+                                                         still fail to reach the goal; likewise, a correct plan
+(e.g., question answering) and diverse agentic tasks
+                                                         isn’t always executable since it may only include
+(e.g., reasoning, planning, and tool use). This ap-
+                                                         high-level steps that can’t be executed in a specific
+proach is motivated by two key insights: (1) focus-
+                                                         environment. Real-world applications typically re-
+ing too narrowly on planning may degrade general
+                                                         quire plans that are both correct and executable,
+capabilities (Chen et al., 2024b), and (2) agentic
+                                                         especially when the executors are not humans (e.g.,
+tasks share overlapping capabilities. For instance,
+                                                         robots and computers).
+reasoning and tool-use tasks often involve plan-
+                                                            To ensure plans are executable, researchers have
+ning components. Thus, fine-tuning on a broader
+                                                         proposed several approaches, including Object
+set of agentic tasks can simultaneously enhance
+                                                         Grounding, Action Grounding, Closed-Loop Sys-
+planning performance and other interrelated capa-
+                                                         tems, and Sample-then-Filter.
+bilities, like reasoning, which are integral to plan-
+ning. Moreover, standardizing trajectory formats         Object Grounding Object grounding ensures the
+from different tasks (Zhang et al., 2024; Chen et al.,   LLM planner uses objects available in the current
+2024b), as well as incorporating unsuccessful rea-       environment when generating plans. For example,
+soning or planning trajectories (Wang et al., 2024;      if a stove is available but a microwave is not, the
+Chen et al., 2024b; Song et al., 2024) can further       planner should choose the stove to heat a pancake
+enhance learning and performance.                        and disregard the unavailable microwave in its plan.
+                                                         The simplest way to do this is by feeding observed
+3   Criterion I: Completeness (Table 4)                  or available objects into the planner via prompts
+                                                         (Huang et al., 2022b; Song et al., 2023; Lin et al.,
+The completeness of planning has two key aspects:        2023a; Singh et al., 2023) or neural embeddings
+(1) if a valid plan exists, the model should generate    (Sharma et al., 2021; Ahn et al., 2022). In par-
+it correctly, and (2) if no feasible plan is possible,   tially observed environments, where some object
+the model should recognize this and refrain from         information are uncertain (e.g., needing to clean a
+generating an incorrect or arbitrary plan.               cup that could be in a cabinet, drawer, or fridge),
+   A plan is correct if it achieves the goal within      the planner can generate multiple possible plans,
+a fixed budget while avoiding excessive complex-         one for each scenario, and select the first feasible
+ity and infinite loops. To ensure correctness, the       one (Prasad et al., 2023; Dagan et al., 2023; Zhao
+LLM must work with classical sound and complete          et al., 2024). Sun et al. (2024) takes a different
+solvers (Guan et al., 2023; Hao et al., 2024a). Also,    approach, first generating a plan with placeholders
+the LLM has to accurately translate the domain           for objects, then filling in the blanks with observed
+and problem into the specific format (e.g., PDDL),       objects during execution.
+required by these solvers (Guan et al., 2023).           Action Grounding Action grounding ensures all
+   In terms of identifying unsolvable planning prob-     actions in a plan can actually be executed in the
+lems, those with inherently unachievable goals,          current environment. E.g., the planner should avoid
+even top LLMs (e.g., GPT-4 (Achiam et al., 2023))        including actions such as ‘draw a star’ if the robot
+and Large Reasoning Models (e.g., OpenAI O1              arm cannot perform such a complex operation. In-
+(Jaech et al., 2024)) struggle due to hallucination      stead, the task should be decomposed into simpler,
+issues (Aghzal et al., 2023; Valmeekam et al., 2024;     supported actions, such as multiple steps of ’draw
+Katz et al., 2024).                                      a line’. Like object grounding, the simplest way is
+to explicitly list all admissible actions in LLMs’ in-   explicit systems require more computation, they
+puts (Singh et al., 2023). If a step goes beyond the     prevent errors from compounding across steps.
+executor’s capabilities (e.g., combining multiple
+allowed actions into one), the LLM planner should        5   Criterion III: Optimality (Table 7)
+be reprompted to break it down until every step is       Optimality means achieving the goal state through
+executable (Prasad et al., 2023).                        the best possible plan. It poses a greater challenge
+   Hierarchical Planning is another common               than standard planning, which only requires reach-
+method for grounding actions in LLM planning             ing the goal state. Researchers have proposed two
+(Huang et al., 2022a; Raman et al., 2022; Song           paradigms for achieving the optimal plans: LLM +
+et al., 2023; Hazra et al., 2024; Bhat et al., 2024).    Optimizer and A∗ search-based methods.
+It starts with high-level steps and then translates
+                                                         LLM + Optimizer It combines the LLM, which
+each one into a sequence of executable actions.
+                                                         turns user requests into symbolic optimization prob-
+This can be done in two ways: either generating
+                                                         lems, with an optimizer that solves them and finds
+all high-level steps first and then refining them into
+                                                         the best solution (Ju et al., 2024; Hao et al., 2024b).
+actions or translating each step as it’s generated. If
+                                                         For example, TTG (Ju et al., 2024) uses the LLM
+an action isn’t exactly admissible, the closest valid
+                                                         to convert travel planning requests of minimum to-
+action is retrieved instead (Huang et al., 2022a;
+                                                         tal costs into Mixed Integer Linear Programming
+Raman et al., 2022).
+                                                         problems, then runs an optimizer such as SCIP
+Sample-then-Filter Since LLMs alone can’t guar-          (Bestuzheva et al., 2021) to provide the optimal
+antee plans meet all constraints, this approach first    plan. LLM + Optimizers ensure optimal solutions
+generates multiple plans and then verifies them, se-     by leveraging LLMs to formulate constrained opti-
+lecting only those that pass all checks. Yuan et al.     mization problems and classical optimizers to solve
+(2023) ranks InstructGPT-generated plans using co-       them. In contrast to classical planners, which typ-
+sine similarity with task embeddings and selects         ically rely on search algorithms, heuristics, and
+the most similar one. Brahman et al. (2024) applies      logical deduction and may not guarantee optimal-
+a verifier-guided beam search, keeping the top-K         ity (Russell and Norvig, 2016), optimizers, often
+plans based on correctness and constraint adher-         based on gradient-based methods (e.g., Newton’s
+ence at each step. Curtis et al. (2024) generates        methods), can guarantee optimal solutions (Boyd
+Pythonic plans with parameter ranges, tests them         and Vandenberghe, 2004).
+with a simulator or classifier, and prompts the LLM      A* Search-Based Methods A* search finds the
+to revise if constraints are still violated.             lowest-cost optimal solution, particularly when us-
+Closed-Loop Systems A closed-loop system in              ing admissible heuristics that do not overestimate
+LLM planning means the model adapts its plan             the actual cost to the goal. This makes it a natural
+based on feedback from executors (Prasad et al.,         choice for LLM-based planners to achieve optimal-
+2023; Yang et al., 2024), simulators (Bhat et al.,       ity. ToolChain* (Zhuang et al., 2023) combines A*
+2024), validators (Zhou et al., 2024; Silver et al.,     tree search with an LLM, which suggests next steps
+2024), other LLMs (Wang et al., 2023b; Zhou et al.,      and estimates heuristic scores, to create plans with
+2023a), or even humans (Huang et al., 2022b),            the fewest tool API calls. SayCanPay (Hazra et al.,
+when the initial plan are inexecutable. It reprompts     2024) uses A* search with LLMs to generate the
+the LLM planner to replan until the plan is fully ex-    shortest possible plans. Beyond A* (Lehnert et al.,
+ecutable. Unlike open-loop systems (Huang et al.,        2024) trains a Transformer model, Searchformer,
+2022a), which lack feedback, closed-loop planning        to mimic A* search paths for complex tasks like
+helps reduce hallucinations and enables LLMs to          Maze navigation and Sokoban puzzles, optimiz-
+handle complex, long-horizon, and dynamic envi-          ing for the fewest steps. Besides A* search, other
+ronments (Wang et al., 2023b).                           search algorithms (e.g., DFS and MCTS) could
+   Closed-loop systems fall into two types: implicit     also be used to find optimal solutions, although
+and explicit (Sun et al., 2024). Implicit systems        without guarantees.
+only fix the failed action (Raman et al., 2022; Singh
+                                                         6   Criterion IV: Representation (Tab. 8-9)
+et al., 2023; Zhou et al., 2024; Prasad et al., 2023;
+Yang et al., 2024), while explicit systems regen-        In LLM planning, representation refers to how in-
+erate the entire plan (Sun et al., 2024). Though         puts and outputs are formatted. Inputs include do-
+mains (predicates and actions), problems (initial       deployments, ensuring LLM planners’ generaliz-
+and goal states), and environmental observations,       ability is important alongside other performance.
+while outputs are the generated plans. Effective rep-
+                                                        Generalized Planning Generalized planning ex-
+resentation enhances problem comprehension and
+                                                        tracts common patterns from a limited set of train-
+execution efficiency, especially given LLMs’ sensi-
+                                                        ing solutions (i.e., plans) to solve unseen tasks
+tivity to prompts. We discuss this in two contexts:
+                                                        within the same domain, which may be larger and
+LLM-as-a-Translator and LLM-as-a-Planner.
+                                                        more complex than the training tasks (Srivastava
+LLM-as-a-Translator LLM-as-a-Translator                 et al., 2011). For example, in the Delivery dataset
+converts between natural language (NL) and              (Yang et al., 2022), models trained on small-scale
+formal planning languages (e.g. PDDL), making           deliveries (9–17 locations) can generalize to larger
+classic planners more accessible to non-experts.        ones (70–100 locations) using the same core strat-
+By converting natural language tasks into formal        egy. Silver et al. (2024) approached this by prompt-
+representations and translating the resulting plans     ing LLMs to summarize the domain and generate a
+back into NL, LLMs reduce ambiguity, minimize           minimal, generalizable Python-based plan.
+hallucinations, and enable external validation,
+improving both usability and reliability in planning    Skill Storage Skill storage focuses on learning
+systems (Xie et al., 2023; Zhou et al., 2024; Sun       and reusing previously acquired skills to tackle new
+et al., 2024; Silver et al., 2024).                     problems. E.g., Wang et al. (2023a) introduced a
+   Recent work has used LLMs to translate natu-         skill library that stores successfully executed skills
+ral language descriptions into PDDL (Liu et al.,        (e.g., Combat Zombie). These skills are abstracted
+2023a; Guan et al., 2023; Xie et al., 2023; Dagan       and generalized for reuse in similar situations (e.g.,
+et al., 2023; Zhou et al., 2024; Tantakoun et al.,      fighting spiders involves similar actions to fighting
+2025), LTL (Pan et al., 2023), and STL (Chen et al.,    zombies). When encountering an unseen task, the
+2024a). To ensure reliability, translations should      LLM planning system retrieves relevant learned
+be tested on development or external datasets like      skills based on the task and current states, then
+Planetarium (Zuo et al., 2024). If there are syntax     applies them to generate an effective solution.
+or semantic errors, validators (e.g. VAL (Howey
+et al., 2004)) or human experts can provide feed-       8   Criterion VI: Efficiency (Table 11)
+back for the LLM to fix them.                           Efficiency in LLM planning means reducing com-
+LLM-as-a-Planner When LLMs act as stan-                 putational and monetary costs by decreasing LLM
+dalone planners without classical planners or op-       calls, world model interactions, input and output
+timizers, various methods help encode environ-          lengths, and model sizes. This is crucial especially
+mental information, domains, and plans beyond           developing planners based on commercial LLMs.
+just natural language. Environment and domain           Reduced LLM and World Model Calls                To
+details have been represented using tables (Lin         reduce the number of LLM and world model calls,
+et al., 2023a), condensed symbols (Hu et al., 2024),    several tricks are used: (1) generating the entire
+Pythonic code (Aghzal et al., 2023; Singh et al.,       plan in one shot instead of step-by-step to reduce
+2023; Sun et al., 2024), neural embeddings (Li          redundant prompts (Hu et al., 2023b; Sun et al.,
+et al., 2022; Ahn et al., 2022), and graphs (Lin        2024; Gonzalez-Pumariega et al., 2024); (2) check-
+et al., 2024; Wu et al., 2024). For generated plans,    ing feasibility by world models only at the end of
+Pythonic code is a common alternative to natural        each subgoal, not after every action (Sun et al.,
+language (Singh et al., 2023; Silver et al., 2024).     2024; Gonzalez-Pumariega et al., 2024); (3) merg-
+                                                        ing plans with the same prefix actions or subgoals
+7   Criterion V: Generalization (Table 10)
+                                                        to avoid duplicate world model checks when sam-
+Generalization refers to LLM planners’ ability to       pling multiple plans (Hu et al., 2023b); and (4) in
+apply learned strategies to new, more complex out-      tree search-based methods, querying the LLM once
+of-domain scenarios beyond its training environ-        to generate a successor function and a goal-check
+ment, which can be enhanced through three key           function. The successor function lists all possible
+approaches: fine-tuning (described previously in        actions and resulting states based on the current
+Section 2), generalized planning, and skill storage.    state, while the goal-check function determines if a
+Given the diverse user queries in the real-world        state meets the goal. This approach avoids repeated
+LLM and world model calls at each node (Katz            ing asynchronous actions. PPNL (Aghzal et al.,
+et al., 2024).                                          2023) can also evaluate a planner’s ability to iden-
+Shorter Inputs and Outputs Reducing input               tify unachievable goals (i.e., completeness).
+and output length includes decreasing prompt and           Planning abilities can also be evaluated through
+plan tokens and minimizing actions in the final plan    downstream tasks, where planning is integral to
+to alleviate the load on executors. For spatial rea-    task completion, and stronger planning skills en-
+soning and planning, (Hu et al., 2024) introduces       hance overall performance. Downstream tasks can
+Chain-of-Symbols (CoS), a compact symbolic rep-         be categorized as follows: (1) Agentic tasks, in-
+resentation that replaces natural language descrip-     cluding reasoning-oriented tasks, tool-use-oriented
+tions in CoT (Wei et al., 2022) trajectories. Lehnert   tasks, programming tasks, and web tasks (Yu et al.,
+et al. (2024) uses search dynamic bootstrapping         2018; Cobbe et al., 2021; Saparov and He, 2022;
+to iteratively fine-tune a LLM, replacing training      Zhou et al., 2023b; Deng et al., 2023; Liu et al.,
+cases with solutions with less tokens and equal op-     2023b; Li et al., 2023; Xu et al., 2023; Jimenez
+timality. To minimize actions, Dagan et al. (2023)      et al., 2023; Ruan et al., 2023; Bairi et al., 2023;
+and Wang et al. (2023b) use action selectors based      Li et al., 2024e), (2) Generation tasks, including
+on predefined rules or trained models to find the       video (Lin et al., 2023b), image (Zala et al., 2023)
+shortest successful plan.                               and text generation (Moryossef et al., 2019). Please
+                                                        refer to Figure 1 for example datasets.
+Smaller Model Sizes Shrinking the model size
+can reduce the computational burden, accelerat-         Methods The most common approach to eval-
+ing training and inference while lowering costs.        uating LLM planning is to test it in a simulated
+To train a smaller planning model, Brahman et al.       environment and validate the generated plans using
+(2024) uses GPT-3 (Brown et al., 2020) as the           either an internal verifier provided by the envi-
+teacher and T5 (Raffel et al., 2020) as the student,    ronment or external verifier (e.g., VAL (Howey
+distilling the teacher’s planning capabilities into     et al., 2004)) to ensure they achieve the intended
+the more compact student model.                         goal. When ground-truth plans are available, LLM-
+                                                        generated plans can also be compared against these
+9   Evaluation                                          reference plans (Zheng et al., 2024).
+Datasets LLM planning evaluation is conducted              The second evaluation method is human evalua-
+on two types of datasets: planning-focused datasets     tion, typically used in the following cases: (1) No
+and downstream-task datasets.                           available verifier: when certain simulated environ-
+   Planning-focused datasets primarily assess plan-     ments (e.g., VirtualHome) or real-world scenarios
+ning abilities. The most common scenarios include       (e.g., using a mobile manipulator) lack automated
+(1) Embodied environments, (2) Task scheduling ,        verification; (2) Open-ended problems: tasks with
+(3) Games, and (4) Task decomposition (Li et al.,       ambiguous instructions or generative outputs (e.g.,
+2024d). Figure 1 presents commonly used plan-           text or images) where multiple valid solutions may
+ning datasets; readers can refer to Li et al. (2024d,   differ from the ground truth.
+2025) for further details.                                 The final evaluation method, LLM-as-a-Judge,
+   While most of the datasets mentioned above as-       uses another LLM to automatically assess the qual-
+sess whether the generated plans are correct, some      ity of generated plans in the cases mentioned above.
+specifically target key performance criteria in LLM     This approach has been increasingly adopted in
+planning. For grounding, Open Grounded Plan-            recent LLM planning research (Guo et al., 2024;
+ning (Guo et al., 2024) and Embodied Agent Inter-       O’Donoghue et al., 2023). Compared to human
+face (Li et al., 2024f) evaluate performance in em-     evaluation, LLM judges are faster and more cost-
+bodied environments, while CoScript (Yuan et al.,       effective, making them especially valuable for eval-
+2023), TravelPlanner (Xie et al., 2023), and PPNL       uating large datasets. However, this method has
+(Aghzal et al., 2023) focus on planning problems        limitations, such as position bias, length bias, self-
+with constraints. For representation, Planetarium       inconsistency, and sensitivity to prompts (Zheng
+(Zuo et al., 2024) assesses LLMs’ ability to trans-     et al., 2023; Ye et al., 2024; Wei et al., 2024). Ad-
+late natural language into PDDL. For optimality,        dressing these issues is crucial to ensure reliable
+Lin et al. (2024) and Gonzalez-Pumariega et al.         assessments. For more details on LLM-as-a-Judge,
+(2025) introduce tasks requiring optimal plans us-      please see Li et al. (2024a,b); Gu et al. (2024).
+Metrics      Figure 1 summarizes commonly used           Representation        LLMs are highly sensitive to
+evaluation metrics for planning-focused tasks,           prompts (Sclar et al., 2024; Razavi et al., 2025),
+along with representative works. Performance cri-        but most research relies on natural language with-
+teria are measured using specific metrics: (1) Com-      out comparing them to alternative formats, such
+pleteness: success rate and goal condition recall        as PDDL or Python, for describing domains and
+measure whether the generated plan reaches final         problems. Some studies (Singh et al., 2023; Aghzal
+or stepwise goals, while classification metrics (e.g.,   et al., 2024) suggest that using Python to represent
+true negative rate, false negative rate, and unreach-    planning problems can improve performance, but
+able accuracy) assess the planner’s ability to iden-     automatically translating natural language problem
+tify unachievable tasks. When ground-truth plans         descriptions into Python remains challenging, par-
+are available, the exact match score is used. (2) Ex-    ticularly for non-experts. If LLMs are to handle
+ecutability: executability rate evaluates whether the    this translation effectively, additional datasets and
+plan can be executed in the environment, while con-      evaluations are needed to assess their performance.
+straint pass rate checks if constraints are met. (3)     Furthermore, little research has been conducted on
+Optimality: measured by the optimality rate (i.e.,       how different prompt templates impact LLM plan-
+the percentage of optimally solved tasks). (4) Effi-     ning performance, or on the best output formats for
+ciency: common metrics include inference time, in-       representing plans. Lastly, most fine-tuning meth-
+put and output token counts, number of plan steps,       ods rely on natural language data without exploring
+and model size. (5) Representation: the number of        other formats, such as symbolic representations.
+parseable problems indicates correct translations.       Filling these gaps requires building benchmarks
+(6) Generalization: all these metrics can also be ap-    like Planetarium (Zuo et al., 2024) and carefully
+plied to unseen scenarios to assess generalization.      choosing representation formats in experiments.
+See Figure 1 for definitions of individual metrics
+                                                         Hallucination LLMs often experience hallucina-
+and representative works.
+                                                         tions (Huang et al., 2023), which present two major
+                                                         challenges in planning. First, they might struggle to
+10   Discussion                                          assess if a plan is achievable given a specific prob-
+                                                         lem description (Aghzal et al., 2023; Kambhampati,
+In this section, we discuss the limitations in current   2024). Second, they can generate inadmissible ac-
+LLM planning research studies, and suggest future        tions and non-existent objects, requiring translation
+directions for improvement and more comprehen-           or expert intervention to correct them (Huang et al.,
+sive evaluations of LLM planning performance.            2022a; Raman et al., 2022). This increases the cost
+                                                         of planning systems. Further research is needed
+Datasets and Baselines The current evaluation
+                                                         to understand the root causes and improve LLMs’
+of LLM planning has its limitations, primarily be-
+                                                         ability to accurately identify unachievable plans.
+cause studies often rely on limited datasets and
+                                                         Evaluating the impact of these hallucinations re-
+baselines. This makes it tough to fairly and compre-
+                                                         mains an important research direction.
+hensively compare different methods. Most studies
+only use a few datasets from a single domain and         Human Preference Alignment              There is a gap
+difficulty level, and they do not evaluate all the six   in understanding whether system generated plans
+performance criteria. Inconsistent dataset choices       align with human preferences. It is crucial for open-
+make direct comparisons difficult. On top of that,       ended problems where humans execute the plans.
+many studies only compare against basic baselines        Ensuring alignment with human preferences is vital
+such as CoT or ReAct, which does not help in com-        for safety, feasibility, and usability, particularly in
+paring more advanced approaches. To fix this, a          personalized planning tasks such as calendar and
+public, standardized leaderboard should be set up        travel planning. Additionally, Aghzal et al. (2024)
+that covers all performance criteria, uses consis-       found that LLM planners often fail to achieve opti-
+tent evaluation metrics, includes a variety of base-     mality in path planning, frequently producing un-
+line and advanced methods, and utilizes diverse          necessarily long plans. This may stem from inher-
+datasets spanning multiple domains and difficulty        ent length bias in LLMs, which tend to generate
+levels. Another useful direction would be to cre-        longer sequences. Alignment techniques such as
+ate multilingual planning datasets and assess LLM        RLHF (Ouyang et al., 2022) and DPO (Rafailov
+performance across different languages.                  et al., 2024) may help alleviate this issue, as hu-
+mans generally prefer shorter plans for their effi-     ria and discussing evaluation challenges. Our pro-
+ciency, simplicity, and cognitive ease. Further in-     posed criteria offer a structured approach to assess
+vestigation is needed to better align LLM planners      LLM planners across diverse domains. By system-
+with human preferences.                                 atically analyzing existing systems, datasets, and
+Cost Effectiveness Current methods, particularly        evaluation strategies, we aim to provide a founda-
+task decomposition and search-based approaches,         tion for future research in this space. We encourage
+often consume a large number of tokens due to           researchers to build on our findings to create robust,
+lengthy prompts and repeated LLM queries. While         highly adaptable, and efficient LLM planners.
+heuristic search is considered more efficient than
+task decomposition, it still requires substantial re-   12   Limitations
+peated prompting. To improve cost-effectiveness,        This work primarily focuses on commonly stud-
+we may summarize problem descriptions and en-           ied domains involving single-agent scenarios, such
+hance heuristic evaluations, e.g., by improving         as robotics, household tasks, and computer-based
+LLM uncertainty estimation (Huang et al., 2024a)        tasks. We acknowledge that LLM planning is also
+and verification (Li et al., 2024c). These improve-     applied in other areas, including the natural sci-
+ments would help reduce prompt length and enable        ences (O’Donoghue et al., 2023; Liu et al., 2024),
+the early stopping of unpromising partial plans.        the Internet of Things (Cui et al., 2024), and multi-
+Multi-Agent Planning Most existing research             agent scenarios. However, these studies follow
+focuses on single-agent planning, where only one        similar methodologies and evaluations, suggesting
+agent performs a task. Multi-agent planning (Kono-      our survey’s comprehensiveness. We focus on six
+lige and Nilsson, 1980; Torreno et al., 2017) is more   commonly used performance criteria and exclude
+challenging, as it involves multiple agents (e.g.,      others, such as security and personalization, due to
+robots) working together or competing in parallel.      limited research in these areas. Instead, we discuss
+Despite its complexity, multi-agent planning has        them in our future directions section.
+received limited attention in AI planning research.
+It often requires coordinating multiple agents in       Acknowledgements
+collaborative or competitive environments where
+they operate simultaneously. The major challenge        We thank the reviewers for their insightful feed-
+lies in developing effective communication proto-       back, which has helped improve our paper. H.W.
+cols and cooperation strategies while generating        and S.P. are supported by a UC Merced Spring 2023
+viable plans for their collective actions.              Climate Action Seed Competition Grant, CAHSI-
+                                                        Google Institutional Research Program Award, and
+Reasoning, Tool Use, and Memory             There is
+                                                        F3 R&D GSR Award funded by the US Department
+often limited discussion on how other components
+                                                        of Commerce, Economic Development Adminis-
+of LLM agents, such as reasoning, tool use, and
+                                                        tration Build Back Better Regional Challenge. Z.Z.
+memory, affect planning performance. In particular,
+                                                        and F.L. are partially supported by NSF CAREER
+when LLMs are combined with classical planners
+                                                        Award #2303655.
+or optimizers, it is crucial that the LLM accurately
+translates the planning problem into the appropri-
+ate domain representation to ensure correct plan        References
+generation. Currently, these approaches rely on
+human-selected planners and optimizers. Treating        Josh Achiam, Steven Adler, Sandhini Agarwal, Lama
+                                                          Ahmad, Ilge Akkaya, Florencia Leoni Aleman,
+them as tools that LLMs can autonomously choose           Diogo Almeida, Janko Altenschmidt, Sam Altman,
+from could be an exciting prospect. This also raises      Shyamal Anadkat, et al. 2023. Gpt-4 technical report.
+the question of whether LLMs can effectively se-          arXiv preprint arXiv:2303.08774.
+lect the best tool for a given planning task. Future
+research should look into enhancing these agentic       Mohamed Aghzal, Erion Plaku, and Ziyu Yao. 2023.
+                                                         Can large language models be good path planners?
+capabilities in LLM-based planning.                      a benchmark and investigation on spatial-temporal
+                                                         reasoning. arXiv preprint arXiv:2310.03249.
+11   Conclusion
+                                                        Mohamed Aghzal, Erion Plaku, and Ziyu Yao. 2024.
+In our survey, we explore the landscape of modern        Look further ahead: Testing the limits of gpt-4 in
+LLM planners, proposing key performance crite-           path planning. arXiv preprint arXiv:2406.12000.
+Michael Ahn, Anthony Brohan, Noah Brown, Yevgen           Jiangjie Chen, Siyu Yuan, Rong Ye, Bodhisattwa Prasad
+  Chebotar, Omar Cortes, Byron David, Chelsea Finn,          Majumder, and Kyle Richardson. 2023b. Put your
+  Chuyuan Fu, Keerthana Gopalakrishnan, Karol Haus-          money where your mouth is: Evaluating strategic
+  man, et al. 2022. Do as i can, not as i say: Ground-       planning and execution of llm agents in an auction
+  ing language in robotic affordances. arXiv preprint        arena. arXiv preprint arXiv:2310.05746.
+  arXiv:2204.01691.
+                                                          Yongchao Chen, Jacob Arkin, Charles Dawson, Yang
+Ramakrishna Bairi, Atharv Sonwane, Aditya Kanade,           Zhang, Nicholas Roy, and Chuchu Fan. 2024a. Auto-
+  Vageesh D C, Arun Iyer, Suresh Parthasarathy, Sri-        tamp: Autoregressive task and motion planning with
+  ram Rajamani, B. Ashok, and Shashank Shet. 2023.          llms as translators and checkers. In 2024 IEEE In-
+  Codeplan: Repository-level coding using llms and          ternational conference on robotics and automation
+  planning. Preprint, arXiv:2309.12499.                     (ICRA), pages 6695–6702. IEEE.
+Ksenia Bestuzheva, Mathieu Besançon, Wei-Kun Chen,        Zehui Chen, Kuikun Liu, Qiuchen Wang, Wenwei
+  Antonia Chmiela, Tim Donkiewicz, Jasper van               Zhang, Jiangning Liu, Dahua Lin, Kai Chen, and
+  Doornmalen, Leon Eifler, Oliver Gaul, Gerald Gam-         Feng Zhao. 2024b. Agent-flan: Designing data and
+  rath, Ambros Gleixner, et al. 2021. The scip opti-        methods of effective agent tuning for large language
+  mization suite 8.0. arXiv preprint arXiv:2112.08872.      models. arXiv preprint arXiv:2403.12881.
+Vineet Bhat, Ali Umut Kaypak, Prashanth Krish-            Zhenfang Chen, Delin Chen, Wenjun Sun, Rui abd Liu,
+  namurthy, Ramesh Karri, and Farshad Khorrami.             and Chuang Gan. 2025. Autonomous agents from au-
+  2024. Grounding llms for robot task planning              tomatic reward modeling and planning. In The Thir-
+  using closed-loop state feedback. arXiv preprint          teenth International Conference on Learning Repre-
+  arXiv:2402.08546.                                         sentations.
+Stephen Boyd and Lieven Vandenberghe. 2004. Convex        Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian,
+   Optimization. Cambridge University Press.                Mark Chen, Heewoo Jun, Lukasz Kaiser, Matthias
+                                                            Plappert, Jerry Tworek, Jacob Hilton, Reiichiro
+Faeze Brahman, Chandra Bhagavatula, Valentina Py-           Nakano, et al. 2021. Training verifiers to solve math
+  atkin, Jena D Hwang, Xiang Lorraine Li, Hi-               word problems. arXiv preprint arXiv:2110.14168.
+  rona Jacqueline Arai, Soumya Sanyal, Keisuke Sak-
+  aguchi, Xiang Ren, and Yejin Choi. 2024. Plasma:        Hongwei Cui, Yuyang Du, Qun Yang, Yulin Shao, and
+  Procedural knowledge models for language-based            Soung Chang Liew. 2024. Llmind: Orchestrating ai
+  planning and re-planning. In The Twelfth Interna-         and iot with llm for complex task execution. IEEE
+  tional Conference on Learning Representations.            Communications Magazine.
+Tom Brown, Benjamin Mann, Nick Ryder, Melanie             Aidan Curtis, Nishanth Kumar, Jing Cao, Tomás
+  Subbiah, Jared D Kaplan, Prafulla Dhariwal, Arvind        Lozano-Pérez, and Leslie Pack Kaelbling. 2024.
+  Neelakantan, Pranav Shyam, Girish Sastry, Amanda          Trust the proc3s: Solving long-horizon robotics prob-
+  Askell, et al. 2020. Language models are few-shot         lems with llms and constraint satisfaction. arXiv
+  learners. Advances in neural information processing       preprint arXiv:2406.05572.
+  systems, 33:1877–1901.
+                                                          Gautier Dagan, Frank Keller, and Alex Lascarides.
+Daniel Cao, Michael Katz, Harsha Kokel, Kavitha Srini-      2023. Dynamic planning with a llm. arXiv preprint
+  vas, and Shirin Sohrabi. 2024. Automating thought         arXiv:2308.06391.
+  of search: A journey towards soundness and com-
+  pleteness. arXiv preprint arXiv:2408.11326.             Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Sam
+                                                            Stevens, Boshi Wang, Huan Sun, and Yu Su. 2023.
+Georgia Chalvatzaki, Ali Younes, Daljeet Nandha,            Mind2web: Towards a generalist agent for the web.
+  An Thai Le, Leonardo FR Ribeiro, and Iryna                Advances in Neural Information Processing Systems,
+  Gurevych. 2023. Learning to reason over scene             36:28091–28114.
+  graphs: a case study of finetuning gpt-2 into a robot
+  language model for grounded task planning. Fron-        Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Sam
+  tiers in Robotics and AI, 10:1221739.                     Stevens, Boshi Wang, Huan Sun, and Yu Su. 2024.
+                                                            Mind2web: Towards a generalist agent for the web.
+Matthew Chang, Gunjan Chhablani, Alexander Clegg,           Advances in Neural Information Processing Systems,
+ Mikael Dallaire Cote, Ruta Desai, Michal Hlavac,           36.
+ Vladimir Karashchuk, Jacob Krantz, Roozbeh Mot-
+ taghi, Priyam Parashar, et al. 2024. Partnr: A bench-    Alfonso Gerevini, Ivan Serina, et al. 2002. Lpg: A
+ mark for planning and reasoning in embodied multi-         planner based on local search for planning graphs
+ agent tasks. arXiv preprint arXiv:2411.00081.              with action costs. In Aips, volume 2, pages 281–290.
+
+Baian Chen, Chang Shu, Ehsan Shareghi, Nigel Col-         Gonzalo Gonzalez-Pumariega, Wayne Chen, Kushal Ke-
+  lier, Karthik Narasimhan, and Shunyu Yao. 2023a.          dia, and Sanjiban Choudhury. 2024. Query-efficient
+  Fireact: Toward language agent fine-tuning. arXiv         planning with language models. arXiv preprint
+  preprint arXiv:2310.05915.                                arXiv:2412.06162.
+Gonzalo Gonzalez-Pumariega, Leong Su Yean,                 Hanxu Hu, Hongyuan Lu, Huajian Zhang, Yun-Ze Song,
+  Neha Sunkara, and Sanjiban Choudhury. 2025.                Wai Lam, and Yue Zhang. 2024. Chain-of-symbol
+  Robotouille: An asynchronous planning benchmark            prompting for spatial reasoning in large language
+  for llm agents. arXiv preprint arXiv:2502.05227.           models. In First Conference on Language Modeling.
+
+Jiawei Gu, Xuhui Jiang, Zhichao Shi, Hexiang Tan,          Mengkang Hu, Yao Mu, Xinmiao Yu, Mingyu Ding,
+   Xuehao Zhai, Chengjin Xu, Wei Li, Yinghan Shen,          Shiguang Wu, Wenqi Shao, Qiguang Chen, Bin
+   Shengjie Ma, Honghao Liu, et al. 2024. A survey on       Wang, Yu Qiao, and Ping Luo. 2023b. Tree-planner:
+   llm-as-a-judge. arXiv preprint arXiv:2411.15594.         Efficient close-loop task planning with large language
+                                                            models. arXiv preprint arXiv:2310.08582.
+Lin Guan, Karthik Valmeekam, Sarath Sreedharan,
+  and Subbarao Kambhampati. 2023. Leveraging pre-          Hsiu-Yuan Huang, Yutong Yang, Zhaoxi Zhang, San-
+  trained large language models to construct and utilize     woo Lee, and Yunfang Wu. 2024a. A survey of un-
+  world models for model-based task planning. Ad-            certainty estimation in llms: Theory meets practice.
+  vances in Neural Information Processing Systems,           arXiv preprint arXiv:2410.15326.
+  36:79081–79094.
+                                                           Jen-tse Huang, Eric John Li, Man Ho Lam, Tian Liang,
+Shiguang Guo, Ziliang Deng, Hongyu Lin, Yaojie Lu,           Wenxuan Wang, Youliang Yuan, Wenxiang Jiao,
+  Xianpei Han, and Le Sun. 2024. Open grounded               Xing Wang, Zhaopeng Tu, and Michael R Lyu. 2024b.
+  planning: Challenges and benchmark construction.            How far are we on the decision-making of llms? eval-
+  In Proceedings of the 62nd Annual Meeting of the            uating llms’ gaming ability in multi-agent environ-
+  Association for Computational Linguistics (Volume           ments. arXiv preprint arXiv:2403.11807.
+  1: Long Papers), ACL 2024, Bangkok, Thailand, Au-
+  gust 11-16, 2024, pages 4982–5003. Association for       Lei Huang, Weijiang Yu, Weitao Ma, Weihong Zhong,
+  Computational Linguistics.                                 Zhangyin Feng, Haotian Wang, Qianglong Chen,
+                                                             Weihua Peng, Xiaocheng Feng, Bing Qin, et al. 2023.
+Shibo Hao, Yi Gu, Haodi Ma, Joshua Jiahua Hong,              A survey on hallucination in large language models:
+  Zhen Wang, Daisy Zhe Wang, and Zhiting Hu. 2023.           Principles, taxonomy, challenges, and open questions.
+  Reasoning with language model is planning with             arXiv preprint arXiv:2311.05232.
+  world model. arXiv preprint arXiv:2305.14992.
+                                                           Wenlong Huang, Pieter Abbeel, Deepak Pathak, and
+Yilun Hao, Yongchao Chen, Yang Zhang, and Chuchu            Igor Mordatch. 2022a. Language models as zero-
+  Fan. 2024a. Large language models can plan your           shot planners: Extracting actionable knowledge for
+  travels rigorously with formal verification tools.        embodied agents. In International conference on
+  arXiv preprint arXiv:2404.11891.                          machine learning, pages 9118–9147. PMLR.
+Yilun Hao, Yang Zhang, and Chuchu Fan. 2024b. Plan-
+                                                           Wenlong Huang, Fei Xia, Ted Xiao, Harris Chan,
+   ning anything with rigor: General-purpose zero-shot
+                                                            Jacky Liang, Pete Florence, Andy Zeng, Jonathan
+   planning with llm-based formalized programming.
+                                                            Tompson, Igor Mordatch, Yevgen Chebotar, et al.
+   arXiv preprint arXiv:2410.12112.
+                                                            2022b. Inner monologue: Embodied reasoning
+Rishi Hazra, Pedro Zuidberg Dos Martires, and Luc           through planning with language models. arXiv
+  De Raedt. 2024. Saycanpay: Heuristic planning with        preprint arXiv:2207.05608.
+  large language models using learnable domain knowl-
+  edge. In Proceedings of the AAAI Conference on Ar-       Xu Huang, Weiwen Liu, Xiaolong Chen, Xingmei
+  tificial Intelligence, volume 38, pages 20123–20133.       Wang, Hao Wang, Defu Lian, Yasheng Wang, Ruim-
+                                                             ing Tang, and Enhong Chen. 2024c. Understanding
+Malte Helmert. 2006. The fast downward planning              the planning of llm agents: A survey. arXiv preprint
+ system. Journal of Artificial Intelligence Research,        arXiv:2402.02716.
+ 26:191–246.
+                                                           Aaron Jaech, Adam Kalai, Adam Lerer, Adam Richard-
+Eran Hirsch, Guy Uziel, and Ateret Anaby-Tavor.              son, Ahmed El-Kishky, Aiden Low, Alec Helyar,
+  2024. What’s the plan? evaluating and developing           Aleksander Madry, Alex Beutel, Alex Carney, et al.
+  planning-aware techniques for llms. arXiv preprint         2024. Openai o1 system card. arXiv preprint
+  arXiv:2402.11489.                                          arXiv:2412.16720.
+
+Richard Howey, Derek Long, and Maria Fox. 2004. Val:       Peter A Jansen. 2020. Visually-grounded planning
+  Automatic plan validation, continuous effects and          without vision: Language models infer detailed
+  mixed initiative planning using pddl. In 16th IEEE         plans from high-level instructions. arXiv preprint
+  International Conference on Tools with Artificial In-      arXiv:2009.14259.
+  telligence, pages 294–301. IEEE.
+                                                           Carlos E Jimenez, John Yang, Alexander Wettig,
+Hanxu Hu, Hongyuan Lu, Huajian Zhang, Yun-Ze Song,           Shunyu Yao, Kexin Pei, Ofir Press, and Karthik
+  Wai Lam, and Yue Zhang. 2023a. Chain-of-symbol             Narasimhan. 2023. Swe-bench: Can language mod-
+  prompting elicits planning in large langauge models.       els resolve real-world github issues? arXiv preprint
+  arXiv preprint arXiv:2305.10276.                           arXiv:2310.06770.
+Da Ju, Song Jiang, Andrew Cohen, Aaron Foss, Sasha          Haoming Li, Zhaoliang Chen, Jonathan Zhang, and
+  Mitts, Arman Zharmagambetov, Brandon Amos,                  Fei Liu. 2025. Planet: A collection of benchmarks
+  Xian Li, Justine T Kao, Maryam Fazel-Zarandi,               for evaluating llms’ planning capabilities. Preprint,
+  et al. 2024. To the globe (ttg): Towards language-          arXiv:2504.14773.
+  driven guaranteed travel planning. arXiv preprint
+  arXiv:2410.16456.                                         Jinyang Li, Binyuan Hui, Ge Qu, Jiaxi Yang, Binhua
+                                                               Li, Bowen Li, Bailin Wang, Bowen Qin, Ruiying
+Subbarao Kambhampati. 2024. Can large language                 Geng, Nan Huo, et al. 2024e. Can llm already serve
+  models reason and plan? Annals of the New York               as a database interface? a big bench for large-scale
+  Academy of Sciences, 1534(1):15–18.                          database grounded text-to-sqls. Advances in Neural
+                                                               Information Processing Systems, 36.
+Subbarao Kambhampati, Karthik Valmeekam, Lin
+  Guan, Kaya Stechly, Mudit Verma, Siddhant Bham-           Manling Li, Shiyu Zhao, Qineng Wang, Kangrui Wang,
+  bri, Lucas Saldyt, and Anil Murthy. 2024. Llms can’t       Yu Zhou, Sanjana Srivastava, Cem Gokmen, Tony
+  plan, but can help planning in llm-modulo frame-           Lee, Li Erran Li, Ruohan Zhang, et al. 2024f. Embod-
+  works. arXiv preprint arXiv:2402.01817.                    ied agent interface: Benchmarking llms for embodied
+                                                             decision making. arXiv preprint arXiv:2410.07166.
+Nabil A Kartam and David E Wilkins. 1990. Towards           Minghao Li, Yingxiu Zhao, Bowen Yu, Feifan Song,
+  a foundation for evaluating ai planners. AI EDAM,           Hangyu Li, Haiyang Yu, Zhoujun Li, Fei Huang,
+  4(1):1–13.                                                  and Yongbin Li. 2023. Api-bank: A comprehensive
+                                                              benchmark for tool-augmented llms. arXiv preprint
+Michael Katz, Harsha Kokel, Kavitha Srinivas, and             arXiv:2304.08244.
+  Shirin Sohrabi. 2024. Thought of search: Planning
+  with language models through the lens of efficiency.      Shuang Li, Xavier Puig, Chris Paxton, Yilun Du, Clin-
+  In The Thirty-eighth Annual Conference on Neural            ton Wang, Linxi Fan, Tao Chen, De-An Huang, Ekin
+  Information Processing Systems.                             Akyürek, Anima Anandkumar, et al. 2022. Pre-
+                                                              trained language models for interactive decision-
+Jing Yu Koh, Stephen McAleer, Daniel Fried, and Rus-          making. Advances in Neural Information Processing
+   lan Salakhutdinov. 2024. Tree search for language          Systems, 35:31199–31212.
+   model agents. arXiv preprint arXiv:2407.01476.
+                                                            Bill Yuchen Lin, Chengsong Huang, Qian Liu, Wenda
+Kurt Konolige and Nils J Nilsson. 1980. Multiple-agent        Gu, Sam Sommerer, and Xiang Ren. 2023a. On
+  planning systems. In AAAI, volume 80, pages 138–            grounded planning for embodied tasks with language
+  142.                                                        models. In Proceedings of the AAAI Conference
+                                                              on Artificial Intelligence, volume 37, pages 13192–
+Lucas Lehnert, Sainbayar Sukhbaatar, DiJia Su, Qinqing        13200.
+  Zheng, Paul Mcvay, Michael Rabbat, and Yuandong
+  Tian. 2024. Beyond a*: Better planning with trans-        Fangru Lin, Emanuele La Malfa, Valentin Hofmann,
+  formers via search dynamics bootstrapping. arXiv            Elle Michelle Yang, Anthony Cohn, and Janet B
+  preprint arXiv:2402.14083.                                  Pierrehumbert. 2024. Graph-enhanced large lan-
+                                                              guage models in asynchronous plan reasoning. arXiv
+Dawei Li, Bohan Jiang, Liangjie Huang, Alimohammad            preprint arXiv:2402.02805.
+  Beigi, Chengshuai Zhao, Zhen Tan, Amrita Bhat-
+  tacharjee, Yuxuan Jiang, Canyu Chen, Tianhao Wu,          Han Lin, Abhay Zala, Jaemin Cho, and Mohit Bansal.
+  et al. 2024a. From generation to judgment: Op-              2023b. Videodirectorgpt: Consistent multi-scene
+  portunities and challenges of llm-as-a-judge. arXiv         video generation via llm-guided planning. arXiv
+  preprint arXiv:2411.16594.                                  preprint arXiv:2309.15091.
+
+                                                            Nir Lipovetzky, Miquel Ramirez, Christian Muise, and
+Haitao Li, Qian Dong, Junjie Chen, Huixue Su, Yu-             Hector Geffner. 2014. Width and inference based
+  jia Zhou, Qingyao Ai, Ziyi Ye, and Yiqun Liu.               planners: Siw, bfs (f), and probe. Proceedings of the
+  2024b. Llms-as-judges: a comprehensive survey               8th International Planning Competition (IPC-2014),
+  on llm-based evaluation methods. arXiv preprint             page 43.
+  arXiv:2412.05579.
+                                                            Bo Liu, Yuqian Jiang, Xiaohan Zhang, Qiang Liu,
+Haoming Li, Zhaoliang Chen, Songyuan Liu, Yiming              Shiqi Zhang, Joydeep Biswas, and Peter Stone.
+  Lu, and Fei Liu. 2024c. Systematic analysis of llm          2023a. Llm+ p: Empowering large language models
+  contributions to planning: Solver, verifier, heuristic.     with optimal planning proficiency. arXiv preprint
+  Preprint, arXiv:2412.09666.                                 arXiv:2304.11477.
+
+Haoming Li, Zhaoliang Chen, Jonathan Zhang, and Fei         Gang Liu, Michael Sun, Wojciech Matusik, Meng Jiang,
+  Liu. 2024d. Lasp: Surveying the state-of-the-art in         and Jie Chen. 2024. Multimodal large language mod-
+  large language model-assisted ai planning. arXiv            els for inverse molecular design with retrosynthetic
+  preprint arXiv:2409.01806.                                  planning. arXiv preprint arXiv:2410.04223.
+Xiao Liu, Hao Yu, Hanchen Zhang, Yifan Xu, Xu-                Rafael Rafailov, Archit Sharma, Eric Mitchell, Christo-
+  anyu Lei, Hanyu Lai, Yu Gu, Hangliang Ding,                   pher D Manning, Stefano Ermon, and Chelsea Finn.
+  Kaiwen Men, Kejuan Yang, et al. 2023b. Agent-                 2024. Direct preference optimization: Your language
+  bench: Evaluating llms as agents. arXiv preprint              model is secretly a reward model. Advances in Neu-
+  arXiv:2308.03688.                                             ral Information Processing Systems, 36.
+
+Yujie Lu, Pan Lu, Zhiyu Chen, Wanrong Zhu, Xin Eric           Colin Raffel, Noam Shazeer, Adam Roberts, Katherine
+  Wang, and William Yang Wang. 2023. Multimodal                 Lee, Sharan Narang, Michael Matena, Yanqi Zhou,
+  procedural planning via dual text-image prompting.            Wei Li, and Peter J Liu. 2020. Exploring the lim-
+  arXiv preprint arXiv:2305.01795.                              its of transfer learning with a unified text-to-text
+                                                                transformer. Journal of machine learning research,
+Drew McDermott, Malik Ghallab, Adele E. Howe,                   21(140):1–67.
+  Craig A. Knoblock, Ashwin Ram, Manuela M.
+  Veloso, Daniel S. Weld, and David E. Wilkins. 1998.         Shreyas Sundara Raman, Vanya Cohen, Ifrah Idrees,
+  Pddl-the planning domain definition language.                 Eric Rosen, Raymond Mooney, Stefanie Tellex, and
+                                                                David Paulius. 2024. Cape: Corrective actions from
+Amit Moryossef, Yoav Goldberg, and Ido Dagan. 2019.             precondition errors using large language models. In
+ Step-by-step: Separating planning from realization             2024 IEEE International Conference on Robotics and
+ in neural data-to-text generation. arXiv preprint              Automation (ICRA), pages 14070–14077. IEEE.
+ arXiv:1904.03396.
+                                                              Shreyas Sundara Raman, Vanya Cohen, Eric Rosen,
+Allen Newell, John Calman Shaw, and Herbert A Si-               Ifrah Idrees, David Paulius, and Stefanie Tellex. 2022.
+  mon. 1958. Elements of a theory of human problem              Planning with large language models via corrective
+  solving. Psychological review, 65(3):151.                     re-prompting. In NeurIPS 2022 Foundation Models
+                                                                for Decision Making Workshop.
+Odhran O’Donoghue, Aleksandar Shtedritski, John Gin-
+  ger, Ralph Abboud, Ali Essa Ghareeb, Justin Booth,          Amirhossein Razavi, Mina Soltangheis, Negar
+  and Samuel G Rodriques. 2023. Bioplanner: au-                Arabzadeh, Sara Salamat, Morteza Zihayat, and
+  tomatic evaluation of llms on protocol planning in           Ebrahim Bagheri. 2025. Benchmarking prompt
+  biology. arXiv preprint arXiv:2310.10632.                    sensitivity in large language models. Preprint,
+                                                               arXiv:2502.06065.
+Jiefu Ou, Arda Uzunoglu, Benjamin Van Durme, and
+   Daniel Khashabi. 2024. Worldapis: The world is             Allen Z Ren, Anushri Dixit, Alexandra Bodrova,
+   worth how many apis? a thought experiment. arXiv             Sumeet Singh, Stephen Tu, Noah Brown, Peng Xu,
+   preprint arXiv:2407.07778.                                   Leila Takayama, Fei Xia, Jake Varley, et al. 2023.
+                                                                Robots that ask for help: Uncertainty alignment
+Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida,               for large language model planners. arXiv preprint
+  Carroll Wainwright, Pamela Mishkin, Chong Zhang,              arXiv:2307.01928.
+  Sandhini Agarwal, Katarina Slama, Alex Ray, et al.
+  2022. Training language models to follow instruc-           Jingqing Ruan, Yihong Chen, Bin Zhang, Zhiwei Xu,
+  tions with human feedback. Advances in neural in-              Tianpeng Bao, Guoqing Du, Shiwei Shi, Hangyu
+  formation processing systems, 35:27730–27744.                  Mao, Ziyue Li, Xingyu Zeng, and Rui Zhao.
+                                                                 2023. Tptu: Large language model-based ai
+Jiayi Pan, Glen Chou, and Dmitry Berenson. 2023.                 agents for task planning and tool usage. Preprint,
+   Data-efficient learning of natural language to linear         arXiv:2308.03427.
+   temporal logic translators for robot task specification.
+                                                              Stuart J Russell and Peter Norvig. 2016. Artificial intel-
+   In 2023 IEEE International Conference on Robotics
+                                                                 ligence: a modern approach. pearson.
+   and Automation (ICRA), pages 11554–11561. IEEE.
+                                                              Abulhair Saparov and He He. 2022. Language models
+Archiki Prasad, Alexander Koller, Mareike Hartmann,             are greedy reasoners: A systematic formal analysis of
+  Peter Clark, Ashish Sabharwal, Mohit Bansal, and              chain-of-thought. arXiv preprint arXiv:2210.01240.
+  Tushar Khot. 2023. Adapt: As-needed decompo-
+  sition and planning with language models. arXiv             Melanie Sclar, Yejin Choi, Yulia Tsvetkov, and Alane
+  preprint arXiv:2311.05772.                                   Suhr. 2024. Quantifying language models’ sensitiv-
+                                                               ity to spurious features in prompt design or: How i
+Xavier Puig, Kevin Ra, Marko Boben, Jiaman Li,                 learned to start worrying about prompt formatting.
+  Tingwu Wang, Sanja Fidler, and Antonio Torralba.             Preprint, arXiv:2310.11324.
+  2018. Virtualhome: Simulating household activities
+  via programs. In Proceedings of the IEEE conference         Pratyusha Sharma, Antonio Torralba, and Jacob An-
+  on computer vision and pattern recognition, pages             dreas. 2021. Skill induction and planning with latent
+  8494–8502.                                                    language. arXiv preprint arXiv:2110.01517.
+Alec Radford, Jeffrey Wu, Rewon Child, David Luan,            Zijing Shi, Meng Fang, and Ling Chen. 2025. Monte
+  Dario Amodei, Ilya Sutskever, et al. 2019. Language            carlo planning with large language model for text-
+  models are unsupervised multitask learners. OpenAI             based games. In The Thirteenth International Con-
+  blog, 1(8):9.                                                  ference on Learning Representations.
+Mohit Shridhar, Jesse Thomason, Daniel Gordon,              Karthik Valmeekam, Matthew Marquez, Sarath Sreed-
+ Yonatan Bisk, Winson Han, Roozbeh Mottaghi, Luke             haran, and Subbarao Kambhampati. 2023b. On the
+ Zettlemoyer, and Dieter Fox. 2020a. Alfred: A                planning abilities of large language models-a criti-
+ benchmark for interpreting grounded instructions for         cal investigation. Advances in Neural Information
+ everyday tasks. In Proceedings of the IEEE/CVF con-          Processing Systems, 36:75993–76005.
+ ference on computer vision and pattern recognition,
+ pages 10740–10749.                                         Karthik Valmeekam, Kaya Stechly, and Subbarao Kamb-
+                                                              hampati. 2024. Llms still can’t plan; can lrms? a
+Mohit Shridhar, Xingdi Yuan, Marc-Alexandre Côté,             preliminary evaluation of openai’s o1 on planbench.
+ Yonatan Bisk, Adam Trischler, and Matthew                    arXiv preprint arXiv:2409.13373.
+ Hausknecht. 2020b. Alfworld: Aligning text and em-
+ bodied environments for interactive learning. arXiv        Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Man-
+ preprint arXiv:2010.03768.                                   dlekar, Chaowei Xiao, Yuke Zhu, Linxi Fan, and An-
+                                                              ima Anandkumar. 2023a. Voyager: An open-ended
+Tom Silver, Soham Dan, Kavitha Srinivas, Joshua B             embodied agent with large language models. arXiv
+  Tenenbaum, Leslie Kaelbling, and Michael Katz.              preprint arXiv:2305.16291.
+  2024. Generalized planning in pddl domains with
+  pretrained large language models. In Proceedings          Renxi Wang, Haonan Li, Xudong Han, Yixuan Zhang,
+  of the AAAI Conference on Artificial Intelligence,          and Timothy Baldwin. 2024. Learning from fail-
+  volume 38, pages 20256–20264.                               ure: Integrating negative examples when fine-tuning
+                                                              large language models as agents. arXiv preprint
+Ishika Singh, Valts Blukis, Arsalan Mousavian, Ankit          arXiv:2402.11651.
+   Goyal, Danfei Xu, Jonathan Tremblay, Dieter Fox,
+   Jesse Thomason, and Animesh Garg. 2023. Prog-            Zihao Wang, Shaofei Cai, Guanzhou Chen, Anji Liu,
+   prompt: Generating situated robot task plans using         Xiaojian Ma, and Yitao Liang. 2023b. Describe, ex-
+   large language models. In 2023 IEEE International          plain, plan and select: Interactive planning with large
+   Conference on Robotics and Automation (ICRA),              language models enables open-worldzhao2024large
+   pages 11523–11530. IEEE.                                   multi-task agents. arXiv preprint arXiv:2302.01560.
+
+Chan Hee Song, Jiaman Wu, Clayton Washington,               Hui Wei, Shenghua He, Tian Xia, Andy Wong, Jingyang
+  Brian M Sadler, Wei-Lun Chao, and Yu Su. 2023.              Lin, and Mei Han. 2024. Systematic evaluation of
+  Llm-planner: Few-shot grounded planning for em-             llm-as-a-judge in llm alignment tasks: Explainable
+  bodied agents with large language models. In Pro-           metrics and diverse prompt templates. arXiv preprint
+  ceedings of the IEEE/CVF International Conference           arXiv:2408.13006.
+  on Computer Vision, pages 2998–3009.
+                                                            Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten
+Yifan Song, Da Yin, Xiang Yue, Jie Huang, Sujian               Bosma, Fei Xia, Ed Chi, Quoc V Le, Denny Zhou,
+  Li, and Bill Yuchen Lin. 2024. Trial and error:              et al. 2022. Chain-of-thought prompting elicits rea-
+  Exploration-based trajectory optimization for llm            soning in large language models. Advances in neural
+  agents. arXiv preprint arXiv:2403.02502.                     information processing systems, 35:24824–24837.
+Siddharth Srivastava, Neil Immerman, and Shlomo Zil-        Xixi Wu, Yifei Shen, Caihua Shan, Kaitao Song, Siwei
+   berstein. 2011. A new representation and associated        Wang, Bohang Zhang, Jiarui Feng, Hong Cheng, Wei
+   algorithms for generalized planning. Artificial Intel-     Chen, Yun Xiong, et al. 2024. Can graph learning
+   ligence, 175(2):615–647.                                   improve planning in llm-based agents? In The Thirty-
+                                                              eighth Annual Conference on Neural Information
+Haotian Sun, Yuchen Zhuang, Lingkai Kong, Bo Dai,             Processing Systems.
+  and Chao Zhang. 2024. Adaplanner: Adaptive plan-
+  ning from feedback with language models. Advances         Yue Wu, Xuan Tang, Tom M Mitchell, and Yuanzhi
+  in Neural Information Processing Systems, 36.               Li. 2023a. Smartplay: A benchmark for llms as
+                                                              intelligent agents. arXiv preprint arXiv:2310.01557.
+Marcus Tantakoun, Xiaodan Zhu, and Christian Muise.
+ 2025. Llms as planning modelers: A survey for lever-       Zhenyu Wu, Ziwei Wang, Xiuwei Xu, Jiwen Lu,
+ aging large language models to construct automated           and Haibin Yan. 2023b. Embodied task plan-
+ planning models. Preprint, arXiv:2503.18971.                 ning with large language models. arXiv preprint
+                                                              arXiv:2307.01848.
+Alejandro Torreno, Eva Onaindia, Antonín Komenda,
+  and Michal Štolba. 2017. Cooperative multi-agent          Jian Xie, Kai Zhang, Jiangjie Chen, Tinghui Zhu,
+  planning: A survey. ACM Computing Surveys                    Renze Lou, Yuandong Tian, Yanghua Xiao, and
+  (CSUR), 50(6):1–32.                                          Yu Su. 2024. Travelplanner: A benchmark for real-
+                                                               world planning with language agents. arXiv preprint
+Karthik Valmeekam, Matthew Marquez, Alberto Olmo,              arXiv:2402.01622.
+  Sarath Sreedharan, and Subbarao Kambhampati.
+  2023a. Planbench: An extensible benchmark for             Yaqi Xie, Chen Yu, Tongyao Zhu, Jinbin Bai, Ze Gong,
+  evaluating large language models on planning and            and Harold Soh. 2023. Translating natural language
+  reasoning about change. Advances in Neural Infor-           to planning goals with large-language models. arXiv
+  mation Processing Systems, 36:38975–38987.                  preprint arXiv:2302.05128.
+Qiantong Xu, Fenglu Hong, Bo Li, Changran Hu,                Huaixiu Steven Zheng, Swaroop Mishra, Hugh Zhang,
+  Zhengyu Chen, and Jian Zhang. 2023. On the tool              Xinyun Chen, Minmin Chen, Azade Nova, Le Hou,
+  manipulation capability of open-source large lan-            Heng-Tze Cheng, Quoc V Le, Ed H Chi, et al. 2024.
+  guage models. arXiv preprint arXiv:2305.16504.               Natural plan: Benchmarking llms on natural lan-
+                                                               guage planning. arXiv preprint arXiv:2406.04520.
+Ruihan Yang, Jiangjie Chen, Yikai Zhang, Siyu Yuan,
+  Aili Chen, Kyle Richardson, Yanghua Xiao, and De-          Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan
+  qing Yang. 2024. Selfgoal: Your language agents              Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin,
+  already know how to achieve high-level goals. arXiv          Zhuohan Li, Dacheng Li, Eric Xing, et al. 2023.
+  preprint arXiv:2406.04784.                                   Judging llm-as-a-judge with mt-bench and chatbot
+                                                               arena. Advances in Neural Information Processing
+Ryan Yang, Tom Silver, Aidan Curtis, Tomas Lozano-             Systems, 36:46595–46623.
+  Perez, and Leslie Pack Kaelbling. 2022. Pg3: Policy-       Andy Zhou, Kai Yan, Michal Shlapentokh-Rothman,
+  guided planning for generalized policy generation.           Haohan Wang, and Yu-Xiong Wang. 2023a. Lan-
+  arXiv preprint arXiv:2204.10420.                             guage agent tree search unifies reasoning acting
+                                                               and planning in language models. arXiv preprint
+Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak Shafran,              arXiv:2310.04406.
+  Tom Griffiths, Yuan Cao, and Karthik Narasimhan.
+  2024. Tree of thoughts: Deliberate problem solving         Shuyan Zhou, Frank F Xu, Hao Zhu, Xuhui Zhou,
+  with large language models. Advances in Neural               Robert Lo, Abishek Sridhar, Xianyi Cheng, Tianyue
+  Information Processing Systems, 36.                          Ou, Yonatan Bisk, Daniel Fried, et al. 2023b. We-
+                                                               barena: A realistic web environment for building au-
+Jiayi Ye, Yanbo Wang, Yue Huang, Dongping Chen,                tonomous agents. arXiv preprint arXiv:2307.13854.
+   Qihui Zhang, Nuno Moniz, Tian Gao, Werner Geyer,
+   Chao Huang, Pin-Yu Chen, et al. 2024. Justice             Zhehua Zhou, Jiayang Song, Kunpeng Yao, Zhan Shu,
+   or prejudice? quantifying biases in llm-as-a-judge.         and Lei Ma. 2024. Isr-llm: Iterative self-refined
+   arXiv preprint arXiv:2410.02736.                            large language model for long-horizon sequential task
+                                                               planning. In 2024 IEEE International Conference on
+Tao Yu, Rui Zhang, Kai Yang, Michihiro Yasunaga,               Robotics and Automation (ICRA), pages 2081–2088.
+  Dongxu Wang, Zifan Li, James Ma, Irene Li, Qingn-            IEEE.
+  ing Yao, Shanelle Roman, et al. 2018. Spider: A
+  large-scale human-labeled dataset for complex and          Yuchen Zhuang, Xiang Chen, Tong Yu, Saayan Mitra,
+  cross-domain semantic parsing and text-to-sql task.          Victor Bursztyn, Ryan A Rossi, Somdeb Sarkhel,
+  arXiv preprint arXiv:1809.08887.                             and Chao Zhang. 2023. Toolchain*: Efficient action
+                                                               space navigation in large language models with a*
+                                                               search. arXiv preprint arXiv:2310.13227.
+Quan Yuan, Mehran Kazemi, Xin Xu, Isaac Noble,
+  Vaiva Imbrasaite, and Deepak Ramachandran. 2024.           Max Zuo, Francisco Piedrahita Velez, Xiaochen Li,
+  Tasklama: probing the complex task understanding            Michael L Littman, and Stephen H Bach. 2024. Plan-
+  of language models. In Proceedings of the AAAI Con-         etarium: A rigorous benchmark for translating text
+  ference on Artificial Intelligence, volume 38, pages        to structured planning languages. arXiv preprint
+  19468–19476.                                                arXiv:2407.03321.
+
+Siyu Yuan, Jiangjie Chen, Ziquan Fu, Xuyang Ge, So-          13   Appendix
+  ham Shah, Charles Robert Jankowski, Yanghua Xiao,
+  and Deqing Yang. 2023. Distilling script knowledge
+  from large language models for constrained language
+  planning. arXiv preprint arXiv:2305.05252.
+
+Abhay Zala, Han Lin, Jaemin Cho, and Mohit Bansal.
+  2023. Diagrammergpt: Generating open-domain,
+  open-platform diagrams via llm planning. arXiv
+  preprint arXiv:2310.12128.
+
+Jianguo Zhang, Tian Lan, Rithesh Murthy, Zhiwei Liu,
+   Weiran Yao, Juntao Tan, Thai Hoang, Liangwei Yang,
+   Yihao Feng, Zuxin Liu, et al. 2024. Agentohana:
+   Design unified data and training pipeline for effective
+   agent learning. arXiv preprint arXiv:2402.15506.
+
+Zirui Zhao, Wee Sun Lee, and David Hsu. 2024. Large
+   language models as commonsense knowledge for
+   large-scale task planning. Advances in Neural Infor-
+   mation Processing Systems, 36.
+                             Table 1: Summary of Foundations in LLM Planning (Section 2)
+Method Name             Dataset             Evaluation Metric         Methods                                         Major Contribution
+DEPS                    Alfworld            Success Rate, Average     1. LLM generates PDDL goal from task            1.LLM-DP achieves 96% success in Alfworld,
+(Wang et al., 2023b)                        Episode Length            description                                     outperforming the ReAct baseline (53%) with
+                                                                      2. Sampling world beliefs and using sym-        fewer actions.
+                                                                      bolic planning                                  2.Enhances correctness in LLM planning by dy-
+                                                                      3. Plan generator (BFS(f)) for generating       namically adjusting plans in response to environ-
+                                                                      plans                                           mental feedback and sub-goal feasibility.
+ProgPrompt              VirtualHome,        Success Rate, Goal        1. Pythonic program generation for task         1. ProgPrompt significantly outperforms base-
+(Singh et al., 2023)    Real-World          Conditions    Recall,     planning                                        line methods by using programmatic LLM
+                        Robot Tasks         Executability             2. Use of natural language comments and         prompts to generate executable task plans,
+                                                                      assertions for feedback                         achieving up to 1.00 SR and 1.00 Exec in var-
+                                                                      3. Integration with real-time environment       ious VirtualHome tasks. It also adapts well to
+                                                                      state feedback during task execution            real-world robot tasks, with a Plan SR of 1 in
+                                                                                                                      most cases.
+                                                                                                                      2. Improves correctness by incorporating envi-
+                                                                                                                      ronmental state feedback directly into the plan-
+                                                                                                                      ning process.
+Adaplanner              ALFWorld and        Success Rate              Closed-loop approach allowing LLM agent         1. Uses code-style LLM prompt structure and
+(Sun et al., 2024)      MiniWoB++                                     to refine self-generated plan adaptively        skill discovery mechanism. Achieves 91.79%
+                                                                                                                      success rate on ALFWorld tasks.
+                                                                                                                      2. Achieves 91.11% success rate on MiniWoB++
+                                                                                                                      tasks with feedback.
+                                                                                                                      3. Improves planning correctness by adaptively
+                                                                                                                      refining plans based on environmental feedback,
+                                                                                                                      effectively managing complex sequential tasks.
+GNN-Enhanced Task       HuggingFace,        Node F1-Score, Link       1. Integration of GNNs for task graph navi-     1. GNN-enhanced planning outperforms LLM-
+Planner                 Multimedia tasks,   F1-Score, Task Accu-      gation                                          based solutions by improving task accuracy (up
+(Wu et al., 2024)       Daily Life API      racy, Token Consump-      2.     Training-free (SGC) and training-        to 9%) with reduced token consumption. The
+                        tasks,    TMDB      tion                      required (GraphSAGE) approaches                 proposed method scales well with larger task
+                        API tasks                                     3. GNN-based node and edge selection for        graphs and improves planning efficiency by a
+                                                                      task planning                                   significant margin.
+                                                                      4. Training fine-tuned models for better task   2.Addresses correctness by effectively mapping
+                                                                      retrieval                                       task dependencies in a graph structure, enhanc-
+                                                                                                                      ing sub-task selection and sequence planning.
+SelfGoal                Public     Goods    Success Rate, TrueSkill   1. Constructs GOALTREE to decompose             1. SelfGoal achieves a 94% success rate in dy-
+(Yang et al., 2024)     Game, Guess 2/3     Score,    Contribution    high-level goals dynamically                    namic multi-agent environments, outperforming
+                        of the Average,     Consistency               2. Uses Search Module to select the most        baselines (e.g., ReAct, ADAPT) by dynamically
+                        First-Price Auc-                              relevant subgoals                               adjusting subgoal guidance. It significantly im-
+                        tion, Bargaining                              3. Decomposition updates based on environ-      proves task performance, especially in coopera-
+                                                                      mental feedback                                 tive and competitive tasks.
+                                                                      4. Adaptive subgoal tree refinement during      2. SelfGoal enhances correctness and adaptabil-
+                                                                      task execution                                  ity in planning by dynamically adjusting sub-
+                                                                                                                      goals and actions based on ongoing task perfor-
+                                                                                                                      mance and feedback.
+ADaPT                   ALFWorld, Web-      Success Rate, Task        1. As-needed recursive decomposition of         ADaPT improves success rates by up to 33%
+(Prasad et al., 2023)   Shop, TextCraft     Complexity Handling,      complex tasks                                   over baselines, dynamically decomposing com-
+                        & hotel data        Sub-Task Decomposi-       2. Planner and executor modules with dy-        plex tasks as needed. It handles task complexity
+                                            tion Efficiency           namic failure adaptation                        efficiently with up to 28.3% higher success rates
+                                                                      3. Multi-level decomposition for task com-      on ALFWorld and 27% higher on WebShop.
+                                                                      plexity handling
+LLM+P                   Blocksworld,        Success Rate, Optimal     1. Converts natural language problem de-        1. LLM+P significantly outperforms LLMs in
+(Liu et al., 2023a)     Grippers,    Bar-   Plan Success, Plan Exe-   scription into PDDL format                      solving long-horizon planning problems, achiev-
+                        man, Termes, and    cution Time               2. Uses classical planners (e.g., FAST-         ing optimal plans in robot domains with high
+                        other robot plan-                             DOWNWARD) to generate optimal plans             success rates (up to 100% on Blocksworld) and
+                        ning scenarios                                3. Translates planner output back into natu-    minimal execution time. 2. LLM+P improves
+                                                                      ral language                                    correctness by integrating LLMs with classical
+                                                                                                                      planning techniques to generate and execute op-
+                                                                                                                      timal plans.
+LLM-DP                  Alfworld            Success Rate, Average     1. LLM converts task descriptions into exe-     LLM-DP outperforms the ReAct baseline,
+(Dagan et al., 2023)                        Episode Length            cutable PDDL goals                              achieving 96% success in Alfworld, with sig-
+                                                                      2. Symbolic planner (BFS(f)) generates          nificantly fewer actions (13.16 vs. 18.69) per
+                                                                      valid plans                                     task and higher efficiency due to belief sampling
+                                                                      3. Belief sampling to generate multiple         and symbolic planning integration.
+                                                                      world states for planning
+PDDL World Model        Household, Tyre-    Error Count, Success      1. LLM-based PDDL generation for task           1. The paper shows that GPT-4 is capable of gen-
+Generation              world, Logistics    Rate                      planning                                        erating high-quality PDDL models with fewer
+(Guan et al., 2023)                                                   2. Error correction using LLMs as feedback      errors than GPT-3.5-Turbo. It demonstrates that
+                                                                      interfaces                                      GPT-4-based world models lead to a 95% suc-
+                                                                      3. Use of external planners for generating      cess rate in planning tasks using classical plan-
+                                                                      feasible plans from PDDL models                 ners like Fast Downward.
+                                                                                                                      2. Enhances plan correctness by using LLM-
+                                                                                                                      generated PDDL models in conjunction with
+                                                                                                                      domain-independent planners, ensuring plans
+                                                                                                                      are not only feasible but also optimal.
+LLM Planning Evalu-     Blocksworld,        Success Rate, Leven-      1. Evaluates LLMs (GPT-3, BLOOM) on             LLMs struggle with autonomous plan generation
+ation                   Mystery             shtein Edit Distance      common planning domains                         (3% success rate), but perform better when used
+(Valmeekam et al.,      Blocksworld                                   2. Three evaluation modes: autonomous,          for heuristic guidance in planning tasks (with
+2023b)                                                                heuristic, and human-in-the-loop                LPG) and assist human planners by improving
+                                                                      3. Comparison of LLM-generated plans            task completion accuracy (74% to 82%).
+                                                                      with optimal solutions using automated plan-
+                                                                      ning tools
+                             Table 2: Summary of Foundations in LLM Planning (Section 2)
+Method Name             Dataset             Evaluation Metric         Methods                                         Major Contribution
+Tree Search for Lan-    WebArena, Visu-     Success Rate, Search      1. Best-first search algorithm using language   1. Tree Search improves the GPT-4o agent’s
+guage Model Agents      alWebArena          Budget Efficiency         model feedback                                  success rate by 39.7% on VisualWebArena and
+(Koh et al., 2024)                                                    2. Backtracking to refine paths based on        28.0% on WebArena. The search mechanism
+                                                                      value function                                  enhances multi-step planning and exploration,
+                                                                      3. Model-based value function for search        setting a new state-of-the-art in web task com-
+                                                                      guidance                                        pletion.
+                                                                                                                      2. Enhances correctness by using a best-first
+                                                                                                                      search strategy that adapts to environmental feed-
+                                                                                                                      back, improving decision-making in complex
+                                                                                                                      web tasks.
+SimPlan                 Blocksworld,        Success Rate              1. Hybrid approach combining LLMs with          1.SimPlan outperforms baseline LLM-based
+(Hirsch et al., 2024)   Ferry, Grippers,                              greedy best-first search                        planners by integrating world modeling and
+                        Depots, Minigrid                              2. Utilizes external world modeling tools       search algorithms, achieving high success rates
+                                                                      3. Heuristic-driven planning for enhanced       in domains like Blocksworld and Ferry. It high-
+                                                                      action ranking                                  lights the effectiveness of combining LLMs with
+                                                                      4. Optimizes path selection through search      traditional planning methods.
+                                                                      algorithms                                      2. Addresses limitations in LLMs’ planning
+                                                                                                                      capabilities by integrating classical planning
+                                                                                                                      methodologies, enhancing correctness through
+                                                                                                                      structured problem-solving.
+LATS                    HotPotQA,           Pass@1 Accuracy, Suc-     1. Integrates MCTS-based search for reason-     1.LATS achieves state-of-the-art results, includ-
+(Zhou et al., 2023a)    WebShop, Hu-        cess Rate                 ing, acting, and planning                       ing 92.7% Pass@1 accuracy on HumanEval with
+                        manEval, Game                                 2. External feedback integration with self-     GPT-4 and surpassing ReAct with 75.9% suc-
+                        of 24                                         reflection for better decision-making           cess rate on WebShop. It unifies reasoning, act-
+                                                                      3. Dynamic sampling of multiple action          ing, and planning in one framework and im-
+                                                                      paths for exploration                           proves decision-making by using Monte Carlo
+                                                                                                                      Tree Search.
+                                                                                                                      2.Significantly enhances correctness in planning
+                                                                                                                      by introducing a tree search framework that
+                                                                                                                      adapts to environmental feedback and multiple
+                                                                                                                      reasoning paths.
+Tree of Thought         Game of 24,         Success Rate, Passage     1. Tree-based search for exploring multiple     1.ToT significantly improves problem-solving
+(Yao et al., 2024)      Creative Writing,   Coherency, Task Com-      reasoning paths                                 performance, with 74% success in Game of
+                        Mini Crosswords     pletion Time              2. Self-evaluation and decision-making with     24 compared to 4% for traditional Chain-of-
+                                                                      backtracking                                    Thought prompting. It introduces a new frame-
+                                                                      3. Application of breadth-first and depth-      work for deliberate planning and exploration in
+                                                                      first search                                    LLM-based reasoning tasks.
+                                                                      4. Thought decomposition for structured         2.Enhances correctness by allowing for explo-
+                                                                      problem-solving                                 ration of multiple paths and adjusting strategies
+                                                                                                                      based on real-time feedback.
+Thought of Search       24 Game, Mini       Success Rate, Plan        1. Using LLMs to generate code for search       1. Thought of Search achieves 100% accuracy
+(Katz et al., 2024)     Crosswords,         Time, Model Evaluation    components (successor functions and goal        across datasets with minimal LLM calls (1–2
+                        BlocksWorld,        Calls                     tests)                                          calls per function). Significantly more efficient
+                        PrOntoQA                                      2. Search performed using BFS and DFS           than existing LLM-based planning methods.
+                                                                      3. Minimizes LLM calls for efficiency           2. Significantly improves correctness by verify-
+                                                                                                                      ing search components for soundness and com-
+                                                                                                                      pleteness, reducing computational inefficiency.
+RAP                     Blocksworld,        Success Rate, Plan Gen-   1. Repurposes LLM as both a world model         1. RAP achieves 33% relative improvement in
+(Hao et al., 2023)      GSM8K, PrOn-        eration Success, Task     and a reasoning agent                           plan generation over GPT-4 with CoT, and out-
+                        toQA                Completion Time           2. Uses Monte Carlo Tree Search (MCTS)          performs baseline methods on math reasoning
+                                                                      for strategic exploration                       and logical inference tasks, achieving a 64% suc-
+                                                                      3. Reward-based planning for balancing ex-      cess rate on Blocksworld and 94.2% accuracy
+                                                                      ploration and exploitation                      on PrOntoQA.
+                                                                                                                      2. Enhances correctness in LLM planning by
+                                                                                                                      effectively balancing exploration and exploita-
+                                                                                                                      tion in reasoning, leading to higher task success
+                                                                                                                      rates.
+LLM-MCTS                Virtual Home        Success Rate, Task        1. Combines LLM as a commonsense world          LLM-MCTS achieves up to 91.4% success in
+(Zhao et al., 2024)                         Completion Time, Task     model and heuristic policy in MCTS              simple tasks, outperforms GPT-3.5-based poli-
+                                            Complexity                2. Utilizes LLM to predict object locations     cies and traditional MCTS approaches, and
+                                                                      and generate action suggestions                 demonstrates superior performance for large-
+                                                                      3. Improves planning efficiency by limiting     scale task planning with partial observations.
+                                                                      search space with a heuristic policy
+                                                                      4. World model and policy guide MCTS to
+                                                                      select promising action paths
+Visual Semantic Plan-   ALFRED              Success Rate, Predic-     1. Uses GPT-2 for sequence-to-sequence          1. The GPT-2 model achieved 26% accuracy in
+ning with GPT-2                             tion Accuracy             translation of natural language directives      generating correct visual semantic plans without
+(Jansen, 2020)                                                        into action plans                               visual input, increasing to 58% when provided
+                                                                      2. Evaluates command prediction accuracy        with starting location. This demonstrates that de-
+                                                                      using strict and permissive scoring metrics     tailed task planning can be done using language
+                                                                      3. Focuses on generating multi-step plans       models alone.
+                                                                      with minimal visual input                       2. Improves correctness and efficiency in task
+                                                                                                                      planning by leveraging LLMs for both heuristic
+                                                                                                                      guidance and world modeling, leading to better
+                                                                                                                      performance in complex tasks.
+RobLM                   ALFRED              Task Success Rate, Plan   1. Fine-tunes GPT-2 for task planning with      1.RobLM outperforms classical planning sys-
+(Chalvatzaki et al.,                        Accuracy, Argument        grounded scene graph input                      tems in several task categories, achieving high
+2023)                                       Accuracy,    Sub-Task     2. Uses Graph2NL to convert scene graphs        success rates (up to 98% for "SliceObject") and
+                                            Success Rate              into natural language for model input           demonstrating the feasibility of grounded LLMs
+                                                                      3. Task and geometric grounding for robot       for robotic task planning.
+                                                                      execution                                       2. Demonstrates correctness in generating ac-
+                                                                      4. Grounding high-level actions to low-level    tionable plans from textual directives alone, sig-
+                                                                      robotic commands                                nificantly improving plan success rates without
+                                                                                                                      relying on visual data.
+                              Table 3: Summary of Foundations in LLM Planning (Section 2)
+Method Name              Dataset             Evaluation Metric          Methods                                          Major Contribution
+Agent-FLAN               HALF-World,         Accuracy, hallucination    1.Fine-tuning LLMs (Llama2-7B) for agent         1. Outperforms previous works by 3.5% on
+(Chen et al., 2024b)     WebShop,            scores                     tasks                                            agent tasks
+                         Mind2Web,                                      2.Decomposing training data into capabili-       2. Significantly reduces hallucinations through
+                         Knowledge                                      ties like reasoning, retrieval, understanding,   negative sample learning
+                         Graph,    Oper-                                instruction following                            3. Demonstrates scaling law for data and model
+                         ating   System,                                3. Negative sample generation for hallucina-     size improvement
+                         Database, Tool-                                tion mitigation                                  4. Enhances general capabilities like reasoning
+                         Bench                                                                                           and instruction-following in general NLP tasks
+AgentOhana               Webshop,            Success Rate, Task         1. Standardizes heterogeneous multi-turn         AgentOhana aggregates and unifies agent trajec-
+(Zhang et al., 2024)     HotpotQA,           Completion      Time,      agent trajectories from diverse environments     tories from ten diverse environments, achieving
+                         ToolAlpaca,         Reward Accuracy            2. AgentRater for filtering low-quality tra-     significant improvements in model performance
+                         ToolBench, Alf-                                jectories                                        and task execution. The xLAM-v0.1 model
+                         World, APIbank,                                3. Generic dataloader for efficient data han-    trained using AgentOhana outperforms GPT-4
+                         Mind2Web,                                      dling during training                            and other models in benchmarks like Webshop
+                         Knowledge                                                                                       and ToolEval.
+                         Graph, Database
+NAT                      GSM8K, ASDiv,       Accuracy,      F1-Score,   1. Incorporates both positive and negative       1. NAT achieves a 64.64% average performance
+(Wang et al., 2024)      SVAMP, Multi-       EM Score                   samples in fine-tuning LLMs for agent tasks      across GSM8K, ASDiv, SVAMP, and MultiArith
+                         Arith, HotpotQA,                               2. Introduces a prefix/suffix to indicate        using 2k positive and 10k negative samples. It
+                         StrategyQA                                     whether trajectories are positive or negative    outperforms Vanilla and NUT methods in vari-
+                                                                        3. Differentiates high-quality and low-          ous tasks, demonstrating the value of negative
+                                                                        quality negative examples                        examples for agent fine-tuning.
+                                                                        4. Fine-grained NAT with two-level classifi-     2.Enhances correctness by utilizing negative ex-
+                                                                        cation of negative examples                      amples to inform the fine-tuning process, im-
+                                                                                                                         proving task success rates
+ETO                      WebShop, Sci-       Average Reward, Suc-       1. Exploration phase for failure trajectory      1. ETO demonstrates a 22% improvement in
+(Song et al., 2024)      enceWorld,          cess Rate, Task Solving    collection                                       task-solving efficiency over traditional behav-
+                         ALFWorld            Efficiency                 2. Contrastive learning using failure-success    ioral cloning, surpassing baselines like PPO and
+                                                                        trajectory pairs                                 RFT. It significantly improves performance in
+                                                                        3. DPO loss for iterative policy refinement      both in-domain and out-of-domain tasks, espe-
+                                                                        4. Iterative optimization cycle for improve-     cially when expert trajectories are unavailable.
+                                                                        ment                                             2. Significantly improves correctness in task
+                                                                                                                         planning by allowing agents to learn from both
+                                                                                                                         successful and failed interactions, leading to ro-
+                                                                                                                         bust policy enhancements.
+MC-DML                   Jericho   Bench-    Success Rate, Planning     1. Integrates Monte Carlo Tree Search            1. Strengthens the foundation of LLM planning
+(Shi et al., 2025)       mark                Efficiency                 (MCTS) with LLMs for more effective plan-        by combining search algorithms (MCTS) with
+                                                                        ning.                                            language-based reasoning, enabling more struc-
+                                                                        2. Uses in-trial and cross-trial memory          tured and adaptive decision-making.
+                                                                        mechanisms to enhance decision-making            2. Improves correctness by leveraging memory-
+                                                                        based on past failures.                          guided LLM policies to adjust action probabil-
+                                                                                                                         ities dynamically, ensuring valid and effective
+                                                                                                                         decision paths in text-based planning.
+ARMAP                    Multiple agent      Success Rate               1. Uses LLMs to navigate environments and        1. Establishes a novel foundation for LLM plan-
+(Chen et al., 2025).     benchmarks                                     generate diverse action trajectories.            ning by automating the creation of reward mod-
+                                                                        2. Employs a separate LLM to create and          els, enhancing decision-making capabilities of
+                                                                        refine a reward model from these trajecto-       LLM agents.
+                                                                        ries, integrating it with various planning al-   2. Demonstrates a significant advancement in
+                                                                        gorithms.                                        LLM agents’ ability to handle complex, multi-
+                                                                                                                         step decision-making tasks without human-
+                                                                                                                         annotated data, making the approach highly scal-
+                                                                                                                         able and adaptable.
+
+
+
+
+                             Table 4: Summary of Completeness in LLM Planning (Section 3)
+Method Name              Dataset             Evaluation Metric          Methods                                          Major Contribution
+PDDL World Model         Household, Tyre-    Error Count, Success       1. LLM-based PDDL generation for task            The paper shows that GPT-4 is capable of gen-
+Generation               world, Logistics    Rate                       planning                                         erating high-quality PDDL models with fewer
+(Guan et al., 2023)                                                     2. Error correction using LLMs as feedback       errors than GPT-3.5-Turbo. It demonstrates that
+                                                                        interfaces                                       GPT-4-based world models lead to a 95% suc-
+                                                                        3. Use of external planners for generating       cess rate in planning tasks using classical plan-
+                                                                        feasible plans from PDDL models                  ners like Fast Downward.
+Large Language Mod-      TravelPlanner,      Success Rate, Optimiza-    1. Converts natural language travel plan-        1.TravelPlan-LLM achieves 93.9% success in
+els Can Solve Real-      UnsatChristmas,     tion Rate, Interactive     ning queries into SMT (Satisfiability Mod-       solving complex multi-constraint travel planning
+World Planning Rigor-    TSP,       Block    Repair Success Rate        ulo Theory) problems                             problems and offers interactive plan repair for
+ously with Formal Ver-   Picking,    Task                               2. Uses LLMs to generate steps and code          unsatisfiable queries. It generalizes well to new
+ification Tools          Allocation, Ware-                              for formal solvers                               problem domains, including TSP and task allo-
+(Hao et al., 2024a)      house                                          3. Provides feedback and suggestions for         cation.
+                                                                        unsatisfiable queries                            2.Enhances completeness by using formal tools
+                                                                        4. Zero-shot generalization to new tasks and     to verify that LLM-generated plans are both cor-
+                                                                        constraints                                      rect and complete, ensuring that all solutions are
+                                                                                                                         viable and no false solutions are proposed.
+PPNL                     Grid    environ-    Success Rate, Optimal      1. Few-shot prompting with GPT-4 for path        1.PPNL evaluates LLMs on path planning tasks,
+(Aghzal et al., 2023)    ments, ALFRED       Rate, Exact Match Ac-      planning                                         demonstrating GPT-4’s spatial reasoning ability
+                                             curacy, Unreachable Ac-    2. Action-and-effect prompting to guide          when prompted effectively. ReAct prompting
+                                             curacy, Feasible Rate      long-term spatial reasoning                      achieves 96.1% success rate, while fine-tuned
+                                                                        3. CoT and ReAct prompting to en-                models like T5 outperform in in-distribution set-
+                                                                        hance spatial-temporal reasoning and obsta-      tings but struggle with generalization.
+                                                                        cle avoidance                                    2. Directly addresses the completeness of LLM
+                                                                        4. Multi-goal path planning with hierarchi-      planning by evaluating their ability to identify
+                                                                        cal task decomposition                           unsolvable problems and correctly navigate solv-
+                                                                                                                         able scenarios.
+LRM Evaluation           Blocksworld,        Success Rate, Execu-       1. Comparison of LLMs and LRMs using             LRM o1 outperforms all LLMs, achieving
+(Valmeekam et al.,       Mystery             tion Time                  the PlanBench test set                           97.8% on Blocksworld, but struggles with per-
+2024)                    Blocksworld,                                   2. Zero-shot and one-shot prompting for          formance on Mystery Blocksworld (52.8d%).
+                         Random-                                        evaluation                                       LLMs fail to generalize well, showing signif-
+                         ized    Mystery                                3. Performance measured on standard              icant limitations when faced with obfuscated
+                         Blocksworld                                    Blocksworld tasks as well as obfuscated ver-     tasks.
+                                                                        sions (Mystery Blocksworld)
+                                                                        4. Efficiency evaluation of reasoning tokens
+                                                                        used by o1
+                            Table 5: Summary of Executability in LLM Planning (Section 4)
+Method Name             Dataset              Evaluation Metric         Methods                                            Major Contribution
+Adaplanner              ALFWorld and         Success Rate              Closed-loop approach allowing LLM agent            • Uses code-style LLM prompt structure and
+(Sun et al., 2024)      MiniWoB++                                      to refine self-generated plan adaptively           skill discovery mechanism. Achieves 91.79%
+                                                                                                                          success rate on ALFWorld tasks.
+                                                                                                                          • Achieves 91.11% success rate on MiniWoB++
+                                                                                                                          tasks with feedback.
+Inner Monologue         Tabletop and mo-     Success Rate              Uses LLMs for generating sequential, ac-           Demonstrates that LLMs can effectively inte-
+(Huang et al., 2022b)   bile manipulation                              tionable plans based on feedback.                  grate multimodal feedback to improve planning
+                        tasks in both sim-                             Employs closed-loop feedback incorporat-           and execution in robotic tasks.
+                        ulated and real-                               ing success detection, scene descriptions,         Shows adaptability of LLMs to dynamic envi-
+                        world settings                                 and human interactions.                            ronments and tasks, significantly enhancing task
+                                                                                                                          success rates in complex manipulation scenar-
+                                                                                                                          ios.
+LLM-Planner             ALFRED               Success Rate              Uses GPT-3 for generating high-level plans.        Achieves high few-shot performance on the
+(Song et al., 2023)                                                    Incorporates dynamic grounded re-planning          ALFRED dataset, demonstrating the ability to
+                                                                       based on environment feedback.                     quickly adapt to new tasks with minimal training
+                                                                                                                          data.
+                                                                                                                          Introduces dynamic re-planning to adjust plans
+                                                                                                                          based on real-time environmental changes, en-
+                                                                                                                          hancing task success under varied conditions.
+G-PlanET                ALFRED               Key Action Score          Utilizes encoder-decoder LMs with a focus          First study to investigate LMs’ capability in
+(Lin et al., 2023a)                                                    on grounded planning for embodied tasks.           grounded planning for embodied tasks.
+                                                                       Introduces object tables as environmental          Developed a new evaluation metric (KAS) tai-
+                                                                       input for LMs to perceive and plan actions.        lored for assessing the quality of generated plans
+                                                                                                                          in realistic environments.
+LLP                     ALFRED               Task Completion rates     Utilizes latent language to segment and label      Demonstrates effective policy training with mini-
+(Sharma et al., 2021)                                                  hierarchical tasks in demonstrations.              mal natural language annotations, achieving per-
+                                                                       Employs weak and partial natural language          formance comparable to models using more ex-
+                                                                       supervision to train policies.                     tensive data.
+                                                                                                                          Introduces a method that allows hierarchical poli-
+                                                                                                                          cies to be trained using unannotated action se-
+                                                                                                                          quences by inferring natural language descrip-
+                                                                                                                          tions.
+SayCan                  Real-World           Plan Success Rate, Exe-   Leverages LLMs to score the likelihood of          Enables robots to execute complex, long-horizon
+(Ahn et al., 2022)      Kitchen environ-     cution Success Rate       robotic skills contributing to task comple-        tasks using natural language instructions.
+                        ment                                           tion.                                              Nearly doubles performance over non-grounded
+                                                                       Combines LLM outputs with affordance               baselines by integrating real-world affordance
+                                                                       functions from reinforcement learning to pri-      functions with LLM predictions.
+                                                                       oritize feasible actions.
+ADaPT                   ALFWorld, Web-       Success Rate, Task        1. As-needed recursive decomposition of            ADaPT improves success rates by up to 33%
+(Prasad et al., 2023)   Shop, TextCraft      Complexity Handling,      complex tasks                                      over baselines, dynamically decomposing com-
+                        & hotel data         Sub-Task Decomposi-       2. Planner and executor modules with dy-           plex tasks as needed. It handles task complexity
+                                             tion Efficiency           namic failure adaptation                           efficiently with up to 28.3% higher success rates
+                                                                       3. Multi-level decomposition for task com-         on ALFWorld and 27% higher on WebShop.
+                                                                       plexity handling
+LLM-DP                  Alfworld             Success Rate, Average     1. LLM converts task descriptions into exe-        LLM-DP outperforms the ReAct baseline,
+(Dagan et al., 2023)                         Episode Length            cutable PDDL goals                                 achieving 96% success in Alfworld, with sig-
+                                                                       2. Symbolic planner (BFS(f)) generates             nificantly fewer actions (13.16 vs. 18.69) per
+                                                                       valid plans                                        task and higher efficiency due to belief sampling
+                                                                       3. Belief sampling to generate multiple            and symbolic planning integration.
+                                                                       world states for planning
+LLM-MCTS                Virtual Home         Success Rate, Task        1. Combines LLM as a commonsense world             LLM-MCTS achieves up to 91.4% success in
+(Zhao et al., 2024)                          Completion Time, Task     model and heuristic policy in MCTS                 simple tasks, outperforms GPT-3.5-based poli-
+                                             Complexity                2. Utilizes LLM to predict object locations        cies and traditional MCTS approaches, and
+                                                                       and generate action suggestions                    demonstrates superior performance for large-
+                                                                       3. Improves planning efficiency by limiting        scale task planning with partial observations.
+                                                                       search space with a heuristic policy
+                                                                       4. World model and policy guide MCTS to
+                                                                       select promising action paths
+Corrective        Re-   Virtual Home         Executability   Rate,     1. Utilizes precondition errors for re-            1. Introduced a novel approach to improve plan
+prompting                                    Semantic Correctness,     prompting to generate corrective actions.          executability and correctness using error-driven
+(Raman et al., 2022)                         Number of Re-prompts      Employs a template-based prompt strategy           re-prompting.
+                                                                       that incorporates error details for plan adjust-   2. Demonstrated substantial improvements in
+                                                                       ments.                                             task execution rates and reduced the number of
+                                                                                                                          necessary re-prompts compared to baselines.
+                             Table 6: Summary of Executability in LLM Planning (Section 4)
+Method Name              Dataset             Evaluation Metric          Methods                                         Major Contribution
+LLM-Planner              ALFRED              Success Rate               Uses GPT-3 for generating high-level plans.     Achieves high few-shot performance on the
+(Song et al., 2023)                                                     Incorporates dynamic grounded re-planning       ALFRED dataset, demonstrating the ability to
+                                                                        based on environment feedback.                  quickly adapt to new tasks with minimal training
+                                                                                                                        data.
+                                                                                                                        Introduces dynamic re-planning to adjust plans
+                                                                                                                        based on real-time environmental changes, en-
+                                                                                                                        hancing task success under varied conditions.
+SayCanPay                Ravens (Tower of    Planning Success, Cost-    1. Heuristic search-based planning frame-       SayCanPay outperforms other LLM-based plan-
+(Hazra et al., 2024)     Hanoi), BabyAI,     Effectiveness, General-    work using LLMs                                 ning approaches, achieving higher planning suc-
+                         VirtualHome         ization                    2. Three-step process: Say (generate ac-        cess rates (e.g., 94% on BabyAI), improved cost-
+                                                                        tions), Can (action feasibility), Pay (action   efficiency, and better generalization across envi-
+                                                                        payoff)                                         ronments.
+                                                                        3. Beam search for action selection
+BrainBody-LLM            Virtual  Home,      Success Rate, Goal Con-    Employs two separate LLMs for high-level        - Achieved a 29% improvement in task-oriented
+(Bhat et al., 2024)      Franka Research     dition Recall              planning and low-level control.                 success rates over existing methods.
+                         3                                              Utilizes closed-loop state feedback to itera-   Demonstrated effective grounding of language
+                                                                        tively refine plans based on environmental      models in robotic task planning with minimal
+                                                                        feedback.                                       human intervention.
+CLP                      CoScript 3          Constraint faithfulness,   1.Uses an over-generate-then-filter approach    1.Introduced constrained language planning as a
+(Yuan et al., 2023)                          Executability rate         to improve LLMs’ planning.                      new task, allowing for step-by-step procedural
+                                                                        2. Distills structured script knowledge into    reasoning under constraints.
+                                                                        smaller models using LLMs.                      2.Proposed CoScript, a dataset of 55,000
+                                                                                                                        constraint-driven scripts, improving planning
+                                                                                                                        performance.
+                                                                                                                        3.Smaller models trained on CoScript outper-
+                                                                                                                        form LLMs in constrained planning accuracy.
+PLaSma                   COPLAN, Virtu-      Human        Evaluation:   1. Symbolic procedural knowledge distilla-      PlaSma enhances smaller models with procedu-
+(Brahman et al., 2024)   alHome              Coverage,         Order,   tion                                            ral knowledge, outperforming GPT-3 in tasks
+                                             Overall Quality, Exe-      2. Multi-task and task-specific distillation    like goal-based planning and counterfactual re-
+                                             cutability, Correctness    3. Verifier-guided step-wise beam search        planning. Achieves up to 93% success in coun-
+                                                                        4. Constrained and counterfactual replan-       terfactual replanning.
+                                                                        ning tasks
+PRoC3S                   Various      sim-   Success Rate               1. Uses LLMs to generate programs han-          1. Pioneered the integration of LLMs with
+(Curtis et al., 2024)    ulated       and                               dling continuous parameters and constraints.    constraint satisfaction techniques for complex
+                         real-world    do-                              2.Incorporates continuous constraint satis-     robotic tasks.
+                         mains 3                                        faction to adjust plans based on real-time      2.Demonstrated superior efficiency and effec-
+                                                                        feedback.                                       tiveness in diverse manipulation tasks compared
+                                                                                                                        to existing methods.
+BrainBody-LLM            Virtual  Home,      Success Rate, Goal Con-    Employs two separate LLMs for high-level        - Achieved a 29% improvement in task-oriented
+(Bhat et al., 2024)      Franka Research     dition Recall              planning and low-level control.                 success rates over existing methods.
+                         3                                              Utilizes closed-loop state feedback to itera-   Demonstrated effective grounding of language
+                                                                        tively refine plans based on environmental      models in robotic task planning with minimal
+                                                                        feedback.                                       human intervention.
+ProgPrompt               VirtualHome,        Success Rate, Goal         1. Pythonic program generation for task         ProgPrompt significantly outperforms baseline
+(Singh et al., 2023)     Real-World          Conditions    Recall,      planning                                        methods by using programmatic LLM prompts
+                         Robot Tasks         Executability              2. Use of natural language comments and         to generate executable task plans, achieving up
+                                                                        assertions for feedback                         to 1.00 SR and 1.00 Exec in various Virtual-
+                                                                        3. Integration with real-time environment       Home tasks. It also adapts well to real-world
+                                                                        state feedback during task execution            robot tasks, with a Plan SR of 1 in most cases.
+ISR-LLM                  Diverse planning    Success Rate               1.Utilizes iterative self-refinement to en-     1.Introduced a novel framework that signifi-
+(Zhou et al., 2024)      problem domains                                hance LLM-based planning.                       cantly improves feasibility and success in long-
+                                                                        2.Employs an LLM translator to convert nat-     horizon task planning.
+                                                                        ural language to PDDL, aiding in plan for-      2. Demonstrated superior task accomplishment
+                                                                        mulation and refinement.                        rates across multiple domains compared to state-
+                                                                                                                        of-the-art LLM-based planners.
+ADaPT                    ALFWorld, Web-      Success Rate, Task         1. As-needed recursive decomposition of         ADaPT improves success rates by up to 33%
+(Prasad et al., 2023)    Shop, TextCraft     Complexity Handling,       complex tasks                                   over baselines, dynamically decomposing com-
+                         & hotel data        Sub-Task Decomposi-        2. Planner and executor modules with dy-        plex tasks as needed. It handles task complexity
+                                             tion Efficiency            namic failure adaptation                        efficiently with up to 28.3% higher success rates
+                                                                        3. Multi-level decomposition for task com-      on ALFWorld and 27% higher on WebShop.
+                                                                        plexity handling
+SelfGoal                 Public     Goods    Success Rate, TrueSkill    1. Constructs GOALTREE to decompose             SelfGoal achieves a 94% success rate in dynamic
+(Yang et al., 2024)      Game, Guess 2/3     Score,    Contribution     high-level goals dynamically                    multi-agent environments, outperforming base-
+                         of the Average,     Consistency                2. Uses Search Module to select the most        lines (e.g., ReAct, ADAPT) by dynamically ad-
+                         First-Price Auc-                               relevant subgoals                               justing subgoal guidance. It significantly im-
+                         tion, Bargaining                               3. Decomposition updates based on environ-      proves task performance, especially in coopera-
+                                                                        mental feedback                                 tive and competitive tasks.
+                                                                        4. Adaptive subgoal tree refinement during
+                                                                        task execution
+                               Table 7: Summary of Optimality in LLM Planning (Section 5)
+Method Name              Dataset             Evaluation Metric           Methods                                         Major Contribution
+TTG                      Synthetic travel    Exact Match accuracy,       1. Fine-tuned LLM for translating NL re-        TTG achieves 91% translation accuracy with
+(Ju et al., 2024)        requests    and     Cost ratio, Net Promoter    quests to symbolic form                         LLM, guarantees optimal itineraries with min-
+                         flight & hotel      Score                       2. MILP solver for optimal travel itineraries   imal cost, and provides a user-friendly sys-
+                         data                                            3. Real-time response (<5 seconds) with         tem with a high NPS (35-40%) on generated
+                                                                         guaranteed optimality                           itineraries.
+ToolChain*               Home     Search,    Success Rate, Effi-         1. A* search-based planning algorithm for       ToolChain* improves success rate by 3.1% and
+(Zhuang et al., 2023)    Trip    Booking,    ciency (Time), Running      tool-use tasks                                  reduces planning time by 7.35x compared to
+                         Google Sheets,      Time Comparison             2. Efficient node expansion and pruning us-     baselines like MCTS, demonstrating its effi-
+                         Virtual   Home,                                 ing task-specific cost functions                ciency in navigating expansive action spaces.
+                         GSM8K                                           3. Combines exploration and exploitation
+                                                                         for optimal solutions
+SayCanPay                Ravens (Tower of    Planning Success, Cost-     1. Heuristic search-based planning frame-       SayCanPay outperforms other LLM-based plan-
+(Hazra et al., 2024)     Hanoi), BabyAI,     Effectiveness, General-     work using LLMs                                 ning approaches, achieving higher planning suc-
+                         VirtualHome         ization                     2. Three-step process: Say (generate ac-        cess rates (e.g., 94% on BabyAI), improved cost-
+                                                                         tions), Can (action feasibility), Pay (action   efficiency, and better generalization across envi-
+                                                                         payoff)                                         ronments.
+                                                                         3. Beam search for action selection
+Beyond A*                Sokoban, Maze       Success Weighted by         1. Trains Transformer to imitate A* search      1. Demonstrates novel training methods that in-
+(Lehnert et al., 2024)   Navigation          Cost (SWC), Improved        dynamics                                        tegrate search dynamics into Transformer train-
+                                             Length Ratio (ILR), Op-     2. Fine-tunes to generate shorter execution     ing, enhancing planning efficiency.
+                                             timal Plan Success Rate     traces                                          2. Achieves significant reductions in search
+                                                                         3. Bootstraps from search dynamics for op-      steps (up to 26.8% fewer than A*) and improves
+                                                                         timized plan generation                         task-solving performance on complex puzzles
+                                                                                                                         and navigation tasks.
+LLMFP                    9 diverse plan-     Plan optimality, con-       1. Converts natural language planning prob-     1. Introduces a novel method of achieving op-
+(Hao et al., 2024b)      ning        tasks   straint satisfaction rate   lems into formal optimization problems us-      timality in LLM planning by rigorously con-
+                         (multi-constraint                               ing zero-shot LLM reasoning.                    structing optimization problems from natural
+                         decision-making                                 2. Uses SMT solvers to guarantee that the       language inputs, significantly outperforming tra-
+                         and multi-step                                  generated plans are both logically correct      ditional planning models.
+                         planning)                                       and executable.                                 2. Demonstrates strong performance across a
+                                                                                                                         range of complex tasks, achieving over 83% opti-
+                                                                                                                         mal rates, thereby highlighting the effectiveness
+                                                                                                                         of integrating LLMs with classical optimization
+                                                                                                                         approaches for high-quality planning outcomes.
+                          Table 8: Summary of Representation in LLM Planning (Section 6)
+Method Name             Dataset             Evaluation Metric           Methods                                          Major Contribution
+LLM-GoalTrans           Blocksworld, AL-    Goal Translation Suc-       1. Uses GPT-3.5 to translate natural lan-        1. Demonstrated effective translation of natural
+(Xie et al., 2023)      FRED                cess Rate                   guage instructions into PDDL goals.              language to PDDL goals, with high success rates
+                                                                        2.Employs n-shot learning to improve trans-      in structured environments.
+                                                                        lation accuracy.                                 2.Highlighted the challenges and limitations of
+                                                                                                                         LLMs in tasks requiring numerical or physical
+                                                                                                                         reasoning.
+ISR-LLM                 Diverse planning    Success Rate                1.Utilizes iterative self-refinement to en-      1.Introduced a novel framework that signifi-
+(Zhou et al., 2024)     problem domains                                 hance LLM-based planning.                        cantly improves feasibility and success in long-
+                                                                        2.Employs an LLM translator to convert nat-      horizon task planning.
+                                                                        ural language to PDDL, aiding in plan for-       2. Demonstrated superior task accomplishment
+                                                                        mulation and refinement.                         rates across multiple domains compared to state-
+                                                                                                                         of-the-art LLM-based planners.
+Adaplanner              ALFWorld and        Success Rate                Closed-loop approach allowing LLM agent          1. Uses code-style LLM prompt structure and
+(Sun et al., 2024)      MiniWoB++                                       to refine self-generated plan adaptively         skill discovery mechanism. Achieves 91.79%
+                                                                                                                         success rate on ALFWorld tasks.
+                                                                                                                         2. Achieves 91.11% success rate on MiniWoB++
+                                                                                                                         tasks with feedback.
+LLM-GenPlan             Various PDDL        Percentage     of   tasks   1.Uses GPT-4 to synthesize domain-specific       1.Demonstrated GPT-4’s effectiveness as a gen-
+(Silver et al., 2024)   domains             solved                      Python programs for task planning.               eralized planner across several PDDL domains.
+                                                                        2.Incorporates Chain-of-Thought summa-           2.Highlighted the significant benefits of auto-
+                                                                        rization and automated debugging in the pro-     mated debugging and the mixed impacts of
+                                                                        cess.                                            Chain-of-Thought summarization in planning
+                                                                                                                         tasks.
+LLM+P                   Blocksworld,        Success Rate, Optimal       1. Converts natural language problem de-         LLM+P significantly outperforms LLMs in solv-
+(Liu et al., 2023a)     Grippers,    Bar-   Plan Success, Plan Exe-     scription into PDDL format                       ing long-horizon planning problems, achieving
+                        man, Termes, and    cution Time                 2. Uses classical planners (e.g., FAST-          optimal plans in robot domains with high suc-
+                        other robot plan-                               DOWNWARD) to generate optimal plans              cess rates (up to 100% on Blocksworld) and
+                        ning scenarios                                  3. Translates planner output back into natu-     minimal execution time.
+                                                                        ral language
+PDDL World Model        Household, Tyre-    Error Count, Success        1. LLM-based PDDL generation for task            The paper shows that GPT-4 is capable of gen-
+Generation              world, Logistics    Rate                        planning                                         erating high-quality PDDL models with fewer
+(Guan et al., 2023)                                                     2. Error correction using LLMs as feedback       errors than GPT-3.5-Turbo. It demonstrates that
+                                                                        interfaces                                       GPT-4-based world models lead to a 95% suc-
+                                                                        3. Use of external planners for generating       cess rate in planning tasks using classical plan-
+                                                                        feasible plans from PDDL models                  ners like Fast Downward.
+LLM-DP                  Alfworld            Success Rate, Average       1. LLM converts task descriptions into exe-      LLM-DP outperforms the ReAct baseline,
+(Dagan et al., 2023)                        Episode Length              cutable PDDL goals                               achieving 96% success in Alfworld, with sig-
+                                                                        2. Symbolic planner (BFS(f)) generates           nificantly fewer actions (13.16 vs. 18.69) per
+                                                                        valid plans                                      task and higher efficiency due to belief sampling
+                                                                        3. Belief sampling to generate multiple          and symbolic planning integration.
+                                                                        world states for planning
+LTL-Gen                 Custom datasets     Accuracy                    1. Uses large-scale semantic parsing with        1.Demonstrates high accuracy with minimal hu-
+(Pan et al., 2023)      with LTL/natural                                minimal human-labeled data.                      man data compared to prior work.
+                        language pairs                                  2.Employs synthetic data generation and          2.Enhances data efficiency for natural language
+                                                                        constrained decoding.                            to LTL translation, making it feasible for broader
+                                                                                                                         applications.
+AutoTAMP                Custom 2D task      Success Rate                1. Translates NL instructions to STL using       1. Introduces a novel method for autoregressive
+(Chen et al., 2024a)    domains                                         LLMs.                                            re-prompting to correct translation errors.
+                                                                        2.Utilizes autoregressive re-prompting for       2.Demonstrates significant improvements in task
+                                                                        syntactic and semantic error correction.         success rates with hard geometric and temporal
+                                                                        3.Plans trajectories with a formal STL plan-     constraints.
+                                                                        ner.                                             3.Provides a robust framework that combines
+                                                                                                                         LLM translation capabilities with formal plan-
+                                                                                                                         ning efficiency.
+G-PlanET                ALFRED              Key Action Score            Utilizes encoder-decoder LMs with a focus        First study to investigate LMs’ capability in
+(Lin et al., 2023a)                                                     on grounded planning for embodied tasks.         grounded planning for embodied tasks.
+                                                                        Introduces object tables as environmental        Developed a new evaluation metric (KAS) tai-
+                                                                        input for LMs to perceive and plan actions.      lored for assessing the quality of generated plans
+                                                                                                                         in realistic environments.
+PPNL                    Grid    environ-    Success Rate, Optimal       1. Few-shot prompting with GPT-4 for path        PPNL evaluates LLMs on path planning tasks,
+(Aghzal et al., 2023)   ments, ALFRED       Rate, Exact Match Ac-       planning                                         demonstrating GPT-4’s spatial reasoning ability
+                                            curacy, Unreachable Ac-     2. Action-and-effect prompting to guide          when prompted effectively. ReAct prompting
+                                            curacy, Feasible Rate       long-term spatial reasoning                      achieves 96.1% success rate, while fine-tuned
+                                                                        3. CoT and ReAct prompting to en-                models like T5 outperform in in-distribution set-
+                                                                        hance spatial-temporal reasoning and obsta-      tings but struggle with generalization.
+                                                                        cle avoidance
+                                                                        4. Multi-goal path planning with hierarchi-
+                                                                        cal task decomposition
+ProgPrompt              VirtualHome,        Success Rate, Goal          1. Pythonic program generation for task          ProgPrompt significantly outperforms baseline
+(Singh et al., 2023)    Real-World          Conditions    Recall,       planning                                         methods by using programmatic LLM prompts
+                        Robot Tasks         Executability               2. Use of natural language comments and          to generate executable task plans, achieving up
+                                                                        assertions for feedback                          to 1.00 SR and 1.00 Exec in various Virtual-
+                                                                        3. Integration with real-time environment        Home tasks. It also adapts well to real-world
+                                                                        state feedback during task execution             robot tasks, with a Plan SR of 1 in most cases.
+Adaplanner              ALFWorld and        Success Rate                Closed-loop approach allowing LLM agent          1. Uses code-style LLM prompt structure and
+(Sun et al., 2024)      MiniWoB++                                       to refine self-generated plan adaptively         skill discovery mechanism. Achieves 91.79%
+                                                                                                                         success rate on ALFWorld tasks.
+                                                                                                                         2. Achieves 91.11% success rate on MiniWoB++
+                                                                                                                         tasks with feedback.
+LID                     VirtualHome,        Task completion rates,      1. Utilizes pre-trained LMs to convert ob-       1. Demonstrates that pre-trained LMs can signif-
+(Li et al., 2022)       BabyAI              Generalization to novel     servations, goals, and history into sequential   icantly improve task completion rates and gener-
+                                            scenes and tasks            data for decision-making.                        alization in interactive decision-making.
+                                                                        2. Employs active data gathering to train        2. Provides insights into the effectiveness of
+                                                                        policies without pre-collected expert data.      sequential input representations and LM-based
+                                                                                                                         weight initialization for generalization.
+SayCan                  Real-World          Plan Success Rate, Exe-     Leverages LLMs to score the likelihood of        Enables robots to execute complex, long-horizon
+(Ahn et al., 2022)      Kitchen environ-    cution Success Rate         robotic skills contributing to task comple-      tasks using natural language instructions.
+                        ment                                            tion.                                            Nearly doubles performance over non-grounded
+                                                                        Combines LLM outputs with affordance             baselines by integrating real-world affordance
+                                                                        functions from reinforcement learning to pri-    functions with LLM predictions.
+                                                                        oritize feasible actions.
+                           Table 9: Summary of Representation in LLM Planning (Section 6)
+Method Name             Dataset             Evaluation Metric         Methods                                         Major Contribution
+PLaG                    AsyncHow            accuracy                  1. Utilizes graph-based representations to      1. Successfully introduces a graph-theoretical
+(Lin et al., 2024)                                                    instruct LLMs in planning tasks.                approach to enhance LLMs’ performance in
+                                                                      2. Combines natural language with graph         asynchronous planning tasks.
+                                                                      theory for enhanced task planning.              2. Demonstrates the utility of graph-enhanced
+                                                                                                                      prompts to improve accuracy across different
+                                                                                                                      LLM architectures.
+GNN-Enhanced Task       HuggingFace,        Node F1-Score, Link       1. Integration of GNNs for task graph navi-     GNN-enhanced planning outperforms LLM-
+Planner                 Multimedia tasks,   F1-Score, Task Accu-      gation                                          based solutions by improving task accuracy (up
+(Wu et al., 2024)       Daily Life API      racy, Token Consump-      2.     Training-free (SGC) and training-        to 9%) with reduced token consumption. The
+                        tasks,    TMDB      tion                      required (GraphSAGE) approaches                 proposed method scales well with larger task
+                        API tasks                                     3. GNN-based node and edge selection for        graphs and improves planning efficiency by a
+                                                                      task planning                                   significant margin.
+                                                                      4. Training fine-tuned models for better task
+                                                                      retrieval
+
+
+
+
+                          Table 10: Summary of Generalization in LLM Planning (Section 7)
+Method Name             Dataset             Evaluation Metric         Methods                                         Major Contribution
+LLM-GenPlan             Various PDDL        Percentage   of   tasks   1.Uses GPT-4 to synthesize domain-specific      1.Demonstrated GPT-4’s effectiveness as a gen-
+(Silver et al., 2024)   domains             solved                    Python programs for task planning.              eralized planner across several PDDL domains.
+                                                                      2.Incorporates Chain-of-Thought summa-          2.Highlighted the significant benefits of auto-
+                                                                      rization and automated debugging in the pro-    mated debugging and the mixed impacts of
+                                                                      cess.                                           Chain-of-Thought summarization in planning
+                                                                                                                      tasks.
+VOYAGER                 Minecraft           Unique items collected,   1. Uses an automatic curriculum to maxi-        1. First LLM-powered embodied agent for life-
+(Wang et al., 2023a)                        Distance traveled, Tech   mize exploration.                               long learning in Minecraft, capable of continu-
+                                            tree milestones           2. Maintains a skill library for storing and    ous self-improvement.
+                                                                      retrieving executable behaviors.                2. Demonstrates significant improvements in
+                                                                      3. Employs an iterative prompting mecha-        discovery and task completion, outperforming
+                                                                      nism that incorporates feedback for continu-    state-of-the-art methods in efficiency and gener-
+                                                                      ous improvement.                                alization.
+                               Table 11: Summary of Efficiency in LLM Planning (Section 8)
+Method Name              Dataset              Evaluation Metric          Methods                                         Major Contribution
+Adaplanner               ALFWorld and         Success Rate               Closed-loop approach allowing LLM agent         1. Uses code-style LLM prompt structure and
+(Sun et al., 2024)       MiniWoB++                                       to refine self-generated plan adaptively        skill discovery mechanism. Achieves 91.79%
+                                                                                                                         success rate on ALFWorld tasks.
+                                                                                                                         2. Achieves 91.11% success rate on MiniWoB++
+                                                                                                                         tasks with feedback.
+                                                                                                                         3. Improves planning correctness by adaptively
+                                                                                                                         refining plans based on environmental feedback,
+                                                                                                                         effectively managing complex sequential tasks.
+
+Query-Efficient Plan-    PlanBench, Lo-       Success Rate               1. Uses LLMs as heuristics in search-based      1. Enhances query efficiency in planning by
+ning                     gistics, Grippers,                              planning to propose actions or select states.   leveraging LLMs to reduce the number of
+(Gonzalez-Pumariega      Robotouille                                     2. Employs generative LLM planners that         queries to the world model, thus saving com-
+et al., 2024)                                                            dynamically adapt plans based on feedback       putational resources and time.
+                                                                         from a world model.                             2. Demonstrates that LLM-based generative
+                                                                                                                         planners can effectively adapt to feedback, im-
+                                                                                                                         proving correctness and efficiency in planning
+                                                                                                                         tasks by avoiding cul-de-sacs and refining action
+                                                                                                                         sequences dynamically.
+Tree-planner             VirtualHome          Success Rate,       Ex-    1. Plan sampling using LLM for prospective      1. Tree-Planner achieves a 1.29% improvement
+(Hu et al., 2023b)                            ecutability,       Goal    plans                                           in Success Rate and a 53.29% reduction in token
+                                              Conditions       Recall,   2. Action tree construction                     cost compared to ITERATIVE-PLANNER and
+                                              Error, Correction Token    3. Grounded deciding with real-time obser-      a 40.52% reduction in error corrections.
+                                              Cost                       vations                                         2. Significantly enhances efficiency in LLM
+                                                                                                                         planning by reducing the number of LLM calls
+                                                                                                                         and interaction with the world model, and
+                                                                                                                         by minimizing input/output lengths and model
+                                                                                                                         sizes.
+Thought of Search        24 Game, Mini        Success Rate, Plan         1. Using LLMs to generate code for search       Thought of Search achieves 100% accuracy
+(Katz et al., 2024)      Crosswords,          Time, Model Evaluation     components (successor functions and goal        across datasets with minimal LLM calls (1–2
+                         BlocksWorld,         Calls                      tests)                                          calls per function). Significantly more efficient
+                         PrOntoQA                                        2. Search performed using BFS and DFS           than existing LLM-based planning methods.
+                                                                         3. Minimizes LLM calls for efficiency
+Chain-of-Symbols         Brick     World,     Accuracy, Precision, Re-   1. Translates spatial relationships to sym-     1. COS improves accuracy by 60.8% on Brick
+(Hu et al., 2023a)       NLVR-based           call, Token Usage          bolic representation                            World tasks (from 31.8% to 92.6%) and reduces
+                         Manipulation,                                   2. Uses chained intermediate steps for effi-    token usage by 65.8%.
+                         Natural    Lan-                                 cient planning                                  2.Significantly enhances the correctness and ef-
+                         guage Naviga-                                   3. Reduced redundancy in input tokens           ficiency of LLM planning by reducing unnec-
+                         tion, SPARTUN                                                                                   essary token usage by up to 65.8% and improv-
+                                                                                                                         ing accuracy by up to 60.8% in complex spatial
+                                                                                                                         tasks.
+Beyond A*                Sokoban, Maze        Success Weighted by        1. Trains Transformer to imitate A* search      1. Demonstrates novel training methods that in-
+(Lehnert et al., 2024)   Navigation           Cost (SWC), Improved       dynamics                                        tegrate search dynamics into Transformer train-
+                                              Length Ratio (ILR), Op-    2. Fine-tunes to generate shorter execution     ing, enhancing planning efficiency.
+                                              timal Plan Success Rate    traces                                          2. Achieves significant reductions in search
+                                                                         3. Bootstraps from search dynamics for op-      steps (up to 26.8% fewer than A*) and improves
+                                                                         timized plan generation                         task-solving performance on complex puzzles
+                                                                                                                         and navigation tasks.
+LLM-DP                   Alfworld             Success Rate, Average      1. LLM converts task descriptions into exe-     1. LLM-DP outperforms the ReAct baseline,
+(Dagan et al., 2023)                          Episode Length             cutable PDDL goals                              achieving 96% success in Alfworld, with signifi-
+                                                                         2. Symbolic planner (BFS(f)) generates          cantly fewer actions (13.16 vs. 18.69) per task
+                                                                         valid plans                                     and higher efficiency due to belief sampling and
+                                                                         3. Belief sampling to generate multiple         symbolic planning integration.
+                                                                         world states for planning                       2. Reduces computational costs by decreasing
+                                                                                                                         the number of search steps required for planning,
+                                                                                                                         improving efficiency by up to 26.8%
+DEPS                     Alfworld             Success Rate, Average      1. LLM generates PDDL goal from task            1. LLM-DP achieves 96% success in Alfworld,
+(Wang et al., 2023b)                          Episode Length             description                                     outperforming the ReAct baseline (53%) with
+                                                                         2. Sampling world beliefs and using sym-        fewer actions.
+                                                                         bolic planning                                  2.Reduces reliance on extensive LLM calls and
+                                                                         3. Plan generator (BFS(f)) for generating       minimizes human involvement by integrating
+                                                                         plans                                           automatic PDDL generation, thereby enhancing
+                                                                                                                         the efficiency of planning in dynamic environ-
+                                                                                                                         ments.
+PLaSma                   COPLAN, Virtu-       Human        Evaluation:   1. Symbolic procedural knowledge distilla-      1. PlaSma enhances smaller models with proce-
+(Brahman et al., 2024)   alHome               Coverage,         Order,   tion                                            dural knowledge, outperforming GPT-3 in tasks
+                                              Overall Quality, Exe-      2. Multi-task and task-specific distillation    like goal-based planning and counterfactual re-
+                                              cutability, Correctness    3. Verifier-guided step-wise beam search        planning. Achieves up to 93% success in coun-
+                                                                         4. Constrained and counterfactual replan-       terfactual replanning.
+                                                                         ning tasks                                      2.Demonstrates efficiency by enabling smaller
+                                                                                                                         models to perform complex planning tasks with
+                                                                                                                         reduced computational costs.
+KnowNo                   Simulated and        Success Rate, Help Re-     1. Use of Conformal Prediction (CP) for         1. KNOWNO achieves 85% task success while
+(Ren et al., 2023)       Real Robot Tasks     duction, Task Success      uncertainty calibration                         reducing human help by 10–24%. Guarantees
+                                              with Human Help, Pre-      2. Selection of multiple candidate actions      task success with a calibrated confidence level
+                                              diction Set Size           3. Minimizes human intervention based on        using CP.
+                                                                         prediction set size                             2. Enhances efficiency and autonomy by reduc-
+                                                                                                                         ing the need for human intervention, aligning
+                                                                                                                         uncertainty to ensure task success
+AutoToS                  BlocksWorld, 24      Success Rate, Plan         1. Automates feedback process for search        1. AutoToS achieves 100% accuracy across five
+(Cao et al., 2024)       Game, Sokoban,       Accuracy, Number of        components 2. Uses soundness and com-           domains with minimal human feedback. Signif-
+                         Mini Crosswords,     Language Model Calls,      pleteness checks to refine the generated code   icantly reduces the number of model calls and
+                         PrOntoQA             Time to Solve              3.Incorporates both generic and domain-         ensures soundness and completeness.
+                                                                         specific unit tests                             2.Improves efficiency by automating the feed-
+                                                                                                                         back process, significantly reducing the number
+                                                                                                                         of LLM calls and human involvement.
+

@@ -1,0 +1,8 @@
+graph TB
+    E["共享证据池"] --> D1["基础设施视角<br/>Infra Analyst"]
+    E --> D2["应用层视角<br/>App Analyst"]
+    E --> D3["全局视角<br/>Holistic Analyst"]
+    D1 --> J["裁判<br/>Moderator"]
+    D2 --> J
+    D3 --> J
+    J --> R["最终诊断报告"]

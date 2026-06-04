@@ -1,0 +1,65 @@
+flowchart TB
+    subgraph UI["Web 展示与可观测层"]
+        Dashboard["Dashboard<br/>集群视图 / RCA 报告 / 演化趋势"]
+        SSE["SSE 实时日志<br/>Pipeline 状态推送"]
+    end
+
+    subgraph ORCH["编排控制层"]
+        Daemon["Daemon<br/>持续检测 / TTL 去重 / 并发分发"]
+        Pipeline["Pipeline Manager<br/>检测-假设-调查-推理-恢复"]
+        RCA["RCA Engine<br/>假设驱动诊断循环"]
+    end
+
+    subgraph PARA["协作范式层"]
+        Chain["Chain"]
+        ReAct["ReAct"]
+        Reflection["Reflection"]
+        Plan["Plan-and-Execute"]
+        Debate["Debate"]
+        Voting["Voting"]
+    end
+
+    subgraph AGENTS["专用智能体层"]
+        Detect["DetectionAgent<br/>异常发现"]
+        Alert["AlertAgent<br/>告警压缩"]
+        Hypo["HypothesisAgent<br/>根因假设"]
+        PlanAgent["PlanningAgent<br/>调查计划"]
+        Metric["MetricAgent<br/>指标分析"]
+        Log["LogAgent<br/>日志分析"]
+        Trace["TraceAgent<br/>链路分析"]
+        Event["EventAgent<br/>事件分析"]
+        Corr["CorrelationAgent<br/>跨信号关联"]
+        Profile["ProfilingAgent<br/>性能剖析"]
+        Remed["RemediationAgent<br/>修复与回滚"]
+    end
+
+    subgraph TOOLS["工具与可观测数据层"]
+        K8s["K8s API / kubectl"]
+        Prom["Prometheus / PromQL"]
+        Logs["Loki / Elasticsearch / Pod Logs"]
+        Jaeger["Jaeger Trace"]
+        Graph["服务拓扑 / PageRank RCA"]
+        Action["ActionStack / dry-run / rollback"]
+    end
+
+    subgraph MEMORY["记忆与演化层"]
+        Store["FaultContextStore<br/>规则库 / 故障指纹"]
+        Learner["ContextLearner<br/>auto / supervised 学习"]
+        Judge["RCAJudge<br/>质量门控"]
+        TraceStore["TraceStore<br/>执行轨迹"]
+        Feedback["ExpertFeedbackStore<br/>专家反馈"]
+        Tracker["EvolutionTracker<br/>演化审计"]
+    end
+
+    Dashboard <--> SSE
+    SSE <--> Pipeline
+    Daemon --> Pipeline --> RCA --> PARA
+    PARA --> AGENTS
+    AGENTS --> TOOLS
+    AGENTS --> MEMORY
+    TOOLS --> AGENTS
+    MEMORY --> RCA
+    Judge --> Learner --> Store
+    Feedback --> Learner
+    TraceStore --> Tracker
+    Pipeline --> Dashboard

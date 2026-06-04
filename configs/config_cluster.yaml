@@ -1,0 +1,191 @@
+# ──────────────────────────────────────────────
+# AgenticSRE Configuration — Cluster Deployment
+# This config runs directly on the K8S node (no SSH needed)
+# ──────────────────────────────────────────────
+
+llm:
+  api_key: "${LLM_API_KEY}"
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-v4-pro"
+  temperature: 0.1
+  max_tokens: 65536
+  timeout: 300
+
+runtime:
+  mode: "web"
+  log_level: "INFO"
+  log_dir: "./logs"
+  max_workers: 3
+  enable_self_healing: false
+
+kubernetes:
+  namespace: "default"
+  kubeconfig: ""
+  use_ssh: false           # Running on cluster node, use local kubectl
+  use_dry_run: true
+  forbid_unsafe_commands:
+    - "delete namespace"
+    - "delete node"
+    - "drain --force"
+  ssh_jump_host: ""
+  ssh_target: ""
+  target_host: ""
+
+observability:
+  prometheus_url: "http://10.10.3.146:30290"
+  elasticsearch_url: "http://localhost:9200"
+  jaeger_url: "http://10.10.3.146:30686"
+  grafana_url: "http://10.103.160.240:80"
+
+database:
+  dsn: ""
+
+mcp:
+  external_servers: []
+
+remediation:
+  enabled: true
+  confidence_threshold: 0.2
+  max_rollback_depth: 5
+  require_approval: true
+
+memory:
+  enabled: true
+  backend: "json"           # Use JSON backend (no chromadb dep needed)
+  db_path: "./data/memory"
+  embedding_model: ""
+  rules_collection: "sre_rules"
+  faults_collection: "sre_faults"
+  traces_collection: "sre_traces"
+  max_similar_results: 5
+  auto_learn: true
+  judge_threshold: 0.65
+  judge_llm_weight: 0.4
+
+daemon:
+  poll_interval_seconds: 30
+  dedup_ttl_seconds: 300
+  max_concurrent_pipelines: 3
+  default_namespace: ""
+  status_file: "./data/daemon_status.json"
+  signal_history_size: 100
+
+pipeline:
+  max_evidence_iterations: 2
+  hypothesis_confidence_threshold: 0.85
+  enable_correlation: true
+  enable_graph_rca: true
+  enable_recovery: true
+  enable_collaboration_optimization: true
+  enable_fast_evidence_selection: true
+  evidence_agent_timeout_s: 45
+  enable_llm_inference_agent: true
+  enable_structured_evidence: true
+  evidence_summary_max_tokens: 1024
+  skip_alert_compression_for_manual_rca: true
+  skip_planning_in_fast_evidence: true
+
+alert:
+  compression_enabled: true
+  time_window: 300
+  similarity_threshold: 0.8
+  max_group_size: 50
+
+detection:
+  sources_enabled:
+    prometheus: true
+    k8s_event: true
+    pod_health: true
+    node_health: true
+    metric_anomaly: true
+  default_detect_methods: ["threshold", "zscore"]
+  default_lookback_m: 30
+  default_z_threshold: 3.0
+  default_ewma_span: 10
+  metric_checks:
+    - name: "node_cpu_usage"
+      query: 'avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance) * 100'
+      unit: "%"
+      label_key: "instance"
+      level: "node"
+      warn: 85
+      crit: 95
+      detect_methods: ["threshold", "zscore", "ewma"]
+    - name: "node_memory_usage"
+      query: '(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100'
+      unit: "%"
+      label_key: "instance"
+      level: "node"
+      warn: 85
+      crit: 95
+      detect_methods: ["threshold", "zscore"]
+    - name: "node_disk_usage"
+      query: '(1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100'
+      unit: "%"
+      label_key: "instance"
+      level: "node"
+      warn: 85
+      crit: 95
+    - name: "container_cpu"
+      query: 'sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (pod, namespace) / sum(kube_pod_container_resource_limits{resource="cpu"}) by (pod, namespace) * 100'
+      unit: "%"
+      label_key: "pod"
+      ns_key: "namespace"
+      level: "container"
+      warn: 80
+      crit: 95
+      detect_methods: ["threshold", "zscore", "ewma"]
+    - name: "container_memory"
+      query: 'sum(container_memory_working_set_bytes{container!=""}) by (pod, namespace) / sum(kube_pod_container_resource_limits{resource="memory"}) by (pod, namespace) * 100'
+      unit: "%"
+      label_key: "pod"
+      ns_key: "namespace"
+      level: "container"
+      warn: 80
+      crit: 95
+  categories_enabled:
+    infrastructure: true
+    application: true
+    business: true
+    database: true
+    k8s_workload: true
+  business_services:
+    - "nginx-thrift"
+    - "nginx-web"
+    - "compose-post"
+    - "user-service"
+    - "social-graph"
+    - "home-timeline"
+    - "user-timeline"
+    - "post-storage"
+    - "media-service"
+    - "url-shorten"
+    - "text-service"
+  db_services:
+    - "redis"
+    - "memcached"
+    - "mongodb"
+    - "mongo"
+    - "mysql"
+    - "postgres"
+    - "etcd"
+  thresholds: {}
+  critical_event_reasons:
+    - "OOMKilling"
+    - "NodeNotReady"
+    - "EvictionThresholdMet"
+  critical_pod_reasons:
+    - "CrashLoopBackOff"
+    - "OOMKilled"
+
+observability_agent:
+  trace_all_calls: true
+  collect_token_usage: true
+  collect_latency: true
+  behavior_validation: true
+  anomaly_threshold: 3.0
+
+web:
+  host: "0.0.0.0"
+  port: 8080
+  enable_cors: true

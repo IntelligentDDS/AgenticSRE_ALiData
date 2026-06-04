@@ -1,0 +1,298 @@
+                                              Insight Agents: An LLM-Based Multi-Agent System for Data
+                                                                      Insights
+                                                                          Jincheng Bai                                                               Zhenyu Zhang
+                                                                             Amazon                                                                     Amazon
+                                                                           Seattle, USA                                                               Seattle, USA
+                                                                      baijin@amazon.com                                                          zhenyuzh@amazon.com
+
+                                                                        Jennifer Zhang                                                                Zhihuai Zhu
+                                                                           Amazon                                                                       Amazon
+                                                                         Seattle, USA                                                                 Seattle, USA
+                                                                     yezhan@amazon.com                                                           jasonzhu@amazon.com
+
+
+
+
+arXiv:2601.20048v2 [cs.AI] 2 Feb 2026
+                                        Abstract                                                                               1    Introduction
+                                        Today, E-commerce sellers face several key challenges, including                       Running a small business involves numerous challenges, from prod-
+                                        difficulties in discovering and effectively utilizing available pro-                   uct design and manufacturing to marketing and advertising. As
+                                        grams and tools, and struggling to understand and utilize rich data                    an E-commerce company, we support sellers with powerful tools
+                                        from various tools. We therefore aim to develop Insight Agents                         that leverage advanced machine learning to optimize pricing, fore-
+                                        (IA), a conversational multi-agent Data Insight system, to provide                     cast demand, manage inventory, identify market opportunities and
+                                        E-commerce sellers with personalized data and business insights                        many more. Although we provide sellers with rich tools to manage
+                                        through automated information retrieval. Our hypothesis is that IA                     the facets of their business, it can be a challenge for some sellers to
+                                        will serve as a force multiplier for sellers, thereby driving incremen-                find the right tool, and leverage insights effectively. To remove these
+                                        tal seller adoption by reducing the effort required and increase speed                 barriers, we develop Insight Agents (IA), which is an LLM-based
+                                        at which sellers make good business decisions. In this paper, we                       [22] multi-agent conversational assistant, providing personalized
+                                        introduce this novel LLM-backed end-to-end agentic system built                        data and business insight through automated information retrieval.
+                                        on a plan-and-execute paradigm and designed for comprehensive                          It aims to reduce sellers’ cognitive load and unlock their potential
+                                        coverage, high accuracy, and low latency. It features a hierarchi-                     to grow business.
+                                        cal multi-agent structure, consisting of manager agent and two                             Specifically, IA enables seller to talk to their data through two
+                                        worker agents: data presentation and insight generation, for effi-                     main types of requests: (1) Descriptive Analytics that presents data
+                                        cient information retrieval and problem-solving. We design a simple                    according to the specified query. Examples include “what were my
+                                        yet effective ML solution for manager agent that combines Out-                         sales and traffic for the top 10 products last month”, and “how does
+                                        of-Domain (OOD) detection using a lightweight encoder-decoder                          my monthly sales change year over year”. (2) Diagnostic Analysis
+                                        model and agent routing through a BERT-based classifier, optimiz-                      encompassing summarization, benchmarking, and other analytical
+                                        ing both accuracy and latency. Within the two worker agents, a                         techniques. Examples include “how does my business perform”,
+                                        strategic planning is designed for API-based data model that breaks                    “how is my business doing with respect to my benchmarks”.
+                                        down queries into granular components to generate more accurate                            Building a reliable and helpful IA system is challenging, as it
+                                        responses, and domain knowledge is dynamically injected to to                          requires simultaneous consideration of coverage, accuracy and la-
+                                        enhance the insight generator. IA has been launched for Amazon                         tency. To circumvent these challenges, we propose an end-to-end
+                                        sellers in US, which has achieved high accuracy of 90% based on                        agentic workflow built on a plan-and-execute paradigm and de-
+                                        human evaluation, with latency of P90 below 15s.                                       signed for comprehensive coverage, high accuracy, and low latency.
+                                                                                                                               It employs a hierarchical manager-worker multi-agent structure to
+                                                                                                                               optimize data retrieval and question answering, which follows the
+                                        CCS Concepts
+                                                                                                                               general multi-agent concept [6, 21] utilizing different resolution
+                                        • Information systems → Language models; Retrieval tasks                               paths tailored to the query type. The manager agent mainly con-
+                                        and goals.                                                                             sists of Out-of-Domain (OOD) detection and branch routing. We
+                                                                                                                               build specialized lightweight models for OOD (an encoder-decoder
+                                        Keywords                                                                               based detector) and branch routing to resolution path to optimize
+                                                                                                                               latency (a BERT-based classifier). We then divide the solution space
+                                        LLM, Agentic System, Multi-Agent System, Plan-and-Execute, RAG,
+                                                                                                                               into two worker agent-based resolution paths, data presenter
+                                        Information Retrieval
+                                                                                                                               agent and insight generator agent, to facilitate problem-solving.
+                                                                                                                               Essentially, IA is built upon the Retrieval-Augmented Generation
+                                                                                                                               (RAG) [8] framework, leveraging seller data in a tabular format
+                                                                                                                               through a robust and strategic API-based data model. The system
+                                        This is the author’s version. Published in Proceedings of the 48th International ACM   decomposes queries into appropriate grains based on company’s
+                                        SIGIR Conference on Research and Development in Information Retrieval (SIGIR ’25),
+                                        https://doi.org/10.1145/3726302.3731959.                                               internal data API availability in a divide-and-conquer manner, with
+SIGIR ’25, July 13–18, 2025, Padua, Italy                                                    Jincheng Bai, Zhenyu Zhang, Jennifer Zhang, and Jason Zhu
+
+
+
+
+Figure 1: Overall IA Architecture. It illustrates the overall
+hierarchical structure, consisting of a manager agent over-
+seeing two subordinate worker agents: data presenter agent
+and insight generator agent.
+
+
+
+
+automated tabular data retrieval and aggregation facilitated through
+task decomposition, planning, and API/function selection. This pro-       Figure 2: Architecture design for data presenter and insight
+cess, powered by LLM, is analogous to LLM-based task planning             generator.
+[10, 14] and tool selection [16, 19]. In addition, we inject domain
+knowledge dynamically based on query to make insight gener-               2.2    Manager Agent
+ator domain-aware. Overall, we implement the manager-worker
+multi-agent agentic workflow with orchestration architecture to           Out-of-Domain (OOD) Detection. The out-of-domain (OOD)
+streamline the entire process, encompassing query understanding,          detection within manager agent serves as the first gating after
+information retrieval and answer generation. IA has been launched         receiving the query. The component understands seller intent to
+for Amazon sellers in US, which has achieved accuracy of 90% based        determine whether it is out of scope for the data insight agent to
+on human evaluation, with latency of P90 below 15s.                       answer. The in-scope is defined as at least part of the question
+                                                                          can be answered based on the available data. We create a high-
+                                                                          precision classifier that favors precision over recall when filtering
+2 Methodology                                                             data insight requests, to act as an initial screening layer without
+2.1 Architecture Design                                                   running the full analysis pipeline. While some invalid requests may
+                                                                          not be filtered out (false negatives), they can still be caught later
+Overall IA Architecture. The high-level hierarchical manager-
+                                                                          in the data workflow planing stage. Specifically, we implemented
+worker multi-agent architecture of IA is illustrated in Figure 1.
+                                                                          Auto-encoder (AE) based OOD detection, similar to [20] to depict
+Upon receiving a seller’s query, the manager agent first checks
+                                                                          the boundary of in-scope problem space. In particular, the Auto-
+its eligibility against the scope of data insight via Out-of-Domain
+                                                                          encoder with one hidden layer is trained with embedding from
+(OOD) component. It also includes the agent routing component
+                                                                          sentence transformer [18]. Denote the input embedding vector as
+to select the appropriate solver, and the query augmenter to de-
+                                                                          𝑋 , and the encoder transforms it to a hidden representation 𝐻 as
+ambiguate the query based on its best knowledge. We design two
+distinct agent-based resolution paths, i.e., data presenter and insight   𝐻 = 𝜎 (𝑊1𝑋 + 𝑏 1 ) and followed by the decoder, 𝑋ˆ = 𝜎 (𝑊2 𝐻 +
+generator agent which are separable in terms of the solution they         𝑏 2 ) with weights 𝑊1, 𝑏 1,𝑊2, 𝑏 2 . The AE is trained to minimize the
+provide. Before returning response to sellers, IA applies guardrail       reconstruction error 𝑟 = ||𝑋 − 𝑋ˆ ||. We train the AE on the the set
+to prevent response that contains issues such as PII leakage, toxic       of in-domain questions denoted as X𝑖𝑑 , and the threshold for OOD
+message, etc, from exposing to the seller as the post-processing          is determined by
+step.                                                                                                  𝜇𝑖𝑑 + 𝜆 ∗ 𝜎𝑖𝑑                          (1)
+    Design for Data Presenter and Insight Generator. Figure 2             where 𝜇𝑖𝑑 and 𝜎𝑖𝑑 denotes the mean and standard deviation of the
+illustrates the low-level architecture design of the IA, specifically     reconstruction loss 𝑟 on X𝑖𝑑 . The hyper-parameter 𝜆 controls the
+elucidating the details of the two agents in the resolution paths,        precision v.s. recall in the OOD detection.
+which will be explained in section 2.3.                                      Agent Router. The agent router solves a classification problem
+    Implementation Considerations. One bottleneck for LLM-                by categorizing input queries between data presenter and insight
+based agents is the latency. To overcome this, there are two consid-      generator. To strike a balance between latency and accuracy, a
+erations to address it: model-based components and parallelization.       lightweight transformer-based model could be employed, ensuring
+Specifically, we develop specialized model to avoid unnecessary           responsive performance while maintaining robust classification ca-
+LLM calls while ensuring high performance and only apply LLM              pabilities. In particular, we fine-tuned a lightweight BERT [5] based
+for components that involve data fusion and generation. Regarding         model (33M parameters) on super-sampled data, encompassing
+parallelization, OOD detection and agent routing are performed            presenter and insight generator questions with variations.
+simultaneously, with both the data presenter and insight genera-             Query Augmenter. It clarifies, rewrites, and expands queries
+tor branches being initiated concurrently with early termination.         to reduce ambiguity. In particular, the ambiguity regarding data
+The parallelization approach trades off increased infrastructure and      insight related questions often centers around the time range speci-
+computation costs for latency reduction.                                  fied. For example, question "What were my sales for the last week?"
+Insight Agents: An LLM-Based Multi-Agent System for Data Insights                                           SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+
+lacks clarity like what the current date is, and the LLMs might also    API/function selection process, the next step involves payload/input
+have difficulty accurately interpreting time ranges like "last week".   generation with slot filling, where the required input parameters or
+In this step, contextual information like today’s date, the start and   arguments for the chosen tools or APIs are properly populated to
+end dates of the current week are dynamically injected with specific    facilitate their effective execution. In essence, the whole process is
+instructions like "week" referring to the calendar week. This step      similar to code generation such as text-to-SQL, yet it is more robust
+augments the prompt for LLM call in the subsequent step.                in the sense that it is less prone to syntax errors and hallucinations
+                                                                        (especially columns) associated with text-to-SQL.
+2.3     Data Presenter and Insight Generator                               Domain-aware Routing for Insight Generator. The insight
+        Agents                                                          generator also employs a few-shot learning based LLM classifier
+                                                                        for domain-specific branch routing. The predetermined domain-
+We examine the shared components of Data Presenter and Insight
+                                                                        aware resolution paths mainly contain (1) the associated analytical
+Generator Agents, highlighting their key differences.
+                                                                        analysis that may include data aggregation, time series based sea-
+2.3.1 Data Workflow Planner: a Robust Data Model. Our modeling          sonal & trend analysis, as well as benchmark analysis among other
+framework relies on retrieval-augmented generation (RAG) tech-          techniques. (2) the domain-aware knowledge, prompt template and
+nique [8], as the insight related responses are grounded on seller      few-shot examples for the final insight generation.
+data. As specific to IA, the external resources are stored in tabu-
+lar form, which necessitates the development of tabular retrieval       2.3.2 Data Workflow Executor and Generation. Data Workflow
+method different from retrieving from unstructured text data. To        Executor component carries out data retrieval and data aggrega-
+ensure accuracy of data retrieval and aggregation, we propose a         tion/transformation operations, adhering to the instructions out-
+robust data model to retrieve data that leverages company’s internal    lined by the Data Workflow Planner. Additionally, data post pro-
+data APIs, decomposes the query into solvable steps based on API        cessing tasks, such as reformatting the data, column renaming and
+availabilities, following a Divide and Conquer manner. It specifi-      semantic matching-based column filtering are also performed.
+cally uses APIs to retrieve data, which naturally imposes structure        The generation components mainly leverages in-context learn-
+and constraints but yields higher accuracy. This represents a trade-    ing (ICL), with few-shot learning approach [3] and CoT [23], to
+off between flexibility and precision when compared to text-to-SQL      generate insights. The generation process for the data presenter
+solutions [7, 11, 13, 15], which additionally require the effort of     is straightforward, with few-shot examples guiding the desired
+creating and maintaining a relational database. Besides data APIs,      format of the response. Regarding the insight generator, domain
+leveraging external calculation tools for data transformation is also   experts provide specific domain knowledge and few-shot examples
+crucial as calculation errors remain a common challenge for LLMs        tailored to different data sources for LLM to follow.
+[1, 12]. The whole process is similar to tool learning and usage
+by LLM [17], with few-shot examples and tool metadata stored in         3 Experiments
+memory. Workflow planner encompasses task decomposition and
+planning, along with the selection of appropriate APIs/functions        3.1 Experimental Setup
+and payload generation with slot filling. An end-to-end illustration    3.1.1 Datasets. To train OOD detection and agent routing models,
+for data workflow planner can be found in Figure 3.                     we collected 301 commonly asked questions, with 178 in-domain
+   Data-based Out-of-Scope Detection. The LLM performs sec-             and 123 out-of-domain respectively. The in-domain questions are
+ondary out-of-scope detection by comparing incoming queries             further divided into 120 queries for the data presenter and 59 for the
+against provided dataset metadata. An explicit "out" option is pro-     insight generator. To facilitate finetuning of the lightweight BERT
+vided to LLM to prevent hallucination when queries exceed avail-        model with a balanced dataset, the raw data presenter and insight
+able data boundaries.                                                   generator questions are further augmented by LLM to be super-
+   Task Decomposition and Planning. LLM-based task decom-               sampled to 300 questions each, introducing variations to expand
+position and planning [10, 14] leverages chain of thought (CoT)         the dataset. To evaluate IA end-to-end, a benchmarking dataset
+[23] to ensure comprehensive instruction adherence and few-shot         consisting of 100 carefully selected popular questions with ground
+learning [3] to guide the process. The data presenter enables cus-      truth are constructed.
+tomized data retrieval and aggregation through query decompo-
+sition into executable steps, by providing detailed API/function        3.1.2 Setup. The LLM employed in the experiments is based on
+descriptions to LLM. The insight generator decomposes questions         "anthropic.claude-3-sonnet-20240229-v1:0" [2] via Amazon Bedrock.
+into domain-specific categories (such as performance, benchmark-        Regarding the configuration of the OOD model, in our implemen-
+ing, recommendation, etc) if necessary, and then selects predefined     tation the hyperparameter 𝜆 is set as 4, and the dimension the
+domain-aware resolution paths.                                          hidden layer is 64. The base BERT model is "bge-small-en-v1.5"
+   API/function Selection with Payload Generation. The API              (33M parameters) [4].
+and function selection is akin to LLM-based tool selection [16, 19].
+The API/function name, description and column name are provided         3.1.3 Metrics. The performance of OOD model and agent routing
+in the prompt to facilitate the process. This step essentially resem-   model are gauged via metrics such as precision, recall and accuracy.
+bles the schema linking [9], i.e. table & columns linking, where        Since there are multiple combinations of data retrieval/aggregation,
+LLM creates the alignment between the entity references in the          we evaluate the retrieval performance together with end-to-end
+given query and the schema tables or columns. Subsequent to the         model performance, where the IA response is evaluated by human
+SIGIR ’25, July 13–18, 2025, Padua, Italy                                                          Jincheng Bai, Zhenyu Zhang, Jennifer Zhang, and Jason Zhu
+
+
+
+
+                              Figure 3: Illustration for data workflow planner. Use data presenter as an example.
+
+                Table 1: OOD Detection Performance                                        Table 3: Summary of evaluation metrics
+
+ Model                        Precision     Recall     Running Time (second)    Metric             Avg     Std      Min        Max    Median      Samples
+ Auto-encoder                 0.969         0.721      0.009                    Relevancy          0.977   0.102    0.5        1      1           57
+ LLM-based few-shot           0.616         0.971      1.665                    Correctness        0.958   0.125    0.455      1      1           57
+                                                                                Completeness       0.993   0.045    0.714      1      1           57
+               Table 2: Branch Routing Performance
+
+                                                                                                 Table 4: Question-level accuracy
+ Model                            Accuracy          Running Time (second)
+ Finetuned BERT                   0.83              0.31                                 Question-level Accuracy          Count      Percentage
+ LLM-based few-shot               0.60              2.14
+                                                                                         False                            6          10.5
+                                                                                         True                             51         89.5
+auditors on the benchmarking datasets. The response of IA are
+evaluated from the following three quantitative dimensions:
+   Relevance: Assess whether the key points and insights provided
+                                                                               for evaluation providing the rubrics and ground truth. Out of 100
+in the response directly address the question, which is defined as
+                                                                               questions, 57 questions are in-scope, and the summary for the
+relevance = #_key_words from the question that were addressed in
+                                                                               quantitative measures can be found in the table 3.
+the response / total #_key_words in the question.
+                                                                                  Meanwhile, the question-level accuracy is summarized in table 4.
+   Correctness: Verify the accuracy and reliability of the data and
+                                                                               The overall accuracy is high as 89.5%. The end-to-end P90 latency
+information presented in the response (similar to the notion of pre-
+                                                                               is at 13.56s.
+cision). correctness = #_correct_insights in response / total #_insights
+in response.
+   Completeness: Evaluate whether the response covers all the                  4   Conclusions
+necessary data points or metrics that the user is inquiring about              In this paper, we introduced Insight Agents (IA), a hierarchical multi-
+(akin to the concept of recall). completeness = #_required_insights in         agent system leveraging LLMs built on a plan-and-execute para-
+response / total #_required_insights.                                          digm to provide personalized, actionable insights for e-commerce
+   The question-level accuracy is defined as Question-level Accu-              sellers. Designed for comprehensive coverage, high accuracy, and
+racy: the percentage of questions that have correctness, complete-             low latency, our system significantly reduces cognitive load, achiev-
+ness, relevancy of more than 0.8.                                              ing 89.5% accuracy with sub-15-second latency. Looking ahead, we
+                                                                               aim to scale IA to cover more use cases and integrate automated
+3.2     Experimental Results                                                   evaluation techniques for enhanced performance. Ultimately, IA
+3.2.1 OOD Detection. As shown in table 1, AE-based OOD only                    sets the stage for future AI-driven decision supporting systems,
+takes less than 0.01s over each testing sample which significantly             transforming data interaction and driving impactful outcomes in
+beats record compared to the LLM-based method. Meanwhile, it                   e-commerce and beyond.
+outperforms LLM significantly in terms of precision. As a further
+enhancement, the in-domain set (training set) could be enlarged to             Appendix: sample outputs
+improve recall.                                                                Q: "What were the sales for my top 10 products last month?", A: "Your
+                                                                               top 10 products by Sales for August 2024 (2024-08-01 2024-08-31) were:
+3.2.2 Branch Routing. The results of branch routing is in table 2.
+                                                                               1. Product1: $30,000, 2. Product2: $20,000, ..."
+Out of 178 in-domain samples, the model achieves classification
+                                                                               Q: "How is my business performing?" , A: "In Feb 2024, your sales was
+accuracy of 0.83 with 0.3s latency for each routing case, compared
+                                                                               $10K (-$6K or -50% monthly YoY). Number of items sold were 200 (-50
+with 0.60 accuracy in LLM-based classifier with >2s latency.
+                                                                               or -20% YoY). Average selling price came in at $50 (-$20 or -30% YoY).
+3.2.3 Human Evaluation. For end-to-end IA response evaluation,                 Traffic was 30K views (+50% YoY). Conversion rates were 0.50% (-50
+the benchmarking dataset of 100 questions is sent to human auditors            bps YoY). Overall business insights: ..."
+Insight Agents: An LLM-Based Multi-Agent System for Data Insights                                                                      SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+
+Presenter Biography                                                                       [11] Haoyang Li, Jing Zhang, Cuiping Li, and Hong Chen. 2023. RESDSQL: Decoupling
+                                                                                               Schema Linking and Skeleton Parsing for Text-to-SQL. In Proceedings of the 37th
+Dr. Jincheng Bai is a Machine Learning Scientist at Amazon, where                              AAAI Conference on Artificial Intelligence. 13067–13075.
+he works on generative AI and agentic LLM systems. He earned                              [12] Xiaoyuan Li, Wenjie Wang, Moxin Li, Junrong Guo, Yang Zhang, and Fuli Feng.
+                                                                                               2024. Evaluating Mathematical Reasoning of Large Language Models: A Fo-
+his PhD in Statistics from Purdue University in the United States.                             cus on Error Identification and Correction. In Findings of the Association for
+His research focuses on deep learning and agentic AI, and he has                               Computational Linguistics: ACL 2024. 11316–11360.
+published at top-tier conferences including NeurIPS and SIGIR.                            [13] Aiwei Liu, Xuming Hu, Lijie Wen, and Philip Yu. 2023. A comprehensive
+                                                                                               evaluation of ChatGPT’s zero-shot Text-to-SQL capability. arXiv preprint
+                                                                                               arXiv:2303.13547 (2023).
+References                                                                                [14] Bhargavi Paranjape, Scott Lundberg, Sameer Singh, Hannaneh Hajishirzi, Luke
+ [1] Janice Ahn, Rishu Verma, Renze Lou, Di Liu, Rui Zhang, and Wenpeng Yin. 2024.             Zettlemoyer, and Marco Tulio Ribeiro. 2023. Art: Automatic multistep reasoning
+     Large Language Models for Mathematical Reasoning: Progresses and Challenges.              and tool-use for large language models. arXiv preprint arXiv:2303.09014 (2023).
+     In Proceedings of the 18th Conference of the European Chapter of the Association     [15] Mohammadreza Pourreza and Davood Rafiei. 2023. DIN-SQL: Decomposed In-
+     for Computational Linguistics: Student Research Workshop. 225–237.                        Context Learning of Text-to-SQL with Self-Correction. In Proceedings of the 37th
+ [2] Anthropic. 2024. The Claude 3 Model Family: Opus, Sonnet, Haiku.                          International Conference on Neural Information Processing Systems. 36339 – 36348.
+ [3] Tom Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared D Kaplan,               [16] Yujia Qin, Shihao Liang, Yining Ye, Kunlun Zhu, Lan Yan, Yaxi Lu, Yankai Lin,
+     Prafulla Dhariwal, Arvind Neelakantan, Pranav Shyam, Girish Sastry, Amanda                Xin Cong, Xiangru Tang, Bill Qian, and et al. 2024. Toolllm: Facilitating large
+     Askell, and et al. 2020. Language models are few-shot learners. In Proceedings of         language models to master 16000+ real-world apis. In In Proceedings of the 12th
+     the 34th International Conference on Neural Information Processing Systems. 1877 –        International Conference on Learning Representations (ICLR).
+     1901.                                                                                [17] Changle Qu, Sunhao Dai, Xiaochi Wei, Hengyi Cai, Shuaiqiang Wang, Dawei
+ [4] Jianlv Chen, Shitao Xiao, Peitian Zhang, Kun Luo, Defu Lian, and Zheng                    Yin, Jun Xu, and Ji-Rong Wen. 2024. Tool Learning with Large Language Models:
+     Liu. 2023. BGE M3-Embedding: Multi-Lingual, Multi-Functionality, Multi-                   A Survey. arXiv preprint arXiv:2405.17935 (2024).
+     Granularity Text Embeddings Through Self-Knowledge Distillation. arXiv               [18] Nils Reimers and Iryna Gurevych. 2019. Sentence-BERT: Sentence Embeddings
+     preprint arXiv:2309.07597 (2023).                                                         using Siamese BERT-Networks. In Proceedings of the 2019 Conference on Em-
+ [5] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2016. BERT:             pirical Methods in Natural Language Processing. Association for Computational
+     Pre-training of Deep Bidirectional Transformers for Language Understanding. In            Linguistics, 3982–3992.
+     Proceedings of NAACL-HLT 2019. 4171–4186.                                            [19] Yifan Song, Weimin Xiong, Dawei Zhu, Cheng Li, Ke Wang, Ye Tian, and Sujian
+ [6] Zane Durante, Qiuyuan Huang, Naoki Wake, Ran Gong, Jae Sung Park, Bidipta                 Li. 2023. Restgpt: Connecting large language models with realworld applications
+     Sarkar, Rohan Taori, Yusuke Noda, Demetri Terzopoulos, Yejin Choi, Katsushi               via restful apis. arXiv preprint arXiv:2306.06624 (2023).
+     Ikeuchi, Hoi Vo, Li Fei-Fei, and Jianfeng Gao. 2024. Agent AI: Surveying the         [20] Hasan Torabi, Seyedeh Leili Mirtaheri, and Sergio Greco. 2023. Practical autoen-
+     Horizons of Multimodal Interaction. arXiv preprint arXiv:2401.03568 (2024).               coder based anomaly detection by using vector reconstruction error. Cybersecu-
+ [7] Dawei Gao, Haibin Wang, Yaliang Li, Xiuyu Sun, and et al. 2023. Text-to-SQL               rity 6, 1 (2023).
+     Empowered by Large Language Models: A Benchmark Evaluation. arXiv preprint           [21] Lei Wang, Ma Chen, Xueyang Feng, Zeyu Zhang, and et al. 2024. A Survey on
+     arXiv:2308.15363 (2023).                                                                  Large Language Model based Autonomous Agents. Frontiers of Computer Science
+ [8] Yunfan Gao, Yun Xiong, Xinyu Gao, Kangxiang Jia, and et al. 2024. Retrieval-              18 (2024), 1–42.
+     Augmented Generation for Large Language Models: A Survey. arXiv preprint             [22] Jason Wei, Yi Tay, Rishi Bommasani, Colin Raffel, Barret Zoph, Sebastian
+     arXiv:2312.10997 (2024).                                                                  Borgeaud, Dani Yogatama, Maarten Bosma, Denny Zhou, Donald Metzler, and et
+ [9] George Katsogiannis-Meimarakis and Georgia Koutrika. 2023. A survey on deep               al. 2022. Emergent abilities of large language models. In Transactions on Machine
+     learning approaches for text-to-SQL. The VLDB Journal 32 (2023), 905–936.                 Learning Research (2022).
+[10] Chuanhao Li, Runhan Yang, Tiankai Li, Milad Bafarassat, Kourosh Sharifi, Dirk        [23] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Fei Xia, Ed Chi,
+     Bergemann, and Zhuoran Yang. 2024. Stride: A tool-assisted llm agent framework            Quoc V Le, and Denny Zhou. 2022. Chain-of-thought prompting elicits reasoning
+     for strategic and interactive decision-making. arXiv preprint arXiv:2405.16376            in large language models. In Proceedings of the 36th International Conference on
+     (2024).                                                                                   Neural Information Processing Systems. 24824 – 24837.
+

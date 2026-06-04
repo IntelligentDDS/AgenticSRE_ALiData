@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgenticSRE Dashboard · v20260527</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=23">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="brand-mark">AS</div>
+            <div class="brand-copy">
+                <h1>AgenticSRE</h1>
+                <span>Operations Console</span>
+            </div>
+            <span class="version">v1.0</span>
+        </div>
+        <ul class="nav-list">
+            <li class="nav-section">运行态势</li>
+            <li class="nav-item active" data-view="overview"><span class="nav-icon">OV</span><span class="nav-text">集群概览</span></li>
+            <li class="nav-item nav-primary" data-view="alerts"><span class="nav-icon">AL</span><span class="nav-text">告警中心</span></li>
+            <li class="nav-item" data-view="metrics"><span class="nav-icon">ME</span><span class="nav-text">指标监控</span></li>
+            <li class="nav-item" data-view="events"><span class="nav-icon">EV</span><span class="nav-text">事件追踪</span></li>
+            <li class="nav-item" data-view="logs"><span class="nav-icon">LG</span><span class="nav-text">日志查询</span></li>
+            <li class="nav-item" data-view="traces"><span class="nav-icon">TR</span><span class="nav-text">链路追踪</span></li>
+
+            <li class="nav-section">诊断闭环</li>
+            <li class="nav-item nav-primary" data-view="rca"><span class="nav-icon">RC</span><span class="nav-text">根因分析</span></li>
+            <li class="nav-item nav-primary" data-view="healcenter"><span class="nav-icon">HE</span><span class="nav-text">自愈中心</span></li>
+            <li class="nav-item" data-view="reports"><span class="nav-icon">RP</span><span class="nav-text">故障报告</span></li>
+            <li class="nav-item" data-view="knowledge"><span class="nav-icon">KB</span><span class="nav-text">故障知识库</span></li>
+            <li class="nav-item" data-view="evolution"><span class="nav-icon">EV</span><span class="nav-text">演化闭环</span></li>
+
+            <li class="nav-section">平台运营</li>
+            <li class="nav-item" data-view="daemon"><span class="nav-icon">DM</span><span class="nav-text">守护进程</span></li>
+            <li class="nav-item" data-view="configcenter"><span class="nav-icon">CF</span><span class="nav-text">配置中心</span></li>
+            <li class="nav-item" data-view="hermes"><span class="nav-icon">AI</span><span class="nav-text">Hermes 助手</span></li>
+
+            <li class="nav-section">实验评测</li>
+            <li class="nav-item" data-view="faultlab"><span class="nav-icon">GC</span><span class="nav-text">通算故障实验</span></li>
+            <li class="nav-item" data-view="llmfaultlab"><span class="nav-icon">LL</span><span class="nav-text">智算故障实验</span></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="health-indicator" id="health-dot">
+                <span class="dot dot-green"></span>
+                <span>系统正常</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- LLM API Key Warning Banner -->
+        <div id="llm-warning" class="llm-warning" style="display:none;">
+            <span class="llm-warning-icon">&#9888;</span>
+            <span class="llm-warning-text">
+                <strong>LLM API Key 未配置</strong> — RCA 根因分析、告警压缩等核心功能不可用。请在 <code>.env</code> 文件中设置 <code>LLM_API_KEY</code>，然后重启服务。
+            </span>
+            <button class="llm-warning-close" onclick="this.parentElement.style.display='none'">&times;</button>
+        </div>
+
+        <!-- Header Bar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="btn-icon" id="toggle-sidebar">&#9776;</button>
+                <div class="page-heading">
+                    <h2 id="view-title">集群概览</h2>
+                    <p id="view-subtitle">Cluster health, topology, and recent operational signals</p>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <span class="badge badge-info" id="cluster-badge">集群连接中...</span>
+                <select id="refresh-interval" class="select-sm">
+                    <option value="0">手动刷新</option>
+                    <option value="10" selected>10秒</option>
+                    <option value="30">30秒</option>
+                    <option value="60">60秒</option>
+                </select>
+                <button class="btn btn-sm btn-primary" onclick="refreshCurrentView()">刷新</button>
+            </div>
+        </header>
+
+        <!-- ═══ Overview Section ═══ -->
+        <section id="view-overview" class="view active">
+            <div class="stat-grid">
+                <div class="stat-card"><div class="stat-label">节点</div><div class="stat-value" id="stat-nodes">-</div></div>
+                <div class="stat-card"><div class="stat-label">Deployment</div><div class="stat-value" id="stat-deploys">-</div></div>
+                <div class="stat-card"><div class="stat-label">Service</div><div class="stat-value" id="stat-services">-</div></div>
+                <div class="stat-card"><div class="stat-label">Pod</div><div class="stat-value" id="stat-pods">-</div></div>
+                <div class="stat-card"><div class="stat-label">命名空间</div><div class="stat-value" id="stat-ns">-</div></div>
+                <div class="stat-card accent"><div class="stat-label">故障实体</div><div class="stat-value" id="stat-faulty" style="color:var(--danger)">-</div></div>
+            </div>
+
+            <!-- Operational Topology -->
+            <div class="card topo-card">
+                <div class="topo-header">
+                    <div>
+                        <h3>集群工作负载拓扑</h3>
+                        <span class="text-muted">按节点和命名空间组织，突出异常工作负载</span>
+                    </div>
+                    <div class="filter-row topo-controls">
+                        <select id="topo-ns-filter" class="select-sm" onchange="filterTopologyNs()">
+                            <option value="">所有命名空间</option>
+                        </select>
+                        <button class="btn btn-sm" onclick="loadTopology()">刷新</button>
+                    </div>
+                </div>
+                <div class="topo-summary" id="topo-health-strip"></div>
+                <div class="topo-layout">
+                    <div class="topo-main" id="topo-node-map"></div>
+                    <aside class="topo-side">
+                        <div class="topo-panel">
+                            <h4>异常摘要</h4>
+                            <div id="topo-fault-list"></div>
+                        </div>
+                        <div class="topo-panel">
+                            <h4>命名空间</h4>
+                            <div id="topo-namespace-list"></div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+
+            <div class="grid-2col">
+                <div class="card">
+                    <h3>节点状态</h3>
+                    <div id="node-grid" class="node-grid"></div>
+                </div>
+                <div class="card">
+                    <h3>Pod状态分布</h3>
+                    <div class="chart-container" style="height:220px"><canvas id="pod-chart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>最近告警</h3>
+                <div id="alert-preview"></div>
+            </div>
+        </section>
+
+        <!-- ═══ Metrics Section ═══ -->
+        <section id="view-metrics" class="view">
+            <!-- Global controls -->
+            <div class="filter-row" style="margin-bottom: 16px">
+                <select id="metrics-ns" class="select-sm" onchange="loadMetrics()">
+                    <option value="">所有命名空间</option>
+                </select>
+                <div class="time-range-btns" id="metrics-time-range">
+                    <button class="time-range-btn active" data-range="1h" onclick="setMetricRange('1h',this)">1H</button>
+                    <button class="time-range-btn" data-range="3h" onclick="setMetricRange('3h',this)">3H</button>
+                    <button class="time-range-btn" data-range="6h" onclick="setMetricRange('6h',this)">6H</button>
+                    <button class="time-range-btn" data-range="24h" onclick="setMetricRange('24h',this)">24H</button>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="loadMetrics()">刷新指标</button>
+            </div>
+
+            <!-- Node Metrics (Time-Series Charts) -->
+            <div class="metric-section-title">NODE METRICS / 节点指标</div>
+            <div class="grid-3col">
+                <div class="card">
+                    <div class="chart-header"><h3>CPU 使用率 (%)</h3></div>
+                    <div class="chart-container"><canvas id="chart-node-cpu"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="chart-header"><h3>内存使用率 (%)</h3></div>
+                    <div class="chart-container"><canvas id="chart-node-memory"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="chart-header"><h3>磁盘使用率 (%)</h3></div>
+                    <div class="chart-container"><canvas id="chart-node-disk"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Network Metrics -->
+            <div class="metric-section-title">NETWORK METRICS / 网络指标</div>
+            <div class="grid-2col">
+                <div class="card">
+                    <div class="chart-header"><h3>网络接收速率 (KB/s)</h3></div>
+                    <div class="chart-container"><canvas id="chart-net-receive"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="chart-header"><h3>网络发送速率 (KB/s)</h3></div>
+                    <div class="chart-container"><canvas id="chart-net-transmit"></canvas></div>
+                </div>
+            </div>
+            <div class="grid-3col">
+                <div class="card">
+                    <div class="chart-header"><h3>TCP 活跃连接数</h3></div>
+                    <div class="chart-container"><canvas id="chart-tcp-established"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="chart-header"><h3>TCP 重传率 (/s)</h3></div>
+                    <div class="chart-container"><canvas id="chart-tcp-retrans"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="chart-header"><h3>DNS 请求速率 (/s)</h3></div>
+                    <div class="chart-container"><canvas id="chart-dns-requests"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Container Metrics (Time-Series Charts) -->
+            <div class="metric-section-title">CONTAINER METRICS / 容器指标</div>
+            <div class="grid-2col">
+                <div class="card">
+                    <div class="chart-header">
+                        <h3>容器 CPU Top10 (cores %)</h3>
+                    </div>
+                    <div class="chart-container"><canvas id="chart-container-cpu"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="chart-header">
+                        <h3>容器内存 Top10 (MB)</h3>
+                    </div>
+                    <div class="chart-container"><canvas id="chart-container-mem"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Business / Service Metrics -->
+            <div class="metric-section-title">BUSINESS METRICS / 业务指标</div>
+            <div class="grid-3col">
+                <div class="card">
+                    <div class="chart-header"><h3>Pod 重启次数 (by namespace)</h3></div>
+                    <div class="chart-container"><canvas id="chart-biz-restarts"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="chart-header"><h3>Deployment 可用副本</h3></div>
+                    <div class="chart-container"><canvas id="chart-biz-replicas"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="chart-header"><h3>API Server 请求速率 (/s)</h3></div>
+                    <div class="chart-container"><canvas id="chart-biz-apiserver"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Instant values + Pod table (collapsible) -->
+            <details class="card">
+                <summary style="cursor:pointer;font-weight:700;font-size:14px;color:var(--text-primary)">节点实时数值 & Pod 状态</summary>
+                <div style="padding-top:16px">
+                    <div class="grid-2col">
+                        <div>
+                            <h3>节点 CPU (%)</h3>
+                            <div id="metrics-node-cpu" class="metrics-instant-bars"></div>
+                        </div>
+                        <div>
+                            <h3>节点内存 (%)</h3>
+                            <div id="metrics-node-memory" class="metrics-instant-bars"></div>
+                        </div>
+                    </div>
+                    <h3 style="margin-top:16px">节点磁盘 (%)</h3>
+                    <div id="metrics-node-disk" class="metrics-instant-bars"></div>
+
+                    <div class="grid-2col" style="margin-top:16px">
+                        <div>
+                            <h3>容器 CPU Top10</h3>
+                            <table class="data-table" id="metrics-cpu-top">
+                                <thead><tr><th>Pod</th><th>命名空间</th><th>CPU %</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h3>容器内存 Top10</h3>
+                            <table class="data-table" id="metrics-mem-top">
+                                <thead><tr><th>Pod</th><th>命名空间</th><th>内存 MB</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top:16px">Pod 状态统计</h3>
+                    <table class="data-table" id="pod-table">
+                        <thead>
+                            <tr><th>名称</th><th>命名空间</th><th>状态</th><th>Ready</th><th>重启</th><th>节点</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </details>
+
+            <!-- Custom PromQL query -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>PromQL 查询</h3>
+                </div>
+                <div class="filter-row">
+                    <input type="text" id="promql-input" class="input-sm" style="flex:1" placeholder="输入 PromQL，例如: up">
+                    <select id="promql-type" class="select-sm">
+                        <option value="instant">即时查询</option>
+                        <option value="range">范围查询</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" onclick="runPromQL()">执行</button>
+                </div>
+                <pre class="log-viewer" id="promql-result" style="max-height:300px;overflow:auto">输入 PromQL 查询后点击执行...</pre>
+            </div>
+        </section>
+
+        <!-- ═══ Logs Section ═══ -->
+        <section id="view-logs" class="view">
+            <div class="filter-row">
+                <select id="log-ns" class="select-sm" onchange="loadPodsByNs()">
+                    <option value="">选择命名空间</option>
+                </select>
+                <select id="log-pod" class="select-sm">
+                    <option value="">选择Pod</option>
+                </select>
+                <input type="number" id="log-lines" class="input-sm" value="200" placeholder="行数">
+                <button class="btn btn-sm btn-primary" onclick="fetchLogs()">查询</button>
+            </div>
+            <div class="card">
+                <pre class="log-viewer" id="log-content">选择Pod后点击查询...</pre>
+            </div>
+        </section>
+
+        <!-- ═══ Alerts Section ═══ -->
+        <section id="view-alerts" class="view">
+            <!-- 检测配置面板 -->
+            <details class="card" id="detection-config-panel">
+                <summary class="card-header" style="cursor:pointer"><h3>检测配置</h3></summary>
+                <div style="padding:16px">
+                    <h4 style="margin-bottom:8px">告警源</h4>
+                    <div id="source-toggles" class="filter-row"></div>
+                    <h4 style="margin:12px 0 8px">内置类别检测</h4>
+                    <div id="category-toggles" class="filter-row"></div>
+                    <h4 style="margin:12px 0 8px">业务服务名称 (Business Services)</h4>
+                    <div id="business-services-tags" class="filter-row" style="flex-wrap:wrap;gap:4px"></div>
+                    <h4 style="margin:12px 0 8px">数据库服务名称 (DB Services)</h4>
+                    <div id="db-services-tags" class="filter-row" style="flex-wrap:wrap;gap:4px"></div>
+                    <h4 style="margin:12px 0 8px">严重事件原因 (critical_event_reasons)</h4>
+                    <div id="critical-event-reasons" class="filter-row"></div>
+                    <h4 style="margin:12px 0 8px">严重Pod原因 (critical_pod_reasons)</h4>
+                    <div id="critical-pod-reasons" class="filter-row"></div>
+                    <h4 style="margin:12px 0 8px">异常检测指标</h4>
+                    <table class="data-table" id="metric-checks-table">
+                        <thead><tr><th>名称</th><th>级别</th><th>Warning</th><th>Critical</th><th>单位</th><th>检测算法</th><th>操作</th></tr></thead>
+                        <tbody id="metric-checks-body"></tbody>
+                    </table>
+                    <button class="btn btn-sm" onclick="addMetricCheck()" style="margin-top:8px">+ 添加指标</button>
+                    <h4 style="margin:12px 0 8px">全局算法参数</h4>
+                    <div class="filter-row" id="global-algo-params">
+                        <label style="font-size:13px;display:inline-flex;align-items:center;gap:4px">
+                            回溯窗口(分钟)
+                            <input type="number" id="cfg-lookback-m" class="input-sm" value="30" style="width:60px">
+                        </label>
+                        <label style="font-size:13px;display:inline-flex;align-items:center;gap:4px">
+                            Z-score阈值
+                            <input type="number" id="cfg-z-threshold" class="input-sm" value="3.0" step="0.1" style="width:60px">
+                        </label>
+                        <label style="font-size:13px;display:inline-flex;align-items:center;gap:4px">
+                            EWMA Span
+                            <input type="number" id="cfg-ewma-span" class="input-sm" value="10" style="width:60px">
+                        </label>
+                    </div>
+                    <div style="margin-top:12px">
+                        <button class="btn btn-primary" onclick="saveDetectionConfig()">保存配置</button>
+                        <span id="detection-save-status" style="margin-left:8px;font-size:12px;color:var(--text-muted)"></span>
+                    </div>
+                </div>
+            </details>
+
+            <!-- 告警列表 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>告警列表</h3>
+                    <button class="btn btn-sm btn-primary" onclick="loadAlertList()">刷新告警</button>
+                </div>
+                <div class="filter-row" id="alert-source-filters">
+                    <span class="text-muted" style="font-size:12px">来源：</span>
+                    <button class="btn btn-sm alert-source-btn active" data-source="all" onclick="filterAlerts('all')">全部</button>
+                    <button class="btn btn-sm alert-source-btn" data-source="k8s_event" onclick="filterAlerts('k8s_event')">
+                        <span class="source-dot source-k8s"></span> K8s事件
+                    </button>
+                    <button class="btn btn-sm alert-source-btn" data-source="prometheus" onclick="filterAlerts('prometheus')">
+                        <span class="source-dot source-prom"></span> Prometheus
+                    </button>
+                    <button class="btn btn-sm alert-source-btn" data-source="pod_health" onclick="filterAlerts('pod_health')">
+                        <span class="source-dot source-pod"></span> Pod健康
+                    </button>
+                    <button class="btn btn-sm alert-source-btn" data-source="node_health" onclick="filterAlerts('node_health')">
+                        <span class="source-dot source-node"></span> 节点健康
+                    </button>
+                    <button class="btn btn-sm alert-source-btn" data-source="metric_anomaly" onclick="filterAlerts('metric_anomaly')">
+                        <span class="source-dot source-metric"></span> 指标异常
+                    </button>
+                    <span class="text-muted" style="font-size:12px;margin-left:12px">级别：</span>
+                    <select id="alert-severity-filter" class="select-sm" onchange="filterAlerts()">
+                        <option value="all">全部</option>
+                        <option value="critical">Critical</option>
+                        <option value="warning">Warning</option>
+                        <option value="info">Info</option>
+                    </select>
+                </div>
+                <div class="stat-grid" id="alert-source-stats" style="margin-bottom:12px"></div>
+                <table class="data-table" id="alert-table">
+                    <thead>
+                        <tr>
+                            <th>来源</th><th>级别</th><th>标题</th>
+                            <th>影响资源</th><th>命名空间</th><th>时间</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alert-table-body"></tbody>
+                </table>
+                <p class="text-muted" id="alert-empty" style="display:none;padding:20px;text-align:center">暂无告警</p>
+            </div>
+
+            <!-- 告警压缩 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>告警压缩 (SOW核心)</h3>
+                    <button class="btn btn-sm btn-primary" onclick="runAlertScan()">智能压缩</button>
+                </div>
+                <div id="alert-scan-result">
+                    <p class="text-muted">点击"智能压缩"运行 LLM 告警压缩与根因推荐...</p>
+                </div>
+            </div>
+
+            <!-- 实时检测信号 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>实时检测信号</h3>
+                    <div>
+                        <button class="btn btn-sm" onclick="toggleDetectionSSE()">实时监听</button>
+                        <button class="btn btn-sm btn-danger" onclick="clearSignals()">清空</button>
+                    </div>
+                </div>
+                <div id="detection-feed" class="signal-feed"></div>
+            </div>
+        </section>
+
+        <!-- ═══ RCA Section ═══ -->
+        <section id="view-rca" class="view">
+            <div class="card">
+                <h3>启动根因分析</h3>
+                <div class="rca-form">
+                    <textarea id="rca-query" class="textarea" rows="3" placeholder="描述故障现象，例如：Pod频繁重启，服务延迟增高..."></textarea>
+                    <div class="filter-row">
+                        <input id="rca-ns" class="input-sm" placeholder="命名空间 (可选)">
+                        <button class="btn btn-primary" onclick="startRCA()">开始分析</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="rca-progress" style="display:none;">
+                <h3>分析进度</h3>
+                <div id="rca-iteration" style="display:none;"></div>
+                <div class="pipeline-phases" id="rca-phases"></div>
+                <div class="rca-hypotheses" id="rca-hypotheses" style="display:none;">
+                    <h4>假设排名</h4>
+                    <div id="rca-hyp-list"></div>
+                </div>
+                <div class="rca-evidence" id="rca-evidence" style="display:none;">
+                    <h4>证据收集</h4>
+                    <div class="evidence-grid" id="rca-evidence-grid"></div>
+                </div>
+                <details class="rca-log-details">
+                    <summary>详细日志</summary>
+                    <pre class="log-viewer" id="rca-log"></pre>
+                </details>
+            </div>
+
+            <div class="card" id="rca-result-card" style="display:none;">
+                <h3>诊断结果</h3>
+                <div id="rca-result-content"></div>
+            </div>
+
+            <div class="card">
+                <h3>历史分析</h3>
+                <div id="rca-history"></div>
+            </div>
+        </section>
+
+        <!-- ═══ Daemon Section ═══ -->
+        <section id="view-daemon" class="view">
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-label">运行状态</div>
+                    <div class="stat-value" id="daemon-status">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">运行时间</div>
+                    <div class="stat-value" id="daemon-uptime">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">扫描周期</div>
+                    <div class="stat-value" id="daemon-cycles">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">活跃管道</div>
+                    <div class="stat-value" id="daemon-pipelines">-</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>守护进程控制</h3>
+                    <div>
+                        <button class="btn btn-sm btn-primary" onclick="startDaemon()">启动</button>
+                        <button class="btn btn-sm btn-danger" onclick="stopDaemon()">停止</button>
+                    </div>
+                </div>
+                <pre class="log-viewer" id="daemon-log">等待启动...</pre>
+            </div>
+        </section>
+
+        <!-- ═══ Traces Section ═══ -->
+        <section id="view-traces" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>链路追踪查询</h3>
+                    <span class="badge badge-info" id="trace-source-badge">Jaeger 未连接</span>
+                </div>
+                <div class="filter-row">
+                    <select id="trace-service" class="select-sm" onchange="loadTraceOperations()">
+                        <option value="">选择服务</option>
+                    </select>
+                    <select id="trace-operation" class="select-sm">
+                        <option value="">所有操作</option>
+                    </select>
+                    <input type="text" id="trace-min-duration" class="input-sm" placeholder="最短耗时 (如 100ms)" style="width:120px">
+                    <input type="text" id="trace-max-duration" class="input-sm" placeholder="最长耗时 (如 5s)" style="width:120px">
+                    <select id="trace-lookback" class="select-sm">
+                        <option value="1h">最近 1 小时</option>
+                        <option value="2h">最近 2 小时</option>
+                        <option value="6h">最近 6 小时</option>
+                        <option value="12h">最近 12 小时</option>
+                        <option value="24h">最近 24 小时</option>
+                    </select>
+                    <input type="number" id="trace-limit" class="input-sm" value="20" style="width:60px" placeholder="条数">
+                    <button class="btn btn-sm btn-primary" onclick="searchTraces()">搜索</button>
+                </div>
+                <div class="filter-row" style="margin-top:8px">
+                    <input type="text" id="trace-id-input" class="input-sm" style="flex:1" placeholder="直接输入 Trace ID 查询">
+                    <button class="btn btn-sm" onclick="lookupTraceById()">查找 Trace</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Trace 列表</h3>
+                    <span class="text-muted" id="trace-count"></span>
+                </div>
+                <table class="data-table" id="trace-table">
+                    <thead>
+                        <tr>
+                            <th>Trace ID</th><th>根服务</th><th>根操作</th><th>Span数</th>
+                            <th>涉及服务</th><th>总耗时</th><th>开始时间</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trace-table-body"></tbody>
+                </table>
+                <p class="text-muted" id="trace-empty" style="display:none;padding:20px;text-align:center">选择服务后搜索Trace...</p>
+            </div>
+
+            <div class="card" id="trace-detail-card" style="display:none;">
+                <div class="card-header">
+                    <h3>Trace 详情</h3>
+                    <button class="btn btn-sm" onclick="document.getElementById('trace-detail-card').style.display='none'">关闭</button>
+                </div>
+                <div id="trace-detail-content"></div>
+            </div>
+        </section>
+
+        <!-- ═══ Knowledge Base Section (故障知识库) ═══ -->
+        <section id="view-knowledge" class="view">
+            <!-- 统计 -->
+            <div class="stat-grid" id="kb-stats">
+                <div class="stat-card"><div class="stat-label">诊断规则</div><div class="stat-value" id="kb-rules-count">-</div></div>
+                <div class="stat-card"><div class="stat-label">故障记录</div><div class="stat-value" id="kb-faults-count">-</div></div>
+                <div class="stat-card"><div class="stat-label">专家反馈</div><div class="stat-value" id="kb-feedback-count">-</div></div>
+                <div class="stat-card accent"><div class="stat-label">已生成规则</div><div class="stat-value" id="kb-generated-count">-</div></div>
+            </div>
+
+            <!-- 搜索 -->
+            <div class="card">
+                <div class="card-header"><h3>知识库搜索</h3></div>
+                <div class="filter-row">
+                    <input type="text" id="kb-search-input" class="input-sm" style="flex:1" placeholder="输入关键词搜索规则和故障记录...">
+                    <button class="btn btn-sm btn-primary" onclick="searchKnowledge()">搜索</button>
+                </div>
+                <div id="kb-search-results"></div>
+            </div>
+
+            <!-- 诊断规则 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>诊断规则</h3>
+                    <button class="btn btn-sm btn-primary" onclick="showAddRuleForm()">+ 添加规则</button>
+                </div>
+                <!-- 添加/编辑表单 -->
+                <div id="rule-form" style="display:none;padding:16px;background:var(--bg-hover);border-radius:8px;margin-bottom:14px;border:1px solid var(--border)">
+                    <h3 id="rule-form-title" style="margin-bottom:10px">添加诊断规则</h3>
+                    <input type="hidden" id="rule-edit-id">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                        <div><label style="font-size:12px;font-weight:600;color:var(--text-muted)">规则名称</label><input id="rule-f-name" class="input-sm" style="width:100%;margin-top:4px" placeholder="如：OOM内存不足检测"></div>
+                        <div><label style="font-size:12px;font-weight:600;color:var(--text-muted)">故障类型</label>
+                            <select id="rule-f-type" class="select-sm" style="width:100%;margin-top:4px">
+                                <option value="资源不足">资源不足</option>
+                                <option value="配置错误">配置错误</option>
+                                <option value="网络异常">网络异常</option>
+                                <option value="应用故障">应用故障</option>
+                                <option value="数据库">数据库</option>
+                                <option value="存储">存储</option>
+                                <option value="调度">调度</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:var(--text-muted)">条件（观测到什么现象）</label><textarea id="rule-f-condition" class="textarea" rows="2" style="margin-top:4px" placeholder="如：Pod 状态为 CrashLoopBackOff 且容器退出码为 137 (OOMKilled)"></textarea></div>
+                    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:var(--text-muted)">结论（可能的根因）</label><textarea id="rule-f-conclusion" class="textarea" rows="2" style="margin-top:4px" placeholder="如：容器内存限制 (resources.limits.memory) 设置过低，需要调大内存限制或优化应用内存使用"></textarea></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+                        <div><label style="font-size:12px;font-weight:600;color:var(--text-muted)">适用范围</label><input id="rule-f-namespace" class="input-sm" style="width:100%;margin-top:4px" placeholder="general（通用）或指定 namespace" value="general"></div>
+                        <div><label style="font-size:12px;font-weight:600;color:var(--text-muted)">置信度 (0-1)</label><input id="rule-f-confidence" type="number" class="input-sm" style="width:100%;margin-top:4px" value="0.8" min="0" max="1" step="0.05"></div>
+                    </div>
+                    <div style="margin-top:14px;display:flex;gap:8px">
+                        <button class="btn btn-primary" onclick="saveRule()">保存</button>
+                        <button class="btn" onclick="hideRuleForm()">取消</button>
+                    </div>
+                </div>
+                <table class="data-table" id="kb-rules-table">
+                    <thead><tr><th>名称</th><th>条件</th><th>结论</th><th>故障类型</th><th>置信度</th><th>来源</th><th>操作</th></tr></thead>
+                    <tbody id="kb-rules-body"></tbody>
+                </table>
+            </div>
+
+            <!-- 故障记录 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>历史故障记录</h3>
+                    <button class="btn btn-sm btn-primary" onclick="addFault()">+ 添加故障</button>
+                </div>
+                <table class="data-table" id="kb-faults-table">
+                    <thead><tr><th>ID</th><th>故障描述</th><th>根因</th><th>故障类型</th><th>时间</th><th>操作</th></tr></thead>
+                    <tbody id="kb-faults-body"></tbody>
+                </table>
+            </div>
+
+            <!-- 专家反馈 -->
+            <div class="card">
+                <div class="card-header"><h3>提交专家反馈</h3></div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    <div class="filter-row" style="gap:8px;align-items:center">
+                        <select id="fb-incident-select" class="input-sm" style="flex:1" onchange="onIncidentSelectChange()">
+                            <option value="">— 选择最近 RCA 分析 —</option>
+                        </select>
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="loadFeedbackIncidents()">刷新</button>
+                    </div>
+                    <input type="text" id="fb-incident-id" class="input-sm" placeholder="或手动输入 session_id / rca-xxxx">
+                    <textarea id="fb-diagnosis" class="textarea" rows="3" placeholder="专家诊断结论（系统将提取规则并学习）"></textarea>
+                    <input type="text" id="fb-comment" class="input-sm" placeholder="备注（可选）">
+                    <button class="btn btn-primary" onclick="submitFeedback()" style="align-self:flex-start">提交反馈</button>
+                    <div id="fb-result"></div>
+                </div>
+            </div>
+
+            <!-- 反馈历史 -->
+            <details class="card">
+                <summary style="cursor:pointer;font-weight:700;font-size:14px;color:var(--text-primary)">反馈历史</summary>
+                <div id="kb-feedback-list" style="padding-top:12px"></div>
+            </details>
+        </section>
+
+        <!-- ═══ Evolution & HITL Section ═══ -->
+        <section id="view-evolution" class="view">
+            <div class="stat-grid">
+                <div class="stat-card"><div class="stat-label">记忆健康</div><div class="stat-value" id="evo-memory-health">-</div></div>
+                <div class="stat-card"><div class="stat-label">待审核</div><div class="stat-value" id="evo-hitl-pending">-</div></div>
+                <div class="stat-card"><div class="stat-label">演化快照</div><div class="stat-value" id="evo-snapshots">-</div></div>
+                <div class="stat-card accent"><div class="stat-label">低质量规则</div><div class="stat-value" id="evo-low-quality">-</div></div>
+            </div>
+
+            <div class="grid-2col">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>SOW 对齐状态</h3>
+                        <button class="btn btn-sm" onclick="loadEvolution()">刷新</button>
+                    </div>
+                    <div id="sow-alignment-list"></div>
+                </div>
+                <div class="card">
+                    <h3>演化建议</h3>
+                    <div id="evolution-recommendations"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><h3>Human In The Loop 审核队列</h3></div>
+                <div id="hitl-review-list"></div>
+            </div>
+
+            <div class="card">
+                <h3>记忆治理</h3>
+                <div id="memory-governance"></div>
+            </div>
+        </section>
+
+        <!-- ═══ General Compute Fault Lab Section ═══ -->
+        <section id="view-faultlab" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>通算故障实验</h3>
+                    <div>
+                        <button class="btn btn-sm" onclick="loadFaultLab()">刷新场景</button>
+                        <button class="btn btn-sm" onclick="openFaultTargetManager()">管理目标</button>
+                    </div>
+                </div>
+                <div class="filter-row" style="border-bottom:1px solid var(--border,#e2e8f0);padding-bottom:8px;margin-bottom:8px">
+                    <label style="font-weight:600">目标集群</label>
+                    <select id="faultlab-cluster" class="select-sm" style="min-width:200px"></select>
+                    <label>namespace 覆盖</label>
+                    <input id="faultlab-ns-override" class="input-sm" placeholder="留空 = 用 scenario 默认" style="width:200px">
+                    <span class="text-muted" id="faultlab-cluster-hint" style="font-size:12px"></span>
+                </div>
+                <div class="filter-row">
+                    <select id="faultlab-scenario" class="select-sm" style="min-width:260px"></select>
+                    <label class="inline-check"><input type="checkbox" id="faultlab-load" checked> 背景负载</label>
+                    <label class="inline-check"><input type="checkbox" id="faultlab-dryrun" checked> Dry-run</label>
+                    <button class="btn btn-sm btn-primary" onclick="injectFaultScenario()">注入</button>
+                    <button class="btn btn-sm btn-danger" onclick="cleanupFaultScenario()">清理</button>
+                </div>
+                <div id="faultlab-scenario-detail"></div>
+                <pre class="log-viewer" id="faultlab-output" style="min-height:160px"></pre>
+            </div>
+
+            <div class="card">
+                <h3>场景覆盖</h3>
+                <div id="faultlab-grid" class="faultlab-grid"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Live Benchmark 连续故障实验</h3>
+                    <button class="btn btn-sm" onclick="loadK8sFaultExperiments()">刷新记录</button>
+                </div>
+                <div class="filter-row">
+                    <input id="k8s-fault-exp-name" class="input-sm" placeholder="实验名称" style="min-width:220px">
+                    <input id="k8s-fault-exp-system" class="input-sm" value="social-network" placeholder="业务系统" style="width:160px">
+                    <input id="k8s-fault-exp-total" class="input-sm" type="number" value="0" min="0" placeholder="总时长秒" style="width:120px">
+                    <input id="k8s-fault-exp-wait" class="input-sm" type="number" value="5" min="0" placeholder="间隔秒" style="width:100px">
+                    <button class="btn btn-sm" onclick="addK8sFaultExperimentStep()">添加当前场景</button>
+                    <button class="btn btn-sm btn-primary" onclick="startK8sFaultExperiment()">启动实验</button>
+                </div>
+                <div id="k8s-fault-exp-steps" class="fault-exp-steps"></div>
+                <pre class="log-viewer" id="k8s-fault-exp-output" style="min-height:150px"></pre>
+                <div id="k8s-fault-exp-runs" class="fault-exp-runs"></div>
+            </div>
+        </section>
+
+        <!-- ═══ LLM Inference Fault Lab Section ═══ -->
+        <section id="view-llmfaultlab" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>智算故障实验</h3>
+                    <div>
+                        <button class="btn btn-sm" onclick="loadLLMFaultLab()">刷新场景</button>
+                        <button class="btn btn-sm" onclick="openFaultTargetManager()">管理目标</button>
+                    </div>
+                </div>
+                <div class="faultlab-summary" id="llmfaultlab-summary"></div>
+                <div class="fault-env" id="llmfaultlab-env"></div>
+                <div class="filter-row" style="border-bottom:1px solid var(--border,#e2e8f0);padding-bottom:8px;margin-bottom:8px">
+                    <label style="font-weight:600">目标类型</label>
+                    <label class="inline-check"><input type="radio" name="llmfaultlab-mode" value="k8s" checked onchange="onLLMFaultModeChange()"> K8s 集群（容器内 vLLM）</label>
+                    <label class="inline-check"><input type="radio" name="llmfaultlab-mode" value="host" onchange="onLLMFaultModeChange()"> 裸机 GPU 主机</label>
+                </div>
+                <div class="filter-row" id="llmfaultlab-k8s-row">
+                    <label>集群</label>
+                    <select id="llmfaultlab-cluster" class="select-sm" style="min-width:180px"></select>
+                    <input id="llmfaultlab-namespace" class="input-sm" value="default" placeholder="namespace" style="width:140px">
+                    <input id="llmfaultlab-deployment" class="input-sm" value="vllm-server" placeholder="deployment" style="width:160px">
+                </div>
+                <div class="filter-row" id="llmfaultlab-host-row" style="display:none">
+                    <label>GPU 主机</label>
+                    <select id="llmfaultlab-host" class="select-sm" style="min-width:220px"></select>
+                    <button class="btn btn-sm" onclick="probeLLMHost()">探测</button>
+                    <span class="text-muted" id="llmfaultlab-host-hint" style="font-size:12px"></span>
+                </div>
+                <div class="filter-row">
+                    <select id="llmfaultlab-scenario" class="select-sm" style="min-width:260px"></select>
+                    <label class="inline-check"><input type="checkbox" id="llmfaultlab-dryrun" checked> Dry-run</label>
+                    <button class="btn btn-sm btn-primary" onclick="injectLLMFaultScenario()">注入</button>
+                    <button class="btn btn-sm" onclick="runLLMFaultExperiment()">实验</button>
+                    <button class="btn btn-sm btn-danger" onclick="cleanupLLMFaultScenario()">恢复</button>
+                </div>
+                <div id="llmfaultlab-scenario-detail"></div>
+                <pre class="log-viewer" id="llmfaultlab-output" style="min-height:160px"></pre>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>连续故障实验</h3>
+                    <button class="btn btn-sm" onclick="loadFaultExperiments()">刷新记录</button>
+                </div>
+                <div class="filter-row">
+                    <input id="fault-exp-name" class="input-sm" placeholder="实验名称" style="min-width:220px">
+                    <input id="fault-exp-system" class="input-sm" value="llm-inference" placeholder="业务系统" style="width:160px">
+                    <input id="fault-exp-total" class="input-sm" type="number" value="0" min="0" placeholder="总时长秒" style="width:120px">
+                    <input id="fault-exp-wait" class="input-sm" type="number" value="5" min="0" placeholder="间隔秒" style="width:100px">
+                    <button class="btn btn-sm" onclick="addFaultExperimentStep()">添加当前场景</button>
+                    <button class="btn btn-sm btn-primary" onclick="startFaultExperiment()">启动实验</button>
+                </div>
+                <div id="fault-exp-steps" class="fault-exp-steps"></div>
+                <pre class="log-viewer" id="fault-exp-output" style="min-height:150px"></pre>
+                <div id="fault-exp-runs" class="fault-exp-runs"></div>
+            </div>
+
+            <div class="card">
+                <h3>智算场景覆盖</h3>
+                <div id="llmfaultlab-grid" class="faultlab-grid"></div>
+            </div>
+        </section>
+
+        <!-- ═══ Config Center Section ═══ -->
+        <section id="view-configcenter" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>配置中心</h3>
+                    <div>
+                        <button class="btn btn-sm" onclick="loadConfigCenter()">刷新</button>
+                        <button class="btn btn-sm btn-primary" onclick="saveConfigCenter()">保存</button>
+                    </div>
+                </div>
+                <div class="grid-3col">
+                    <div class="config-panel">
+                        <h4>大模型</h4>
+                        <label class="config-field">
+                            <span>模型名称 <code>llm.model</code></span>
+                            <input id="cfg-llm-model" class="input-sm" placeholder="deepseek-v4-pro">
+                            <small>RCA、诊断和自愈建议使用的模型标识，需与推理服务一致。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>服务地址 <code>llm.base_url</code></span>
+                            <input id="cfg-llm-base" class="input-sm" placeholder="https://api.deepseek.com">
+                            <small>OpenAI 兼容接口基础地址，例如 https://host/v1。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>API Key <code>llm.api_key</code></span>
+                            <input id="cfg-llm-key" class="input-sm" placeholder="留空则不修改" type="password">
+                            <small>密钥不会明文回显；留空保存时保持原值。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>采样温度 <code>llm.temperature</code></span>
+                            <input id="cfg-llm-temp" class="input-sm" type="number" min="0" max="2" step="0.1" placeholder="0.1">
+                            <small>范围 0-2。诊断建议低温度，结果更稳定。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>最大输出 Token <code>llm.max_tokens</code></span>
+                            <input id="cfg-llm-maxtokens" class="input-sm" type="number" min="1" placeholder="65536">
+                            <small>单次模型调用允许生成的最大 Token 数。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>请求超时 <code>llm.timeout</code></span>
+                            <input id="cfg-llm-timeout" class="input-sm" type="number" min="1" placeholder="300">
+                            <small>单位秒。复杂多智能体分析可适当增大。</small>
+                        </label>
+                    </div>
+                    <div class="config-panel">
+                        <h4>指标异常检测</h4>
+                        <label class="config-field">
+                            <span>默认算法 <code>detection.default_algorithm</code></span>
+                            <select id="cfg-det-algo" class="select-sm">
+                                <option value="zscore">zscore</option>
+                                <option value="iqr">iqr</option>
+                                <option value="threshold">threshold</option>
+                                <option value="spectral_residual">spectral_residual</option>
+                            </select>
+                            <small>未单独配置指标算法时使用。zscore 适合稳定基线指标。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>Z 阈值 <code>detection.default_z_threshold</code></span>
+                            <input id="cfg-det-z" class="input-sm" type="number" step="0.1" placeholder="3.0">
+                            <small>值越小越敏感，误报风险也更高。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>回看窗口 <code>detection.default_lookback_m</code></span>
+                            <input id="cfg-det-lookback" class="input-sm" type="number" min="1" placeholder="30">
+                            <small>单位分钟，用于读取历史指标样本。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>最少样本 <code>detection.min_samples</code></span>
+                            <input id="cfg-det-minsamples" class="input-sm" type="number" min="3" placeholder="12">
+                            <small>样本不足时不触发统计异常判断。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>连续确认点 <code>detection.confirmation_points</code></span>
+                            <input id="cfg-det-confirm" class="input-sm" type="number" min="1" placeholder="1">
+                            <small>连续多个异常点才告警，可过滤瞬态抖动。</small>
+                        </label>
+                    </div>
+                    <div class="config-panel">
+                        <h4>自愈策略</h4>
+                        <label class="config-check"><input id="cfg-heal-enabled" type="checkbox"><span>启用真实自愈 <code>remediation.enabled</code></span><small>允许执行真实变更命令，生产环境需谨慎开启。</small></label>
+                        <label class="config-check"><input id="cfg-heal-recommendonly" type="checkbox"><span>仅生成建议 <code>remediation.recommend_only</code></span><small>开启后禁止真实执行，只允许方案生成和 Dry-run。</small></label>
+                        <label class="config-check"><input id="cfg-heal-dryrun" type="checkbox"><span>默认 Dry-run <code>remediation.dry_run</code></span><small>开启后默认只预演命令，不修改集群。</small></label>
+                        <label class="config-check"><input id="cfg-heal-approval" type="checkbox"><span>需要审批 <code>remediation.require_approval</code></span><small>真实执行前要求人工审批，建议保持开启。</small></label>
+                        <label class="config-field">
+                            <span>置信度阈值 <code>remediation.confidence_threshold</code></span>
+                            <input id="cfg-heal-confidence" class="input-sm" type="number" min="0" max="1" step="0.05" placeholder="0.85">
+                            <small>诊断置信度达到该值后才允许进入自愈执行流程。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>最大动作数 <code>remediation.max_steps</code></span>
+                            <input id="cfg-heal-maxsteps" class="input-sm" type="number" min="1" placeholder="5">
+                            <small>限制单次自愈最多执行的命令数量。</small>
+                        </label>
+                        <label class="config-field">
+                            <span>自动执行最高风险 <code>remediation.max_auto_risk_level</code></span>
+                            <select id="cfg-heal-risk" class="select-sm">
+                                <option value="low">low</option>
+                                <option value="medium">medium</option>
+                                <option value="high">high</option>
+                            </select>
+                            <small>超过该风险等级的动作需要升级审批。</small>
+                        </label>
+                    </div>
+                </div>
+                <div class="config-docs">
+                    <div class="section-subtitle">参数说明</div>
+                    <div id="configcenter-docs" class="config-doc-grid"></div>
+                </div>
+                <pre class="log-viewer" id="configcenter-output" style="min-height:120px"></pre>
+            </div>
+        </section>
+
+        <!-- ═══ Heal Center Section ═══ -->
+        <section id="view-healcenter" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>自愈中心</h3>
+                    <button class="btn btn-sm" onclick="loadHealCenter()">刷新</button>
+                </div>
+                <div class="filter-row">
+                    <input id="heal-namespace" class="input-sm" value="default" placeholder="namespace">
+                    <input id="heal-message" class="input-sm" style="min-width:320px" placeholder="故障描述，如 Pod xxx OOMKilled">
+                    <input id="heal-pod" class="input-sm" placeholder="pod 可选">
+                    <input id="heal-node" class="input-sm" placeholder="node 可选">
+                    <label class="inline-check"><input id="heal-dryrun" type="checkbox" checked> Dry-run</label>
+                    <button class="btn btn-sm btn-primary" onclick="suggestHeal()">生成建议</button>
+                    <button class="btn btn-sm btn-danger" onclick="openHealPlanFromCenter()">打开方案</button>
+                </div>
+                <div id="heal-suggestions" class="heal-grid"></div>
+                <pre class="log-viewer" id="heal-output" style="min-height:120px"></pre>
+            </div>
+            <div class="card">
+                <h3>自愈知识库</h3>
+                <div id="heal-recipes-meta" class="heal-recipes-meta"></div>
+                <div id="heal-recipes" class="faultlab-grid"></div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3>自愈运行记录</h3>
+                    <select id="heal-run-filter" class="select-sm" onchange="renderHealRuns(_lastHealRuns || [])">
+                        <option value="all">全部</option>
+                        <option value="real">真实执行</option>
+                        <option value="dry_run">Dry-run</option>
+                        <option value="failed">失败</option>
+                        <option value="recovered">已验证恢复</option>
+                        <option value="unrecovered">验证未恢复</option>
+                    </select>
+                </div>
+                <div id="heal-runs-summary" class="heal-runs-summary"></div>
+                <div id="heal-runs"></div>
+            </div>
+        </section>
+
+        <!-- ═══ Reports Section (故障报告) ═══ -->
+        <section id="view-reports" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>历史诊断分析</h3>
+                    <button class="btn btn-sm" onclick="loadReportList()">刷新</button>
+                </div>
+                <p class="text-muted" style="margin-bottom:12px;font-size:13px">选择一次历史分析，生成完整的故障诊断报告</p>
+                <div id="report-list"></div>
+            </div>
+
+            <!-- 报告预览 -->
+            <div class="card" id="report-preview-card" style="display:none">
+                <div class="card-header">
+                    <h3>报告预览</h3>
+                    <div>
+                        <button class="btn btn-sm btn-primary" id="report-export-btn" onclick="exportReport()">导出 HTML</button>
+                        <button class="btn btn-sm" style="background:var(--success);color:#fff;border-color:var(--success)" onclick="exportReportWord()">导出 Word</button>
+                    </div>
+                </div>
+                <div id="report-preview"></div>
+            </div>
+        </section>
+
+        <!-- ═══ Events Section ═══ -->
+        <section id="view-events" class="view">
+            <div class="filter-row">
+                <select id="event-ns" class="select-sm">
+                    <option value="">所有命名空间</option>
+                </select>
+                <button class="btn btn-sm btn-primary" onclick="loadEvents()">查询事件</button>
+            </div>
+            <div class="card">
+                <table class="data-table" id="event-table">
+                    <thead>
+                        <tr><th>类型</th><th>原因</th><th>对象</th><th>消息</th><th>次数</th><th>时间</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ═══ Hermes Agent Section ═══ -->
+        <section id="view-hermes" class="view">
+            <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 160px);padding:0">
+                <!-- Header -->
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border-light)">
+                    <div>
+                        <h3 style="margin:0">Hermes Agent 智能运维助手</h3>
+                        <span style="font-size:12px;color:#64748b">NousResearch 通用AI Agent — 通过终端工具执行kubectl/curl命令</span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <span class="badge badge-info" id="hermes-status">就绪</span>
+                        <span style="font-size:12px;color:#64748b" id="hermes-tokens">Token: 0</span>
+                        <button class="btn btn-sm" onclick="hermesNewSession()">新会话</button>
+                    </div>
+                </div>
+                <!-- Messages -->
+                <div id="hermes-messages" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+                    <div class="hermes-welcome" style="text-align:center;color:#64748b;padding:40px 20px">
+                        <div style="font-size:48px;margin-bottom:12px">&#9742;</div>
+                        <h3 style="color:#334155;margin-bottom:8px">Hermes Agent 智能运维助手</h3>
+                        <p style="font-size:14px;max-width:500px;margin:0 auto">
+                            可以用自然语言提问，Hermes Agent 会自动执行 kubectl、curl 等命令来调查和解决问题。
+                        </p>
+                        <div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap">
+                            <button class="btn btn-sm" onclick="hermesSend('检查 test-social-network 命名空间的所有 Pod 状态')">检查Pod状态</button>
+                            <button class="btn btn-sm" onclick="hermesSend('查看集群节点的CPU和内存使用情况')">查看资源使用</button>
+                            <button class="btn btn-sm" onclick="hermesSend('分析最近5分钟的K8s告警事件')">分析告警事件</button>
+                            <button class="btn btn-sm" onclick="hermesSend('test-social-network 中哪些服务有异常？请详细诊断')">诊断服务异常</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Input -->
+                <div style="padding:12px 20px;border-top:1px solid var(--border-light);display:flex;gap:8px">
+                    <input type="text" id="hermes-input" class="input" placeholder="输入运维问题（如：检查 compose-post-service 的日志）"
+                           style="flex:1" onkeydown="if(event.key==='Enter')hermesSendInput()">
+                    <button class="btn btn-primary" onclick="hermesSendInput()" id="hermes-send-btn">发送</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══ 故障目标管理 Modal ═══ -->
+    <div id="fault-target-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:1000;align-items:flex-start;justify-content:center;padding:40px 20px;overflow:auto">
+        <div style="background:#fff;border-radius:8px;width:min(960px,100%);max-width:960px;box-shadow:0 20px 50px rgba(15,23,42,0.25);overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #e2e8f0">
+                <h3 style="margin:0">故障注入目标管理</h3>
+                <button class="btn btn-sm" onclick="closeFaultTargetManager()">关闭</button>
+            </div>
+            <div style="padding:16px 20px">
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                    <button class="btn btn-sm btn-primary" onclick="switchTargetTab('k8s')" id="tgt-tab-k8s">K8s 集群</button>
+                    <button class="btn btn-sm" onclick="switchTargetTab('host')" id="tgt-tab-host">GPU 主机</button>
+                </div>
+                <div id="tgt-pane-k8s">
+                    <table class="data-table" style="width:100%">
+                        <thead><tr>
+                            <th>ID</th><th>名称</th><th>kubeconfig</th><th>context</th><th>默认 ns</th><th>说明</th><th></th>
+                        </tr></thead>
+                        <tbody id="tgt-k8s-body"></tbody>
+                    </table>
+                    <button class="btn btn-sm" style="margin-top:8px" onclick="addClusterRow()">+ 新增集群</button>
+                </div>
+                <div id="tgt-pane-host" style="display:none">
+                    <table class="data-table" style="width:100%">
+                        <thead><tr>
+                            <th>ID</th><th>名称</th><th>host</th><th>ssh_user</th><th>ssh_key_path</th><th>jump_host</th><th>GPU</th><th>角色</th><th></th>
+                        </tr></thead>
+                        <tbody id="tgt-host-body"></tbody>
+                    </table>
+                    <button class="btn btn-sm" style="margin-top:8px" onclick="addHostRow()">+ 新增主机</button>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid #e2e8f0;background:#f8fafc">
+                <button class="btn btn-sm" onclick="closeFaultTargetManager()">取消</button>
+                <button class="btn btn-sm btn-primary" onclick="saveFaultTargets()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ 自愈方案 Modal ═══ -->
+    <div id="heal-plan-modal" class="modal-backdrop" style="display:none">
+        <div class="modal-panel heal-plan-modal">
+            <div class="modal-header">
+                <div>
+                    <h3>自愈方案</h3>
+                    <p id="heal-plan-subtitle">生成、编辑、执行和反馈自愈动作</p>
+                </div>
+                <button class="btn btn-sm" onclick="closeHealPlanModal()">关闭</button>
+            </div>
+            <div class="modal-body">
+                <div id="heal-plan-summary" class="heal-plan-summary"></div>
+                <div class="heal-plan-toolbar">
+                    <label class="inline-check"><input id="heal-plan-select-all" type="checkbox" checked onchange="toggleHealPlanAll(this.checked)"> 全选动作</label>
+                    <label class="inline-check"><input id="heal-plan-dryrun" type="checkbox" checked> Dry-run</label>
+                    <label class="inline-check"><input id="heal-plan-approved" type="checkbox"> 已审批</label>
+                    <label class="inline-check"><input id="heal-plan-riskack" type="checkbox"> 高风险确认</label>
+                </div>
+                <div id="heal-plan-actions" class="heal-plan-actions"></div>
+                <div id="heal-plan-blocked" class="heal-plan-blocked"></div>
+                <div class="heal-plan-feedback">
+                    <select id="heal-plan-feedback-rating" class="select-sm">
+                        <option value="helpful">方案有效</option>
+                        <option value="partial">部分有效</option>
+                        <option value="unsafe">存在风险</option>
+                        <option value="wrong">方案错误</option>
+                    </select>
+                    <input id="heal-plan-feedback-note" class="input-sm" placeholder="反馈备注，可选">
+                    <button class="btn btn-sm" onclick="submitHealPlanFeedback()">提交反馈</button>
+                </div>
+                <pre class="log-viewer" id="heal-plan-output" style="min-height:120px"></pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-sm" onclick="closeHealPlanModal()">取消</button>
+                <button class="btn btn-sm btn-primary" onclick="executeHealPlan(true)">Dry-run 预演</button>
+                <button class="btn btn-sm btn-danger" onclick="executeHealPlan(false)">执行选中动作</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=28"></script>
+</body>
+</html>

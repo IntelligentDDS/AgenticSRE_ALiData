@@ -1,0 +1,20 @@
+flowchart LR
+    Trace["RCA 执行轨迹<br/>假设 / 证据 / 工具调用 / 报告"] --> Judge["RCAJudge<br/>规则评分 + LLM 评分"]
+    Judge --> Gate{质量达标?}
+
+    Gate -- 否 --> Review["人工审核<br/>标记风险 / 不自动学习"]
+    Review --> Feedback["ExpertFeedbackStore<br/>真实根因 / 评论"]
+
+    Gate -- 是 --> Extract["ContextLearner<br/>提炼可复用诊断规则"]
+    Feedback --> Supervised["监督式对比学习<br/>诊断 vs 真实根因"]
+    Supervised --> Extract
+
+    Extract --> Normalize["规则归一化<br/>条件-结论-证据-适用域"]
+    Normalize --> Store["FaultContextStore<br/>向量规则库 / 故障指纹库"]
+    Store --> Retrieve["相似故障检索<br/>Top-K 规则召回"]
+    Retrieve --> Context["ContextBuilder<br/>注入领域 Agent 上下文"]
+    Context --> RCA["下一轮 RCA<br/>假设生成与调查规划"]
+    RCA --> Trace
+
+    Trace --> Tracker["EvolutionTracker<br/>规则数 / 置信度 / 延迟 / Judge 分数"]
+    Store --> Tracker

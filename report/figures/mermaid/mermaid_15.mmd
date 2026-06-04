@@ -1,0 +1,32 @@
+graph TB
+    subgraph 感知层["故障感知层"]
+        D1["异常检测<br/>Z-score / EWMA"]
+        D2["告警压缩<br/>AlertInsight"]
+        D3["事件监听<br/>K8s Events"]
+    end
+    
+    subgraph 分析层["根因分析层"]
+        A1["指标分析<br/>Metric Agent"]
+        A2["日志分析<br/>Log Agent"]
+        A3["链路分析<br/>Trace Agent"]
+        A4["事件分析<br/>Event Agent"]
+        C["关联分析<br/>Hero + Graph RCA"]
+    end
+    
+    subgraph 决策层["决策与执行层"]
+        R1["根因推理<br/>Hypothesis-Driven"]
+        R2["修复规划<br/>Remediation Plan"]
+        R3["安全执行<br/>ActionStack"]
+    end
+    
+    subgraph 演化层["记忆与演化层"]
+        M1["知识库<br/>Rules + Faults"]
+        M2["经验学习<br/>ContextLearner"]
+        M3["演化追踪<br/>EvolutionTracker"]
+    end
+    
+    感知层 --> 分析层
+    分析层 --> 决策层
+    决策层 --> 演化层
+    演化层 -.->|"知识回注"| 分析层
+    演化层 -.->|"策略优化"| 决策层
