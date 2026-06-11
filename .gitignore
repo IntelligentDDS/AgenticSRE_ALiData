@@ -1,3 +1,7 @@
-.*
-!.gitignore
-__pycache__
+.env
+__pycache__/
+*.pyc
+bin/
+logs/
+tests/fixtures/mcp_replay/__cache__/
+data/memory/chromadb/

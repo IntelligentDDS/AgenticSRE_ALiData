@@ -25,10 +25,10 @@
 #   timeout      (可选) HTTP 超时秒；大模型慢时调高到 300~600
 llm:
   api_key: "${LLM_API_KEY}"
-  base_url: "https://api.deepseek.com"      # DeepSeek 例外，可不带 /v1
-  model: "deepseek-v4-pro"
+  base_url: "http://localhost:8000/v1"      # Local OpsLLM-7B server
+  model: "OpsLLM-7B"
   temperature: 0.1
-  max_tokens: 65536
+  max_tokens: 2048                          # Conservative for V100
   timeout: 300
 
 # ─── LLM Provider 预设 (按需取消注释替换上面整段 llm:) ──────────────
@@ -92,10 +92,18 @@ kubernetes:
   target_host: "ubuntu@10.10.3.110"
 
 observability:
-  prometheus_url: "http://localhost:9090"
-  elasticsearch_url: "http://localhost:9200"
-  jaeger_url: "http://localhost:16686"
-  grafana_url: "http://localhost:3000"
+  backend: "mcp"                              # only supported backend
+  mcp_endpoint: "http://localhost:7980/mcp"
+  mcp_timeout_seconds: 60
+  mcp_transport_retry: 3
+  default_region: "cn-hongkong"
+  default_workspace: "rca-benchmark"
+  default_domain: "apm"
+  default_entity_set: "apm.service"
+  default_log_set_domain: "apm"
+  default_log_set_name: "apm.custom.k8s-log-cfbbc0eabc19d43c0a6fb6889b4451ad0.recommendation-log.log"
+  default_trace_set_domain: "apm"
+  default_trace_set_name: "apm.trace.common"
 
 database:
   dsn: ""                   # optional: postgresql://...
@@ -140,7 +148,7 @@ pipeline:
   enable_recovery: false
   enable_collaboration_optimization: true
   enable_fast_evidence_selection: true
-  evidence_agent_timeout_s: 45
+  evidence_agent_timeout_s: 180
   evidence_summary_max_tokens: 1024
   enable_llm_inference_agent: true
   enable_structured_evidence: true
@@ -155,11 +163,11 @@ alert:
 
 detection:
   sources_enabled:
-    prometheus: true
-    k8s_event: true
-    pod_health: true
-    node_health: true
-    metric_anomaly: true
+    prometheus: true       # Now backed by MCP golden-metrics threshold check
+    k8s_event: false       # Disabled: requires native kubectl, no cluster locally
+    pod_health: false      # Disabled: same reason
+    node_health: false     # Disabled: same reason
+    metric_anomaly: false  # Replaced by _check_prometheus_alerts (cheaper)
   default_detect_methods: ["threshold", "zscore"]
   default_lookback_m: 30
   default_z_threshold: 3.0

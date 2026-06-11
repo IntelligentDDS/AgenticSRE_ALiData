@@ -35,3 +35,6 @@ drain3>=0.9.11
 # ─── Async ───
 anyio>=4.0.0
 httpx>=0.27.0
+
+# ─── Aliyun Observability MCP Server ───
+mcp-server-aliyun-observability==1.0.8

@@ -1,0 +1,1082 @@
+[
+  {
+    "review_id": "hitl-4282c529",
+    "incident_id": "rca-eeaa4bf5",
+    "source": "rca_quality_gate",
+    "reason": "RCA quality judge marked the result as needing human review.",
+    "priority": "medium",
+    "status": "pending",
+    "created_at": 1780749908.0737214,
+    "updated_at": 1780749908.0737216,
+    "rca_result": {
+      "root_cause": "The frontend-svc showed a significant increase in p95 and p99 latency, indicating that the performance degradation originated from within this service, likely due to internal resource contention or upstream dependency delays.",
+      "confidence": 0.9,
+      "fault_type": "dependency_failure",
+      "affected_services": [
+        "frontend-svc"
+      ],
+      "timeline": [],
+      "evidence_summary": {
+        "metrics": "Frontend service showed a marked increase in latency (p95 = 100.11ms, p99 = 241.96ms), suggesting internal processing or upstream delays.",
+        "logs": "No error logs were found, but this may indicate that the issue was more operational than catastrophic.",
+        "traces": "Bottleneck spans in 'service-v.GetVersion' and 'http.Request' to 'service-v' within the frontend service point to potential bottlenecks in its request handling.",
+        "events": "No Kubernetes events or resource anomalies were detected, implying the issue was service-specific rather than infrastructure-wide."
+      },
+      "reasoning_chain": "The frontend-svc exhibited high latency in critical paths, indicating it was the source of the performance degradation. Although no errors were logged, the timing and magnitude of the latency spikes suggest a functional issue rather than a failure.",
+      "remediation_suggestion": "Investigate internal resource usage and dependencies within the frontend-svc, and ensure proper load testing and monitoring are in place to catch such issues early.",
+      "prevention": "Implement tighter monitoring for high-latency requests and upstream services, and regularly review service-level agreements to proactively address performance bottlenecks.",
+      "closure_applied": true,
+      "closure_failure_modes": [
+        "insufficient_evidence",
+        "fault_type_ambiguity",
+        "scope_or_target_ambiguity"
+      ],
+      "fault_type_original": "performance_degradation",
+      "fault_type_reason": "Dependency/cache/database/upstream failure terms were present."
+    },
+    "judge": {
+      "judge_level": 2,
+      "combined_score": 0.495,
+      "needs_review": true,
+      "rule_based": {
+        "score": 0.381,
+        "level": 3,
+        "high_patterns": 0,
+        "medium_patterns": 0,
+        "low_patterns": 0,
+        "length": 248
+      },
+      "llm_based": {
+        "judge_level": 1,
+        "coherence_score": 0.8,
+        "evidence_score": 0.7,
+        "specificity_score": 0.9,
+        "actionability_score": 0.8,
+        "feedback": "The RCA is logically coherent and based on observable metrics, with high specificity in identifying the frontend-svc as the root cause. The confidence level is appropriately high given the strong correlation between the service's latency and the observed performance degradation."
+      },
+      "threshold": 0.65,
+      "collaboration_critique": {
+        "quality_score": 0.0,
+        "needs_revision": true,
+        "needs_human_review": false,
+        "weaknesses": [
+          "The RCA fails to identify a root cause despite the APM error_count being 1, which indicates a potential real error in the service.",
+          "There is no specificity in the fault_type, as 'System Stability' is too broad and not supported by concrete evidence.",
+          "The evidence summary lacks detailed analysis of the APM error_count's impact on the service, and no actionable insights are provided."
+        ],
+        "missing_evidence": [
+          "No logs, traces, or metrics showing downstream effects or upstream causes related to the APM error_count.",
+          "Lack of context on whether the APM error_count reflects a real error or a misreporting of the service's health.",
+          "No reflection on the collaboration policy's effectiveness in this scenario, as no actions were taken based on the audit."
+        ],
+        "alternative_hypotheses": [
+          "The APM error_count represents a real error in the service, and further investigation is needed to determine the root cause.",
+          "The fault_type should be more specific, such as 'Data Integrity' or 'Third-Party Integration Failure', based on the nature of the APM error."
+        ],
+        "confidence_adjustment": -0.1,
+        "recommended_focus": [
+          "Re-evaluate the APM error_count and its implications on the service's health.",
+          "Conduct a deeper dive into the APM data to determine if the error_count reflects a real issue and identify the root cause.",
+          "Update the fault_type to a more precise category based on the findings."
+        ]
+      },
+      "closure": {
+        "plan": {
+          "should_iterate": true,
+          "reason": "Quality gate requested closure: judge_score=0.349, critic_score=0.000, modes=insufficient_evidence, fault_type_ambiguity, scope_or_target_ambiguity.",
+          "failure_modes": [
+            "insufficient_evidence",
+            "fault_type_ambiguity",
+            "scope_or_target_ambiguity"
+          ],
+          "target_agents": [
+            "metric_agent",
+            "event_agent",
+            "trace_agent"
+          ],
+          "focus_queries": {
+            "metric_agent": "Second-pass RCA closure. Original root cause: The APM error_count metric, although synthetic, indicates a potential real error in the apm.service, but no concrete logs or traces point to a definitive root cause, suggesting the error may be due to a third-party integration failure or data integrity issue.. Fault type: application_crash. Weaknesses: The RCA fails to identify a root cause despite the APM error_count being 1, which indicates a potential real error in the service.; There is no specificity in the fault_type, as 'System Stability' is too broad and not supported by concrete evidence.; The evidence summary lacks detailed analysis of the APM error_count's impact on the service, and no actionable insights are provided.. Failure modes: insufficient_evidence, fault_type_ambiguity, scope_or_target_ambiguity. Collect quantitative resource, latency, saturation, throttling, and time-window evidence. Use the most recent 5-15 minute window and prioritize target services named in the incident/root cause. For Kubernetes CPU issues, explicitly check container CPU usage, CPU throttling, CPU quota/limits, pod-to-node placement, and node CPU. Distinguish resource exhaustion from software bug and dependency failure.",
+            "event_agent": "Second-pass RCA closure. Original root cause: The APM error_count metric, although synthetic, indicates a potential real error in the apm.service, but no concrete logs or traces point to a definitive root cause, suggesting the error may be due to a third-party integration failure or data integrity issue.. Fault type: application_crash. Weaknesses: The RCA fails to identify a root cause despite the APM error_count being 1, which indicates a potential real error in the service.; There is no specificity in the fault_type, as 'System Stability' is too broad and not supported by concrete evidence.; The evidence summary lacks detailed analysis of the APM error_count's impact on the service, and no actionable insights are provided.. Failure modes: insufficient_evidence, fault_type_ambiguity, scope_or_target_ambiguity. Check recent Kubernetes events, pod lifecycle, node readiness, image pulls, scheduling, and whether events are temporally aligned with the incident. Down-rank stale events that started days ago unless their last-seen time and affected pod placement directly align with the current incident.",
+            "trace_agent": "Second-pass RCA closure. Original root cause: The APM error_count metric, although synthetic, indicates a potential real error in the apm.service, but no concrete logs or traces point to a definitive root cause, suggesting the error may be due to a third-party integration failure or data integrity issue.. Fault type: application_crash. Weaknesses: The RCA fails to identify a root cause despite the APM error_count being 1, which indicates a potential real error in the service.; There is no specificity in the fault_type, as 'System Stability' is too broad and not supported by concrete evidence.; The evidence summary lacks detailed analysis of the APM error_count's impact on the service, and no actionable insights are provided.. Failure modes: insufficient_evidence, fault_type_ambiguity, scope_or_target_ambiguity. Check service-to-service path, bottleneck span, upstream/downstream propagation, and whether the suspected service is the first anomalous hop."
+          },
+          "max_rounds": 1,
+          "hitl_if_unresolved": true
+        },
+        "evidence_agents": [
+          "metric_agent_closure",
+          "event_agent_closure",
+          "trace_agent_closure"
+        ],
+        "revised_result": {
+          "root_cause": "The frontend-svc showed a significant increase in p95 and p99 latency, indicating that the performance degradation originated from within this service, likely due to internal resource contention or upstream dependency delays.",
+          "confidence": 0.9,
+          "fault_type": "dependency_failure",
+          "affected_services": [
+            "frontend-svc"
+          ],
+          "timeline": [],
+          "evidence_summary": {
+            "metrics": "Frontend service showed a marked increase in latency (p95 = 100.11ms, p99 = 241.96ms), suggesting internal processing or upstream delays.",
+            "logs": "No error logs were found, but this may indicate that the issue was more operational than catastrophic.",
+            "traces": "Bottleneck spans in 'service-v.GetVersion' and 'http.Request' to 'service-v' within the frontend service point to potential bottlenecks in its request handling.",
+            "events": "No Kubernetes events or resource anomalies were detected, implying the issue was service-specific rather than infrastructure-wide."
+          },
+          "reasoning_chain": "The frontend-svc exhibited high latency in critical paths, indicating it was the source of the performance degradation. Although no errors were logged, the timing and magnitude of the latency spikes suggest a functional issue rather than a failure.",
+          "remediation_suggestion": "Investigate internal resource usage and dependencies within the frontend-svc, and ensure proper load testing and monitoring are in place to catch such issues early.",
+          "prevention": "Implement tighter monitoring for high-latency requests and upstream services, and regularly review service-level agreements to proactively address performance bottlenecks.",
+          "closure_applied": true,
+          "closure_failure_modes": [
+            "insufficient_evidence",
+            "fault_type_ambiguity",
+            "scope_or_target_ambiguity"
+          ],
+          "fault_type_original": "performance_degradation",
+          "fault_type_reason": "Dependency/cache/database/upstream failure terms were present."
+        },
+        "judge_after": {
+          "judge_level": 2,
+          "combined_score": 0.495,
+          "needs_review": true,
+          "rule_based": {
+            "score": 0.381,
+            "level": 3,
+            "high_patterns": 0,
+            "medium_patterns": 0,
+            "low_patterns": 0,
+            "length": 248
+          },
+          "llm_based": {
+            "judge_level": 1,
+            "coherence_score": 0.8,
+            "evidence_score": 0.7,
+            "specificity_score": 0.9,
+            "actionability_score": 0.8,
+            "feedback": "The RCA is logically coherent and based on observable metrics, with high specificity in identifying the frontend-svc as the root cause. The confidence level is appropriately high given the strong correlation between the service's latency and the observed performance degradation."
+          },
+          "threshold": 0.65
+        }
+      }
+    },
+    "decision": "",
+    "reviewer": "",
+    "expert_diagnosis": "",
+    "comment": "",
+    "learning_result": {}
+  },
+  {
+    "review_id": "hitl-69828314",
+    "incident_id": "rca-513eb42b",
+    "source": "rca_quality_gate",
+    "reason": "RCA quality judge marked the result as needing human review.",
+    "priority": "high",
+    "status": "pending",
+    "created_at": 1780754482.0948396,
+    "updated_at": 1780754482.0948398,
+    "rca_result": {
+      "root_cause": "The frontend-svc experienced a significant increase in CPU usage and subsequent CPU throttling, indicating node-level CPU resource exhaustion as the primary cause of the incident.",
+      "confidence": 0.95,
+      "fault_type": "resource_exhaustion",
+      "affected_services": [
+        "frontend-svc"
+      ],
+      "timeline": [
+        {
+          "time": "15:45:42",
+          "event": "APM aggregated error_count is 5, indicating initial service degradation"
+        },
+        {
+          "time": "15:45:47",
+          "event": "High number of CPU throttling events start occurring in the frontend-svc pod"
+        },
+        {
+          "time": "15:46:02",
+          "event": "Multiple pods in the default namespace show a state of failure, suggesting a broader node-level resource exhaustion"
+        },
+        {
+          "time": "15:46:12",
+          "event": "p95 latency of frontend-svc significantly increases, confirming service performance is severely impacted"
+        }
+      ],
+      "evidence_summary": {
+        "metrics": {
+          "container_cpu_cfs_throttled_seconds_total{namespace=\"default\",pod=\"frontend-svc-5768f78867-qzrhz\"}": "Shows a high number of CPU throttling events, indicating the pod was frequently throttled due to CPU resource exhaustion.",
+          "container_cpu_usage_seconds_total{namespace=\"default\",pod=\"frontend-svc-5768f78867-qzrhz\"}": "Indicates sustained high CPU usage, often nearing or reaching the request limit, which is characteristic of CPU exhaustion."
+        },
+        "logs": {
+          "No direct error logs in the frontend service, but OOMKilled and crashloopbackoff events in related pods suggest underlying resource constraints": "While there are no OOM-related errors in the frontend service's logs, the associated pods show signs of resource exhaustion, supporting the CPU-related root cause."
+        },
+        "traces": {
+          "GetBookInfo span": "A significant bottleneck with increased duration and count, indicating it is a primary source of latency and reflects the service's inability to process requests efficiently due to CPU constraints."
+        },
+        "events": {
+          "kube_pod_status_phase indicates multiple pods in failed state, suggesting node-level resource exhaustion": "Multiple pods across different namespaces fail, pointing to a broader node-level CPU resource exhaustion."
+        }
+      },
+      "reasoning_chain": [
+        "Initial APM metrics show error_count and high p95/p99 latencies in frontend-svc, indicating performance degradation.",
+        "High number of CPU throttling events in the frontend-svc pod confirm that the service is experiencing CPU resource exhaustion.",
+        "Sustained high CPU usage, often nearing or reaching the request limit, is a clear indicator of CPU exhaustion.",
+        "Multiple pods in the default namespace show a state of failure, suggesting a broader node-level resource exhaustion, primarily in CPU."
+      ],
+      "remediation_suggestion": "Scale out the frontend-svc deployment to distribute the load, ensure adequate CPU resources are available, and monitor system performance proactively.",
+      "prevention": "Implement autoscaling policies for critical services, set up alerting on CPU utilization, and perform stress testing to identify and mitigate performance bottlenecks before they become critical.",
+      "closure_applied": true,
+      "closure_failure_modes": [
+        "insufficient_evidence",
+        "scope_or_target_ambiguity"
+      ],
+      "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+    },
+    "judge": {
+      "judge_level": "bronze",
+      "combined_score": 0.0,
+      "needs_review": true,
+      "collaboration_critique": {
+        "quality_score": 2.3,
+        "needs_revision": true,
+        "needs_human_review": false,
+        "weaknesses": [
+          "The RCA report overgeneralizes the root cause as 'resource constraints' without specifying the exact type (e.g., CPU, memory, disk I/O).",
+          "The evidence summary lacks correlation between the observed metrics and the proposed root cause, particularly in the absence of OOM-related errors in the log section.",
+          "The reasoning chain does not sufficiently link the increased latency to the failure of pods, which is more indicative of a node-level issue rather than a service-level one."
+        ],
+        "missing_evidence": [
+          "No evidence of actual OutOfMemory (OOM) kill events in the log or trace data, despite high CPU throttling and pod failures.",
+          "Lack of detailed analysis on disk I/O wait times or network latency, which could also contribute to performance degradation.",
+          "Insufficient context on whether the increased latency precedes or follows the pod failures, which is crucial for determining causality."
+        ],
+        "alternative_hypotheses": [
+          "A node-level resource exhaustion (e.g., CPU or memory) caused by an external flood of requests or a sudden spike in workload, leading to pod failures and elevated latency.",
+          "An internal service misconfiguration (e.g., improper resource limits, misaligned database queries) that triggered a cascade of performance issues, potentially exacerbated by external stress."
+        ],
+        "confidence_adjustment": -0.3,
+        "recommended_focus": [
+          "Re-evaluate the root cause by specifically identifying the type of resource constraint (CPU, memory, disk I/O) based on available logs and metrics.",
+          "Investigate the temporal relationship between the increase in latency and the failure of pods to establish a more accurate causal chain.",
+          "Include additional evidence from network latency and disk I/O to rule out other potential factors affecting performance."
+        ]
+      },
+      "closure": {
+        "plan": {
+          "should_iterate": true,
+          "reason": "Quality gate requested closure: judge_score=0.000, critic_score=2.300, modes=insufficient_evidence, scope_or_target_ambiguity.",
+          "failure_modes": [
+            "insufficient_evidence",
+            "scope_or_target_ambiguity"
+          ],
+          "target_agents": [
+            "metric_agent",
+            "event_agent",
+            "trace_agent"
+          ],
+          "focus_queries": {
+            "metric_agent": "Second-pass RCA closure. Original root cause: The frontend-svc experienced a significant increase in CPU throttling and p95/p99 latency due to node-level CPU resource exhaustion, causing request processing to degrade and leading to multiple pod failures manifesting as 'pod state=Failed' and 'oomkill' events.. Fault type: resource_exhaustion. Weaknesses: The RCA report overgeneralizes the root cause as 'resource constraints' without specifying the exact type (e.g., CPU, memory, disk I/O).; The evidence summary lacks correlation between the observed metrics and the proposed root cause, particularly in the absence of OOM-related errors in the log section.; The reasoning chain does not sufficiently link the increased latency to the failure of pods, which is more indicative of a node-level issue rather than a service-level one.. Failure modes: insufficient_evidence, scope_or_target_ambiguity. Collect quantitative resource, latency, saturation, throttling, and time-window evidence. Use the most recent 5-15 minute window and prioritize target services named in the incident/root cause. For Kubernetes CPU issues, explicitly check container CPU usage, CPU throttling, CPU quota/limits, pod-to-node placement, and node CPU. Distinguish resource exhaustion from software bug and dependency failure.",
+            "event_agent": "Second-pass RCA closure. Original root cause: The frontend-svc experienced a significant increase in CPU throttling and p95/p99 latency due to node-level CPU resource exhaustion, causing request processing to degrade and leading to multiple pod failures manifesting as 'pod state=Failed' and 'oomkill' events.. Fault type: resource_exhaustion. Weaknesses: The RCA report overgeneralizes the root cause as 'resource constraints' without specifying the exact type (e.g., CPU, memory, disk I/O).; The evidence summary lacks correlation between the observed metrics and the proposed root cause, particularly in the absence of OOM-related errors in the log section.; The reasoning chain does not sufficiently link the increased latency to the failure of pods, which is more indicative of a node-level issue rather than a service-level one.. Failure modes: insufficient_evidence, scope_or_target_ambiguity. Check recent Kubernetes events, pod lifecycle, node readiness, image pulls, scheduling, and whether events are temporally aligned with the incident. Down-rank stale events that started days ago unless their last-seen time and affected pod placement directly align with the current incident.",
+            "trace_agent": "Second-pass RCA closure. Original root cause: The frontend-svc experienced a significant increase in CPU throttling and p95/p99 latency due to node-level CPU resource exhaustion, causing request processing to degrade and leading to multiple pod failures manifesting as 'pod state=Failed' and 'oomkill' events.. Fault type: resource_exhaustion. Weaknesses: The RCA report overgeneralizes the root cause as 'resource constraints' without specifying the exact type (e.g., CPU, memory, disk I/O).; The evidence summary lacks correlation between the observed metrics and the proposed root cause, particularly in the absence of OOM-related errors in the log section.; The reasoning chain does not sufficiently link the increased latency to the failure of pods, which is more indicative of a node-level issue rather than a service-level one.. Failure modes: insufficient_evidence, scope_or_target_ambiguity. Check service-to-service path, bottleneck span, upstream/downstream propagation, and whether the suspected service is the first anomalous hop."
+          },
+          "max_rounds": 1,
+          "hitl_if_unresolved": true
+        },
+        "evidence_agents": [
+          "metric_agent_closure",
+          "event_agent_closure",
+          "trace_agent_closure"
+        ],
+        "revised_result": {
+          "root_cause": "The frontend-svc experienced a significant increase in CPU usage and subsequent CPU throttling, indicating node-level CPU resource exhaustion as the primary cause of the incident.",
+          "confidence": 0.95,
+          "fault_type": "resource_exhaustion",
+          "affected_services": [
+            "frontend-svc"
+          ],
+          "timeline": [
+            {
+              "time": "15:45:42",
+              "event": "APM aggregated error_count is 5, indicating initial service degradation"
+            },
+            {
+              "time": "15:45:47",
+              "event": "High number of CPU throttling events start occurring in the frontend-svc pod"
+            },
+            {
+              "time": "15:46:02",
+              "event": "Multiple pods in the default namespace show a state of failure, suggesting a broader node-level resource exhaustion"
+            },
+            {
+              "time": "15:46:12",
+              "event": "p95 latency of frontend-svc significantly increases, confirming service performance is severely impacted"
+            }
+          ],
+          "evidence_summary": {
+            "metrics": {
+              "container_cpu_cfs_throttled_seconds_total{namespace=\"default\",pod=\"frontend-svc-5768f78867-qzrhz\"}": "Shows a high number of CPU throttling events, indicating the pod was frequently throttled due to CPU resource exhaustion.",
+              "container_cpu_usage_seconds_total{namespace=\"default\",pod=\"frontend-svc-5768f78867-qzrhz\"}": "Indicates sustained high CPU usage, often nearing or reaching the request limit, which is characteristic of CPU exhaustion."
+            },
+            "logs": {
+              "No direct error logs in the frontend service, but OOMKilled and crashloopbackoff events in related pods suggest underlying resource constraints": "While there are no OOM-related errors in the frontend service's logs, the associated pods show signs of resource exhaustion, supporting the CPU-related root cause."
+            },
+            "traces": {
+              "GetBookInfo span": "A significant bottleneck with increased duration and count, indicating it is a primary source of latency and reflects the service's inability to process requests efficiently due to CPU constraints."
+            },
+            "events": {
+              "kube_pod_status_phase indicates multiple pods in failed state, suggesting node-level resource exhaustion": "Multiple pods across different namespaces fail, pointing to a broader node-level CPU resource exhaustion."
+            }
+          },
+          "reasoning_chain": [
+            "Initial APM metrics show error_count and high p95/p99 latencies in frontend-svc, indicating performance degradation.",
+            "High number of CPU throttling events in the frontend-svc pod confirm that the service is experiencing CPU resource exhaustion.",
+            "Sustained high CPU usage, often nearing or reaching the request limit, is a clear indicator of CPU exhaustion.",
+            "Multiple pods in the default namespace show a state of failure, suggesting a broader node-level resource exhaustion, primarily in CPU."
+          ],
+          "remediation_suggestion": "Scale out the frontend-svc deployment to distribute the load, ensure adequate CPU resources are available, and monitor system performance proactively.",
+          "prevention": "Implement autoscaling policies for critical services, set up alerting on CPU utilization, and perform stress testing to identify and mitigate performance bottlenecks before they become critical.",
+          "closure_applied": true,
+          "closure_failure_modes": [
+            "insufficient_evidence",
+            "scope_or_target_ambiguity"
+          ],
+          "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+        },
+        "judge_after": {
+          "judge_level": "bronze",
+          "combined_score": 0.0,
+          "needs_review": true
+        }
+      }
+    },
+    "decision": "",
+    "reviewer": "",
+    "expert_diagnosis": "",
+    "comment": "",
+    "learning_result": {}
+  },
+  {
+    "review_id": "hitl-14475b65",
+    "incident_id": "rca-f6d32f31",
+    "source": "rca_quality_gate",
+    "reason": "RCA quality judge marked the result as needing human review.",
+    "priority": "medium",
+    "status": "pending",
+    "created_at": 1780755947.7599146,
+    "updated_at": 1780755947.759915,
+    "rca_result": {
+      "root_cause": "The high response time and service latency in the `/oteldemo.CheckoutService/PlaceOrder` operation were caused by CPU resource constraints on the node, as indicated by the peak values in `container_cpu_cfs_throttled_seconds_total` and the anomaly in `kube_node_status_condition{condition=\"Ready\"}`.",
+      "confidence": 0.7,
+      "fault_type": "resource_exhaustion",
+      "affected_services": [
+        "/oteldemo.CheckoutService/PlaceOrder"
+      ],
+      "timeline": [
+        {
+          "time": "2023-08-29 07:54:01 +0800 CST",
+          "event": "The kube_node_status_condition{condition=\"Ready\"} metric shows an anomaly, indicating node-level resource constraints."
+        },
+        {
+          "time": "2023-08-29 07:54:01 +0800 CST",
+          "event": "High trace latency increases significantly for the /oteldemo.CheckoutService/PlaceOrder operation, up to 5000 ms."
+        },
+        {
+          "time": "2023-08-29 07:54:01 +0800 CST",
+          "event": "The container_cpu_cfs_throttled_seconds_total metric shows peak values, confirming CPU resource constraints."
+        }
+      ],
+      "evidence_summary": {
+        "metrics": {
+          "kube_node_status_condition{condition=\"Ready\"}": "Shows an anomaly starting at 2023-08-29 07:54:01 +0800 CST, indicating potential node resource exhaustion.",
+          "container_cpu_cfs_throttled_seconds_total": "Peak values observed, suggesting CPU resource constraints."
+        },
+        "logs": {
+          "No error patterns related to critical failures (e.g., OOMKilled, CrashLoopBackOff, ImagePullBackOff) are identified in the provided log data. The logs primarily contain warning and critical alerts related to API management and performance degradation.": "No direct evidence of resource-related errors, but logs reflect performance degradation."
+        },
+        "traces": {
+          "/oteldemo.CheckoutService/PlaceOrder": "P95 and P99 latencies increase dramatically (up to 5000 ms), indicating severe service degradation."
+        },
+        "events": {
+          "Pod Failure Events (26)": "26 such events across multiple namespaces, pointing to a widespread service outage due to resource constraints."
+        }
+      },
+      "reasoning_chain": "The kube_node_status_condition{condition=\"Ready\"} metric shows an anomaly, indicating node-level resource constraints. The container_cpu_cfs_throttled_seconds_total metric confirms CPU resource constraints. The /oteldemo.CheckoutService/PlaceOrder operation shows a significant increase in trace latency, aligning with the timing of the node anomaly. Therefore, the root cause is node-level CPU resource exhaustion.",
+      "remediation_suggestion": "Scale out the Kubernetes cluster to distribute the load and ensure sufficient CPU resources are available. Monitor node resource utilization and set up alerting for early detection of resource exhaustion.",
+      "prevention": "Implement horizontal scaling, use autoscaling policies, and regularly monitor node resource utilization. Set up proactive capacity planning and stress testing to identify potential bottlenecks.",
+      "closure_applied": true,
+      "closure_failure_modes": [
+        "insufficient_evidence",
+        "unresolved_competing_hypotheses",
+        "fault_type_ambiguity",
+        "scope_or_target_ambiguity",
+        "temporal_ambiguity"
+      ],
+      "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+    },
+    "judge": {
+      "judge_level": 2,
+      "combined_score": 0.53,
+      "needs_review": true,
+      "rule_based": {
+        "score": 0.439,
+        "level": 2,
+        "high_patterns": 0,
+        "medium_patterns": 0,
+        "low_patterns": 0,
+        "length": 415
+      },
+      "llm_based": {
+        "judge_level": 1,
+        "coherence_score": 0.8,
+        "evidence_score": 0.75,
+        "specificity_score": 0.95,
+        "actionability_score": 0.85,
+        "feedback": "The RCA reasoning is logically coherent and well-supported by relevant metrics. The root cause is specifically identified as node-level CPU resource exhaustion, which is both concrete and actionable."
+      },
+      "threshold": 0.65,
+      "collaboration_critique": {
+        "quality_score": 0.0,
+        "needs_revision": true,
+        "needs_human_review": false,
+        "weaknesses": [
+          "The RCA report lacks detailed, grounded evidence from all signal types, particularly logs and K8s events, to support the root cause identification.",
+          "The fault type 'System-wide resource exhaustion' is too broad and not supported by specific, measurable evidence from the metrics and traces.",
+          "The timeline does not clearly link the node readiness condition to the service-level latency, missing a critical causal relationship.",
+          "The evidence summary in the metric_agent section is incomplete and does not provide a comprehensive view of node-level resource constraints."
+        ],
+        "missing_evidence": [
+          "No concrete evidence of OutOfMemoryError or other resource-related errors in the log sections.",
+          "The k8s event section lacks scaling or scheduling-related errors that could indicate resource exhaustion.",
+          "The trace section does not show enough context about the request flow beyond the latency spikes, lacking deeper insights into what caused the throttling."
+        ],
+        "alternative_hypotheses": [
+          "A hypothesis focusing on misconfigured resource limits or insufficient pod anti-affinity policies could be explored.",
+          "An alternative could be a temporary spike in load combined with a misbehaving dependency (e.g., database or external service), rather than pure resource exhaustion."
+        ],
+        "confidence_adjustment": -0.1,
+        "recommended_focus": [
+          "Re-evaluate the root cause using a more granular analysis of node-level metrics (e.g., memory usage, disk I/O) and correlate with K8s event logs for a more accurate picture.",
+          "Include more detailed evidence from logs, especially any related to memory or CPU-related errors, to strengthen the fault-type accuracy."
+        ]
+      },
+      "closure": {
+        "plan": {
+          "should_iterate": true,
+          "reason": "Quality gate requested closure: judge_score=0.530, critic_score=0.000, modes=insufficient_evidence, unresolved_competing_hypotheses, fault_type_ambiguity, scope_or_target_ambiguity, temporal_ambiguity.",
+          "failure_modes": [
+            "insufficient_evidence",
+            "unresolved_competing_hypotheses",
+            "fault_type_ambiguity",
+            "scope_or_target_ambiguity",
+            "temporal_ambiguity"
+          ],
+          "target_agents": [
+            "metric_agent",
+            "event_agent",
+            "log_agent",
+            "trace_agent"
+          ],
+          "focus_queries": {
+            "metric_agent": "Second-pass RCA closure. Original root cause: The high response time and service latency in the `/oteldemo.CheckoutService/PlaceOrder` operation were caused by CPU resource constraints on the node, as indicated by the peak values in `container_cpu_cfs_throttled_seconds_total` and the anomaly in `kube_node_status_condition{condition=\"Ready\"}`.. Fault type: resource_exhaustion. Weaknesses: The RCA report lacks detailed, grounded evidence from all signal types, particularly logs and K8s events, to support the root cause identification.; The fault type 'System-wide resource exhaustion' is too broad and not supported by specific, measurable evidence from the metrics and traces.; The timeline does not clearly link the node readiness condition to the service-level latency, missing a critical causal relationship.. Failure modes: insufficient_evidence, unresolved_competing_hypotheses, fault_type_ambiguity, scope_or_target_ambiguity, temporal_ambiguity. Collect quantitative resource, latency, saturation, throttling, and time-window evidence. Use the most recent 5-15 minute window and prioritize target services named in the incident/root cause. For Kubernetes CPU issues, explicitly check container CPU usage, CPU throttling, CPU quota/limits, pod-to-node placement, and node CPU. Distinguish resource exhaustion from software bug and dependency failure.",
+            "event_agent": "Second-pass RCA closure. Original root cause: The high response time and service latency in the `/oteldemo.CheckoutService/PlaceOrder` operation were caused by CPU resource constraints on the node, as indicated by the peak values in `container_cpu_cfs_throttled_seconds_total` and the anomaly in `kube_node_status_condition{condition=\"Ready\"}`.. Fault type: resource_exhaustion. Weaknesses: The RCA report lacks detailed, grounded evidence from all signal types, particularly logs and K8s events, to support the root cause identification.; The fault type 'System-wide resource exhaustion' is too broad and not supported by specific, measurable evidence from the metrics and traces.; The timeline does not clearly link the node readiness condition to the service-level latency, missing a critical causal relationship.. Failure modes: insufficient_evidence, unresolved_competing_hypotheses, fault_type_ambiguity, scope_or_target_ambiguity, temporal_ambiguity. Check recent Kubernetes events, pod lifecycle, node readiness, image pulls, scheduling, and whether events are temporally aligned with the incident. Down-rank stale events that started days ago unless their last-seen time and affected pod placement directly align with the current incident.",
+            "log_agent": "Second-pass RCA closure. Original root cause: The high response time and service latency in the `/oteldemo.CheckoutService/PlaceOrder` operation were caused by CPU resource constraints on the node, as indicated by the peak values in `container_cpu_cfs_throttled_seconds_total` and the anomaly in `kube_node_status_condition{condition=\"Ready\"}`.. Fault type: resource_exhaustion. Weaknesses: The RCA report lacks detailed, grounded evidence from all signal types, particularly logs and K8s events, to support the root cause identification.; The fault type 'System-wide resource exhaustion' is too broad and not supported by specific, measurable evidence from the metrics and traces.; The timeline does not clearly link the node readiness condition to the service-level latency, missing a critical causal relationship.. Failure modes: insufficient_evidence, unresolved_competing_hypotheses, fault_type_ambiguity, scope_or_target_ambiguity, temporal_ambiguity. Search for concrete error lines, exception signatures, timeout messages, and evidence that supports or refutes the claimed mechanism.",
+            "trace_agent": "Second-pass RCA closure. Original root cause: The high response time and service latency in the `/oteldemo.CheckoutService/PlaceOrder` operation were caused by CPU resource constraints on the node, as indicated by the peak values in `container_cpu_cfs_throttled_seconds_total` and the anomaly in `kube_node_status_condition{condition=\"Ready\"}`.. Fault type: resource_exhaustion. Weaknesses: The RCA report lacks detailed, grounded evidence from all signal types, particularly logs and K8s events, to support the root cause identification.; The fault type 'System-wide resource exhaustion' is too broad and not supported by specific, measurable evidence from the metrics and traces.; The timeline does not clearly link the node readiness condition to the service-level latency, missing a critical causal relationship.. Failure modes: insufficient_evidence, unresolved_competing_hypotheses, fault_type_ambiguity, scope_or_target_ambiguity, temporal_ambiguity. Check service-to-service path, bottleneck span, upstream/downstream propagation, and whether the suspected service is the first anomalous hop."
+          },
+          "max_rounds": 1,
+          "hitl_if_unresolved": true
+        },
+        "evidence_agents": [
+          "metric_agent_closure",
+          "event_agent_closure",
+          "log_agent_closure",
+          "trace_agent_closure"
+        ],
+        "revised_result": {
+          "root_cause": "The high response time and service latency in the `/oteldemo.CheckoutService/PlaceOrder` operation were caused by CPU resource constraints on the node, as indicated by the peak values in `container_cpu_cfs_throttled_seconds_total` and the anomaly in `kube_node_status_condition{condition=\"Ready\"}`.",
+          "confidence": 0.7,
+          "fault_type": "resource_exhaustion",
+          "affected_services": [
+            "/oteldemo.CheckoutService/PlaceOrder"
+          ],
+          "timeline": [
+            {
+              "time": "2023-08-29 07:54:01 +0800 CST",
+              "event": "The kube_node_status_condition{condition=\"Ready\"} metric shows an anomaly, indicating node-level resource constraints."
+            },
+            {
+              "time": "2023-08-29 07:54:01 +0800 CST",
+              "event": "High trace latency increases significantly for the /oteldemo.CheckoutService/PlaceOrder operation, up to 5000 ms."
+            },
+            {
+              "time": "2023-08-29 07:54:01 +0800 CST",
+              "event": "The container_cpu_cfs_throttled_seconds_total metric shows peak values, confirming CPU resource constraints."
+            }
+          ],
+          "evidence_summary": {
+            "metrics": {
+              "kube_node_status_condition{condition=\"Ready\"}": "Shows an anomaly starting at 2023-08-29 07:54:01 +0800 CST, indicating potential node resource exhaustion.",
+              "container_cpu_cfs_throttled_seconds_total": "Peak values observed, suggesting CPU resource constraints."
+            },
+            "logs": {
+              "No error patterns related to critical failures (e.g., OOMKilled, CrashLoopBackOff, ImagePullBackOff) are identified in the provided log data. The logs primarily contain warning and critical alerts related to API management and performance degradation.": "No direct evidence of resource-related errors, but logs reflect performance degradation."
+            },
+            "traces": {
+              "/oteldemo.CheckoutService/PlaceOrder": "P95 and P99 latencies increase dramatically (up to 5000 ms), indicating severe service degradation."
+            },
+            "events": {
+              "Pod Failure Events (26)": "26 such events across multiple namespaces, pointing to a widespread service outage due to resource constraints."
+            }
+          },
+          "reasoning_chain": "The kube_node_status_condition{condition=\"Ready\"} metric shows an anomaly, indicating node-level resource constraints. The container_cpu_cfs_throttled_seconds_total metric confirms CPU resource constraints. The /oteldemo.CheckoutService/PlaceOrder operation shows a significant increase in trace latency, aligning with the timing of the node anomaly. Therefore, the root cause is node-level CPU resource exhaustion.",
+          "remediation_suggestion": "Scale out the Kubernetes cluster to distribute the load and ensure sufficient CPU resources are available. Monitor node resource utilization and set up alerting for early detection of resource exhaustion.",
+          "prevention": "Implement horizontal scaling, use autoscaling policies, and regularly monitor node resource utilization. Set up proactive capacity planning and stress testing to identify potential bottlenecks.",
+          "closure_applied": true,
+          "closure_failure_modes": [
+            "insufficient_evidence",
+            "unresolved_competing_hypotheses",
+            "fault_type_ambiguity",
+            "scope_or_target_ambiguity",
+            "temporal_ambiguity"
+          ],
+          "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+        },
+        "judge_after": {
+          "judge_level": 2,
+          "combined_score": 0.53,
+          "needs_review": true,
+          "rule_based": {
+            "score": 0.439,
+            "level": 2,
+            "high_patterns": 0,
+            "medium_patterns": 0,
+            "low_patterns": 0,
+            "length": 415
+          },
+          "llm_based": {
+            "judge_level": 1,
+            "coherence_score": 0.8,
+            "evidence_score": 0.75,
+            "specificity_score": 0.95,
+            "actionability_score": 0.85,
+            "feedback": "The RCA reasoning is logically coherent and well-supported by relevant metrics. The root cause is specifically identified as node-level CPU resource exhaustion, which is both concrete and actionable."
+          },
+          "threshold": 0.65
+        }
+      }
+    },
+    "decision": "",
+    "reviewer": "",
+    "expert_diagnosis": "",
+    "comment": "",
+    "learning_result": {}
+  },
+  {
+    "review_id": "hitl-30277790",
+    "incident_id": "rca-da08a63c",
+    "source": "rca_quality_gate",
+    "reason": "RCA quality judge marked the result as needing human review.",
+    "priority": "medium",
+    "status": "pending",
+    "created_at": 1780756885.8617213,
+    "updated_at": 1780756885.8617213,
+    "rca_result": {
+      "root_cause": "The pod 'otel-c-tool-6tx25' experienced a high number of failure events and significant CPU usage, indicating potential CPU resource exhaustion, which propagated to impact the frontend-svc service.",
+      "confidence": 0.9,
+      "fault_type": "resource_exhaustion",
+      "affected_services": [
+        "frontend-svc",
+        "otel-c-tool-6tx25"
+      ],
+      "timeline": [],
+      "evidence_summary": {
+        "metrics": {
+          "container_cpu_usage_seconds_total": "The pod 'otel-c-tool-6tx25' showed a significant increase in CPU usage, reaching up to 97.333% over the last 10 minutes.",
+          "container_cpu_cfs_throttled_seconds_total": "The pod 'otel-c-tool-6tx25' was throttled due to CPU resource exhaustion, with total throttled time exceeding 100 seconds."
+        },
+        "logs": "The 'otel-c-tool-6tx25' pod showed a high number of failure events, including 'Failed to run in container' and 'connection refused' errors.",
+        "traces": "The 'frontend-svc' service had a significant increase in error rate and latency, with the 'p95' and 'p99' latencies violating the threshold.",
+        "events": "Multiple 'Warning Failed' events were observed for the 'otel-c-tool-6tx25' pod, indicating a potential root cause."
+      },
+      "reasoning_chain": "High CPU usage and throttling in the 'otel-c-tool-6tx25' pod -> Potential CPU resource exhaustion -> Propagation of errors and increased latency in the 'frontend-svc' service -> Triggering of the APM operation error alert",
+      "remediation_suggestion": "Allocate more CPU resources to the pod 'otel-c-tool-6tx25' and monitor its resource usage. Ensure that similar resource-related issues are addressed in other services.",
+      "prevention": "Implement monitoring and alerting for resource utilization and service health in all critical components. Use chaos engineering to simulate failures and test resilience. Regularly review and optimize resource allocation in Kubernetes clusters.",
+      "closure_applied": true,
+      "closure_failure_modes": [
+        "scope_or_target_ambiguity"
+      ],
+      "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+    },
+    "judge": {
+      "judge_level": 2,
+      "combined_score": 0.481,
+      "needs_review": true,
+      "rule_based": {
+        "score": 0.358,
+        "level": 3,
+        "high_patterns": 0,
+        "medium_patterns": 0,
+        "low_patterns": 0,
+        "length": 221
+      },
+      "llm_based": {
+        "judge_level": 1,
+        "coherence_score": 0.8,
+        "evidence_score": 0.7,
+        "specificity_score": 0.9,
+        "actionability_score": 0.8,
+        "feedback": "The RCA reasoning is logically coherent with a clear chain of events, and the root cause is specifically identified as CPU resource exhaustion. The evidence is largely supported by metrics, and the conclusion is directly actionable for SRE teams."
+      },
+      "threshold": 0.65,
+      "collaboration_critique": {
+        "quality_score": 1.0,
+        "needs_revision": false,
+        "needs_human_review": false,
+        "weaknesses": [],
+        "missing_evidence": [],
+        "alternative_hypotheses": [],
+        "confidence_adjustment": 0.0,
+        "recommended_focus": []
+      },
+      "closure": {
+        "plan": {
+          "should_iterate": true,
+          "reason": "Quality gate requested closure: judge_score=0.486, critic_score=1.000, modes=scope_or_target_ambiguity.",
+          "failure_modes": [
+            "scope_or_target_ambiguity"
+          ],
+          "target_agents": [
+            "trace_agent",
+            "event_agent",
+            "metric_agent"
+          ],
+          "focus_queries": {
+            "trace_agent": "Second-pass RCA closure. Original root cause: The pod 'otel-c-tool-6tx25' experienced a high number of failure events, likely due to insufficient resources or a software malfunction, which propagated to impact the frontend-svc service.. Fault type: resource_exhaustion. Weaknesses: . Failure modes: scope_or_target_ambiguity. Check service-to-service path, bottleneck span, upstream/downstream propagation, and whether the suspected service is the first anomalous hop.",
+            "event_agent": "Second-pass RCA closure. Original root cause: The pod 'otel-c-tool-6tx25' experienced a high number of failure events, likely due to insufficient resources or a software malfunction, which propagated to impact the frontend-svc service.. Fault type: resource_exhaustion. Weaknesses: . Failure modes: scope_or_target_ambiguity. Check recent Kubernetes events, pod lifecycle, node readiness, image pulls, scheduling, and whether events are temporally aligned with the incident. Down-rank stale events that started days ago unless their last-seen time and affected pod placement directly align with the current incident.",
+            "metric_agent": "Second-pass RCA closure. Original root cause: The pod 'otel-c-tool-6tx25' experienced a high number of failure events, likely due to insufficient resources or a software malfunction, which propagated to impact the frontend-svc service.. Fault type: resource_exhaustion. Weaknesses: . Failure modes: scope_or_target_ambiguity. Collect quantitative resource, latency, saturation, throttling, and time-window evidence. Use the most recent 5-15 minute window and prioritize target services named in the incident/root cause. For Kubernetes CPU issues, explicitly check container CPU usage, CPU throttling, CPU quota/limits, pod-to-node placement, and node CPU. Distinguish resource exhaustion from software bug and dependency failure."
+          },
+          "max_rounds": 1,
+          "hitl_if_unresolved": true
+        },
+        "evidence_agents": [
+          "trace_agent_closure",
+          "event_agent_closure",
+          "metric_agent_closure"
+        ],
+        "revised_result": {
+          "root_cause": "The pod 'otel-c-tool-6tx25' experienced a high number of failure events and significant CPU usage, indicating potential CPU resource exhaustion, which propagated to impact the frontend-svc service.",
+          "confidence": 0.9,
+          "fault_type": "resource_exhaustion",
+          "affected_services": [
+            "frontend-svc",
+            "otel-c-tool-6tx25"
+          ],
+          "timeline": [],
+          "evidence_summary": {
+            "metrics": {
+              "container_cpu_usage_seconds_total": "The pod 'otel-c-tool-6tx25' showed a significant increase in CPU usage, reaching up to 97.333% over the last 10 minutes.",
+              "container_cpu_cfs_throttled_seconds_total": "The pod 'otel-c-tool-6tx25' was throttled due to CPU resource exhaustion, with total throttled time exceeding 100 seconds."
+            },
+            "logs": "The 'otel-c-tool-6tx25' pod showed a high number of failure events, including 'Failed to run in container' and 'connection refused' errors.",
+            "traces": "The 'frontend-svc' service had a significant increase in error rate and latency, with the 'p95' and 'p99' latencies violating the threshold.",
+            "events": "Multiple 'Warning Failed' events were observed for the 'otel-c-tool-6tx25' pod, indicating a potential root cause."
+          },
+          "reasoning_chain": "High CPU usage and throttling in the 'otel-c-tool-6tx25' pod -> Potential CPU resource exhaustion -> Propagation of errors and increased latency in the 'frontend-svc' service -> Triggering of the APM operation error alert",
+          "remediation_suggestion": "Allocate more CPU resources to the pod 'otel-c-tool-6tx25' and monitor its resource usage. Ensure that similar resource-related issues are addressed in other services.",
+          "prevention": "Implement monitoring and alerting for resource utilization and service health in all critical components. Use chaos engineering to simulate failures and test resilience. Regularly review and optimize resource allocation in Kubernetes clusters.",
+          "closure_applied": true,
+          "closure_failure_modes": [
+            "scope_or_target_ambiguity"
+          ],
+          "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+        },
+        "judge_after": {
+          "judge_level": 2,
+          "combined_score": 0.481,
+          "needs_review": true,
+          "rule_based": {
+            "score": 0.358,
+            "level": 3,
+            "high_patterns": 0,
+            "medium_patterns": 0,
+            "low_patterns": 0,
+            "length": 221
+          },
+          "llm_based": {
+            "judge_level": 1,
+            "coherence_score": 0.8,
+            "evidence_score": 0.7,
+            "specificity_score": 0.9,
+            "actionability_score": 0.8,
+            "feedback": "The RCA reasoning is logically coherent with a clear chain of events, and the root cause is specifically identified as CPU resource exhaustion. The evidence is largely supported by metrics, and the conclusion is directly actionable for SRE teams."
+          },
+          "threshold": 0.65
+        }
+      }
+    },
+    "decision": "",
+    "reviewer": "",
+    "expert_diagnosis": "",
+    "comment": "",
+    "learning_result": {}
+  },
+  {
+    "review_id": "hitl-ee0dba06",
+    "incident_id": "rca-b52667f5",
+    "source": "rca_quality_gate",
+    "reason": "RCA quality judge marked the result as needing human review.",
+    "priority": "high",
+    "status": "pending",
+    "created_at": 1780839852.620797,
+    "updated_at": 1780839852.6207972,
+    "rca_result": {
+      "root_cause": "The otel-c-tool-6tx25 pod experienced high CPU usage and throttling, leading to increased latency in the frontend-svc service, which is a downstream dependency in the request flow.",
+      "confidence": 0.8,
+      "fault_type": "resource_exhaustion",
+      "affected_services": [
+        "frontend-svc"
+      ],
+      "timeline": [
+        {
+          "time": "2024-02-07T12:30:00Z--2024-02-07T12:52:00Z",
+          "event": "The otel-c-tool-6tx25 pod showed high CPU usage (>90%) and throttling events, starting at ~12:30 and lasting until ~12:52, impacting downstream services like frontend-svc."
+        }
+      ],
+      "evidence_summary": {
+        "metrics": {
+          "container_cpu_usage_seconds_total": "The otel-c-tool-6tx25 pod had a sustained CPU usage above 90% during the incident window, indicating resource exhaustion.",
+          "frontend_svc_latency": "The frontend-svc service showed a significant increase in p95 and p99 latencies, correlating with the time window of high CPU usage in otel-c-tool-6tx25."
+        },
+        "logs": {
+          "no_specific_errors": "No specific error logs were found in the APM service, but OOMKilled and throttling events were observed in the metric data."
+        },
+        "traces": {
+          "bottleneck_spans": "Spans in the frontend-svc service showed increased duration times, especially in critical paths, indicating potential latency propagation from the otel-c-tool-6tx25 pod."
+        },
+        "events": {
+          "node_resource_pressure": "Some nodes showed high CPU utilization and were not ready, suggesting broader resource constraints, but the primary impact was from the otel-c-tool-6tx25 pod."
+        }
+      },
+      "reasoning_chain": "High CPU usage in otel-c-tool-6tx25 -> Throttling events -> Increased latency in frontend-svc (downstream service) -> Correlation in timing and metrics indicates a direct causal relationship",
+      "remediation_suggestion": "Scale up the otel-c-tool-6tx25 pod or adjust its resource limits to prevent future latency issues. Monitor the system for similar resource-related performance degradations.",
+      "prevention": "Implement automated monitoring and alerting for resource usage, and use horizontal scaling or autoscaling policies to handle peak loads. Ensure proper resource allocation and prioritization in the cluster.",
+      "closure_applied": true,
+      "closure_failure_modes": [
+        "insufficient_evidence",
+        "scope_or_target_ambiguity",
+        "temporal_ambiguity"
+      ],
+      "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+    },
+    "judge": {
+      "judge_level": 2,
+      "combined_score": 0.443,
+      "needs_review": true,
+      "rule_based": {
+        "score": 0.294,
+        "level": 3,
+        "high_patterns": 0,
+        "medium_patterns": 0,
+        "low_patterns": 0,
+        "length": 190
+      },
+      "llm_based": {
+        "judge_level": 1,
+        "coherence_score": 0.8,
+        "evidence_score": 0.9,
+        "specificity_score": 0.9,
+        "actionability_score": 0.85,
+        "feedback": "The RCA reasoning is logically coherent with a clear causal chain and is supported by concrete evidence. The root cause is specific and actionable, with minor room for improvement in evidence presentation."
+      },
+      "threshold": 0.65,
+      "collaboration_critique": {
+        "quality_score": 2.3,
+        "needs_revision": true,
+        "needs_human_review": false,
+        "weaknesses": [
+          "The RCA report overemphasizes the role of the `otel-c-tool-6tx25` pod in causing the APM service's latency without sufficient evidence of a direct causal link.",
+          "The reasoning chain lacks clarity and does not strongly connect the high CPU usage to the observed latency in the APM service.",
+          "The timeline does not provide a clear sequence of events linking the pod's high CPU usage to the APM service's performance degradation."
+        ],
+        "missing_evidence": [
+          "No evidence of a direct impact of the `otel-c-tool-6tx25` pod's high CPU usage on the APM service's latency is provided.",
+          "The absence of p95/p99 violations in the APM service's latency metrics undermines the claim of a severe performance degradation.",
+          "No correlation between the pod's failure events and the APM service's aggregated slow_count is shown."
+        ],
+        "alternative_hypotheses": [
+          "The increased latency in the APM service might be due to external factors such as network congestion or upstream service failures, rather than the `otel-c-tool-6tx25` pod's high CPU usage.",
+          "Other services or nodes might have contributed to the observed latency, but they are not adequately addressed in the RCA."
+        ],
+        "confidence_adjustment": -0.2,
+        "recommended_focus": [
+          "Re-evaluate the causal relationship between the `otel-c-tool-6tx25` pod's high CPU usage and the APM service's latency.",
+          "Include additional evidence from the APM service's metrics and logs to support the root cause analysis.",
+          "Clarify the timeline and reasoning chain to ensure a logical flow of events and a strong argument for the identified root cause."
+        ]
+      },
+      "closure": {
+        "plan": {
+          "should_iterate": true,
+          "reason": "Quality gate requested closure: judge_score=0.392, critic_score=2.300, modes=insufficient_evidence, scope_or_target_ambiguity, temporal_ambiguity.",
+          "failure_modes": [
+            "insufficient_evidence",
+            "scope_or_target_ambiguity",
+            "temporal_ambiguity"
+          ],
+          "target_agents": [
+            "metric_agent",
+            "event_agent",
+            "trace_agent"
+          ],
+          "focus_queries": {
+            "metric_agent": "Second-pass RCA closure. Original root cause: The otel-c-tool-6tx25 pod experienced high CPU usage (>90%) and throttling events, which indirectly caused increased latency in the APM service by impacting downstream services like frontend-svc.. Fault type: resource_exhaustion. Weaknesses: The RCA report overemphasizes the role of the `otel-c-tool-6tx25` pod in causing the APM service's latency without sufficient evidence of a direct causal link.; The reasoning chain lacks clarity and does not strongly connect the high CPU usage to the observed latency in the APM service.; The timeline does not provide a clear sequence of events linking the pod's high CPU usage to the APM service's performance degradation.. Failure modes: insufficient_evidence, scope_or_target_ambiguity, temporal_ambiguity. Collect quantitative resource, latency, saturation, throttling, and time-window evidence. Use the most recent 5-15 minute window and prioritize target services named in the incident/root cause. For Kubernetes CPU issues, explicitly check container CPU usage, CPU throttling, CPU quota/limits, pod-to-node placement, and node CPU. Distinguish resource exhaustion from software bug and dependency failure.",
+            "event_agent": "Second-pass RCA closure. Original root cause: The otel-c-tool-6tx25 pod experienced high CPU usage (>90%) and throttling events, which indirectly caused increased latency in the APM service by impacting downstream services like frontend-svc.. Fault type: resource_exhaustion. Weaknesses: The RCA report overemphasizes the role of the `otel-c-tool-6tx25` pod in causing the APM service's latency without sufficient evidence of a direct causal link.; The reasoning chain lacks clarity and does not strongly connect the high CPU usage to the observed latency in the APM service.; The timeline does not provide a clear sequence of events linking the pod's high CPU usage to the APM service's performance degradation.. Failure modes: insufficient_evidence, scope_or_target_ambiguity, temporal_ambiguity. Check recent Kubernetes events, pod lifecycle, node readiness, image pulls, scheduling, and whether events are temporally aligned with the incident. Down-rank stale events that started days ago unless their last-seen time and affected pod placement directly align with the current incident.",
+            "trace_agent": "Second-pass RCA closure. Original root cause: The otel-c-tool-6tx25 pod experienced high CPU usage (>90%) and throttling events, which indirectly caused increased latency in the APM service by impacting downstream services like frontend-svc.. Fault type: resource_exhaustion. Weaknesses: The RCA report overemphasizes the role of the `otel-c-tool-6tx25` pod in causing the APM service's latency without sufficient evidence of a direct causal link.; The reasoning chain lacks clarity and does not strongly connect the high CPU usage to the observed latency in the APM service.; The timeline does not provide a clear sequence of events linking the pod's high CPU usage to the APM service's performance degradation.. Failure modes: insufficient_evidence, scope_or_target_ambiguity, temporal_ambiguity. Check service-to-service path, bottleneck span, upstream/downstream propagation, and whether the suspected service is the first anomalous hop."
+          },
+          "max_rounds": 1,
+          "hitl_if_unresolved": true
+        },
+        "evidence_agents": [
+          "metric_agent_closure",
+          "event_agent_closure",
+          "trace_agent_closure"
+        ],
+        "revised_result": {
+          "root_cause": "The otel-c-tool-6tx25 pod experienced high CPU usage and throttling, leading to increased latency in the frontend-svc service, which is a downstream dependency in the request flow.",
+          "confidence": 0.8,
+          "fault_type": "resource_exhaustion",
+          "affected_services": [
+            "frontend-svc"
+          ],
+          "timeline": [
+            {
+              "time": "2024-02-07T12:30:00Z--2024-02-07T12:52:00Z",
+              "event": "The otel-c-tool-6tx25 pod showed high CPU usage (>90%) and throttling events, starting at ~12:30 and lasting until ~12:52, impacting downstream services like frontend-svc."
+            }
+          ],
+          "evidence_summary": {
+            "metrics": {
+              "container_cpu_usage_seconds_total": "The otel-c-tool-6tx25 pod had a sustained CPU usage above 90% during the incident window, indicating resource exhaustion.",
+              "frontend_svc_latency": "The frontend-svc service showed a significant increase in p95 and p99 latencies, correlating with the time window of high CPU usage in otel-c-tool-6tx25."
+            },
+            "logs": {
+              "no_specific_errors": "No specific error logs were found in the APM service, but OOMKilled and throttling events were observed in the metric data."
+            },
+            "traces": {
+              "bottleneck_spans": "Spans in the frontend-svc service showed increased duration times, especially in critical paths, indicating potential latency propagation from the otel-c-tool-6tx25 pod."
+            },
+            "events": {
+              "node_resource_pressure": "Some nodes showed high CPU utilization and were not ready, suggesting broader resource constraints, but the primary impact was from the otel-c-tool-6tx25 pod."
+            }
+          },
+          "reasoning_chain": "High CPU usage in otel-c-tool-6tx25 -> Throttling events -> Increased latency in frontend-svc (downstream service) -> Correlation in timing and metrics indicates a direct causal relationship",
+          "remediation_suggestion": "Scale up the otel-c-tool-6tx25 pod or adjust its resource limits to prevent future latency issues. Monitor the system for similar resource-related performance degradations.",
+          "prevention": "Implement automated monitoring and alerting for resource usage, and use horizontal scaling or autoscaling policies to handle peak loads. Ensure proper resource allocation and prioritization in the cluster.",
+          "closure_applied": true,
+          "closure_failure_modes": [
+            "insufficient_evidence",
+            "scope_or_target_ambiguity",
+            "temporal_ambiguity"
+          ],
+          "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+        },
+        "judge_after": {
+          "judge_level": 2,
+          "combined_score": 0.443,
+          "needs_review": true,
+          "rule_based": {
+            "score": 0.294,
+            "level": 3,
+            "high_patterns": 0,
+            "medium_patterns": 0,
+            "low_patterns": 0,
+            "length": 190
+          },
+          "llm_based": {
+            "judge_level": 1,
+            "coherence_score": 0.8,
+            "evidence_score": 0.9,
+            "specificity_score": 0.9,
+            "actionability_score": 0.85,
+            "feedback": "The RCA reasoning is logically coherent with a clear causal chain and is supported by concrete evidence. The root cause is specific and actionable, with minor room for improvement in evidence presentation."
+          },
+          "threshold": 0.65
+        }
+      }
+    },
+    "decision": "",
+    "reviewer": "",
+    "expert_diagnosis": "",
+    "comment": "",
+    "learning_result": {}
+  },
+  {
+    "review_id": "hitl-786a4068",
+    "incident_id": "rca-f45909c0",
+    "source": "rca_quality_gate",
+    "reason": "RCA quality judge marked the result as needing human review.",
+    "priority": "medium",
+    "status": "pending",
+    "created_at": 1781143977.7693012,
+    "updated_at": 1781143977.7693014,
+    "rca_result": {
+      "root_cause": "The ack-node-problem-detector-daemonset-pc26t pod failed due to a sandbox container exit with code 232, leading to a cascade of node-related failures.",
+      "confidence": 0.9,
+      "fault_type": "resource_exhaustion",
+      "affected_services": [
+        "node-exporter-vxfsd",
+        "node-exporter-f6ld6",
+        "shipping-79dd4f6476-k9thw",
+        "recommendation-66699c64db-xd4s6"
+      ],
+      "timeline": [
+        {
+          "time": "2022-03-27T03:18:02.647999987+00:00",
+          "event": "Pod ack-node-problem-detector-daemonset-8fmwt kube-system state=Failed"
+        },
+        {
+          "time": "2022-03-27T03:18:02.651000011+00:00",
+          "event": "Pod ack-node-problem-detector-daemonset-8fmwt kube-system reason=FailedSandboxContainer"
+        },
+        {
+          "time": "2022-03-27T03:18:02.651000011+00:00",
+          "event": "Pod ack-node-problem-detector-daemonset-8fmwt kube-system message=Container ack-node-problem-detector failed at step 'run' due to ExitCode 232"
+        }
+      ],
+      "evidence_summary": {
+        "metrics": "No significant metric anomalies were detected, indicating that the failure was not due to performance degradation or resource exhaustion.",
+        "logs": "No error patterns or rare log entries were found in the log data, suggesting that the issue was not application-level or external service-related.",
+        "traces": "The trace data showed no degradation in service latencies or bottleneck spans, indicating that the frontend service was not experiencing internal performance issues during the incident.",
+        "events": "A significant number of pod failure events were observed in the K8s event logs, with the ack-node-problem-detector-daemonset-pc26t pod failing first and triggering a chain of node-level failures."
+      },
+      "reasoning_chain": "The primary evidence points to a failure in the ack-node-problem-detector-daemonset-pc26t pod, which led to the failure of other related pods such as node-exporter-vxfsd and arm7-prom. The failure was due to a sandbox container exit with code 232, impacting the underlying infrastructure and causing the frontend service to experience increased response times through dependency on these components.",
+      "remediation_suggestion": "Restart the failed pods, investigate the root cause of the failure (e.g., container exit code 232), and ensure that the infrastructure components are resilient to similar failures in the future.",
+      "prevention": "Implement robust monitoring and alerting for Kubernetes pod health, and establish a failover mechanism to automatically restart failed pods. Additionally, review and enhance the resilience of the infrastructure components to prevent cascading failures.",
+      "closure_applied": true,
+      "closure_failure_modes": [
+        "scope_or_target_ambiguity"
+      ],
+      "fault_type_original": "infrastructure_failure",
+      "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+    },
+    "judge": {
+      "judge_level": 2,
+      "combined_score": 0.575,
+      "needs_review": true,
+      "rule_based": {
+        "score": 0.514,
+        "level": 2,
+        "high_patterns": 0,
+        "medium_patterns": 0,
+        "low_patterns": 0,
+        "length": 399
+      },
+      "llm_based": {
+        "judge_level": 1,
+        "coherence_score": 0.9,
+        "evidence_score": 0.85,
+        "specificity_score": 0.95,
+        "actionability_score": 0.9,
+        "feedback": "The RCA is logically coherent and based on concrete evidence, with a specific root cause that is actionable for an SRE to address."
+      },
+      "threshold": 0.65,
+      "collaboration_critique": {
+        "quality_score": 1.0,
+        "needs_revision": false,
+        "needs_human_review": false,
+        "weaknesses": [],
+        "missing_evidence": [],
+        "alternative_hypotheses": [],
+        "confidence_adjustment": 0.0,
+        "recommended_focus": []
+      },
+      "closure": {
+        "plan": {
+          "should_iterate": true,
+          "reason": "Quality gate requested closure: judge_score=0.551, critic_score=1.000, modes=scope_or_target_ambiguity.",
+          "failure_modes": [
+            "scope_or_target_ambiguity"
+          ],
+          "target_agents": [
+            "trace_agent",
+            "event_agent",
+            "metric_agent"
+          ],
+          "focus_queries": {
+            "trace_agent": "Second-pass RCA closure. Original root cause: The ack-node-problem-detector-daemonset-pc26t pod failed, causing a cascade of node-related failures including arm7-prom and f1-metrikserver, which impacted the frontend service due to its dependency on these underlying infrastructure components.. Fault type: dependency_failure. Weaknesses: . Failure modes: scope_or_target_ambiguity. Check service-to-service path, bottleneck span, upstream/downstream propagation, and whether the suspected service is the first anomalous hop.",
+            "event_agent": "Second-pass RCA closure. Original root cause: The ack-node-problem-detector-daemonset-pc26t pod failed, causing a cascade of node-related failures including arm7-prom and f1-metrikserver, which impacted the frontend service due to its dependency on these underlying infrastructure components.. Fault type: dependency_failure. Weaknesses: . Failure modes: scope_or_target_ambiguity. Check recent Kubernetes events, pod lifecycle, node readiness, image pulls, scheduling, and whether events are temporally aligned with the incident. Down-rank stale events that started days ago unless their last-seen time and affected pod placement directly align with the current incident.",
+            "metric_agent": "Second-pass RCA closure. Original root cause: The ack-node-problem-detector-daemonset-pc26t pod failed, causing a cascade of node-related failures including arm7-prom and f1-metrikserver, which impacted the frontend service due to its dependency on these underlying infrastructure components.. Fault type: dependency_failure. Weaknesses: . Failure modes: scope_or_target_ambiguity. Collect quantitative resource, latency, saturation, throttling, and time-window evidence. Use the most recent 5-15 minute window and prioritize target services named in the incident/root cause. For Kubernetes CPU issues, explicitly check container CPU usage, CPU throttling, CPU quota/limits, pod-to-node placement, and node CPU. Distinguish resource exhaustion from software bug and dependency failure."
+          },
+          "max_rounds": 1,
+          "hitl_if_unresolved": true
+        },
+        "evidence_agents": [
+          "trace_agent_closure",
+          "event_agent_closure",
+          "metric_agent_closure"
+        ],
+        "revised_result": {
+          "root_cause": "The ack-node-problem-detector-daemonset-pc26t pod failed due to a sandbox container exit with code 232, leading to a cascade of node-related failures.",
+          "confidence": 0.9,
+          "fault_type": "resource_exhaustion",
+          "affected_services": [
+            "node-exporter-vxfsd",
+            "node-exporter-f6ld6",
+            "shipping-79dd4f6476-k9thw",
+            "recommendation-66699c64db-xd4s6"
+          ],
+          "timeline": [
+            {
+              "time": "2022-03-27T03:18:02.647999987+00:00",
+              "event": "Pod ack-node-problem-detector-daemonset-8fmwt kube-system state=Failed"
+            },
+            {
+              "time": "2022-03-27T03:18:02.651000011+00:00",
+              "event": "Pod ack-node-problem-detector-daemonset-8fmwt kube-system reason=FailedSandboxContainer"
+            },
+            {
+              "time": "2022-03-27T03:18:02.651000011+00:00",
+              "event": "Pod ack-node-problem-detector-daemonset-8fmwt kube-system message=Container ack-node-problem-detector failed at step 'run' due to ExitCode 232"
+            }
+          ],
+          "evidence_summary": {
+            "metrics": "No significant metric anomalies were detected, indicating that the failure was not due to performance degradation or resource exhaustion.",
+            "logs": "No error patterns or rare log entries were found in the log data, suggesting that the issue was not application-level or external service-related.",
+            "traces": "The trace data showed no degradation in service latencies or bottleneck spans, indicating that the frontend service was not experiencing internal performance issues during the incident.",
+            "events": "A significant number of pod failure events were observed in the K8s event logs, with the ack-node-problem-detector-daemonset-pc26t pod failing first and triggering a chain of node-level failures."
+          },
+          "reasoning_chain": "The primary evidence points to a failure in the ack-node-problem-detector-daemonset-pc26t pod, which led to the failure of other related pods such as node-exporter-vxfsd and arm7-prom. The failure was due to a sandbox container exit with code 232, impacting the underlying infrastructure and causing the frontend service to experience increased response times through dependency on these components.",
+          "remediation_suggestion": "Restart the failed pods, investigate the root cause of the failure (e.g., container exit code 232), and ensure that the infrastructure components are resilient to similar failures in the future.",
+          "prevention": "Implement robust monitoring and alerting for Kubernetes pod health, and establish a failover mechanism to automatically restart failed pods. Additionally, review and enhance the resilience of the infrastructure components to prevent cascading failures.",
+          "closure_applied": true,
+          "closure_failure_modes": [
+            "scope_or_target_ambiguity"
+          ],
+          "fault_type_original": "infrastructure_failure",
+          "fault_type_reason": "CPU/memory/resource pressure terms were present in the RCA, evidence, or collaboration focus."
+        },
+        "judge_after": {
+          "judge_level": 2,
+          "combined_score": 0.575,
+          "needs_review": true,
+          "rule_based": {
+            "score": 0.514,
+            "level": 2,
+            "high_patterns": 0,
+            "medium_patterns": 0,
+            "low_patterns": 0,
+            "length": 399
+          },
+          "llm_based": {
+            "judge_level": 1,
+            "coherence_score": 0.9,
+            "evidence_score": 0.85,
+            "specificity_score": 0.95,
+            "actionability_score": 0.9,
+            "feedback": "The RCA is logically coherent and based on concrete evidence, with a specific root cause that is actionable for an SRE to address."
+          },
+          "threshold": 0.65
+        }
+      }
+    },
+    "decision": "",
+    "reviewer": "",
+    "expert_diagnosis": "",
+    "comment": "",
+    "learning_result": {}
+  }
+]

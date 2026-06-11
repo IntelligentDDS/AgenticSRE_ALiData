@@ -112,11 +112,20 @@ Be precise and cite specific metric values. Format as structured analysis."""
         }
 
     def _fetch_metric(self, promql: str, namespace: str = "") -> Optional[Dict]:
-        """Fetch metric from Prometheus."""
+        """Fetch metric range from MCP-backed Prometheus tool — need
+        multi-point time series for 3σ anomaly detection."""
         prom = self.registry.get("prometheus")
         if prom is None:
             return None
-        result = prom.execute(query=promql, query_type="instant")
+        import time as _t
+        now = int(_t.time())
+        result = prom.execute(
+            query=promql,
+            query_type="range",
+            start=str(now - 1800),  # 30-min window
+            end=str(now),
+            step="60s",
+        )
         return result.data if result.success else None
 
     def _extract_values(self, series: Dict) -> List[float]:

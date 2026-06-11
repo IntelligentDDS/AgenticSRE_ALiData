@@ -203,6 +203,10 @@ async def run_rca(
         log("🔧 Initializing tools and agents...")
         if registry is None:
             registry = build_tool_registry(cfg, allow_write=cfg.runtime.enable_self_healing)
+        offline_mode = bool(
+            getattr(cfg.observability, "offline_mode", False)
+            and getattr(cfg.observability, "backend", "") == "alidata"
+        )
         
         llm = LLMClient(cfg.llm)
         
@@ -210,7 +214,7 @@ async def run_rca(
         metric_agent = MetricAgent(llm, registry)
         log_agent = LogAgent(llm, registry)
         trace_agent = TraceAgent(llm, registry)
-        event_agent = EventAgent(llm, registry)
+        event_agent = None if offline_mode else EventAgent(llm, registry)
         llm_inference_agent = LLMInferenceAgent(llm, registry)
         evidence_summary_max_tokens = getattr(cfg.pipeline, "evidence_summary_max_tokens", 1024)
         for agent in (metric_agent, log_agent, trace_agent, event_agent, llm_inference_agent):

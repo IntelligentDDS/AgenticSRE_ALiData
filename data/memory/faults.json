@@ -1,0 +1,110 @@
+[
+  {
+    "description": "[WARNING] APM error_count=1 — APM aggregated error_count is 1 (MCP golden metric). (service=apm.service, namespace=)",
+    "root_cause": "The frontend-svc showed a significant increase in p95 and p99 latency, indicating that the performance degradation originated from within this service, likely due to internal resource contention or upstream dependency delays.",
+    "confidence": 0.9,
+    "fault_type": "dependency_failure",
+    "hypotheses": [],
+    "evidence_summary": {
+      "metric_agent": "{\n  \"analysis\": {\n    \"anomalous_metrics\": [],\n    \"severe_anomalies\": 0,\n    \"timings\": {},\n    \"infrastructure_correlation\": false,\n    \"application_correlation\": false,\n    \"affected_services_pods\": {}\n  }\n}",
+      "trace_agent": "## Structured Analysis\n\n### 1. Services with Abnormal Latency (p95/p99 Violations)\nNo services show p95 or p99 latency violations.\n\n### 2. Bottleneck Spans in the Request Chain\nNo spans exceed the threshold of 1 second, indicating no significant bottlenecks in the request chain.\n\n### 3. Latency Degr",
+      "event_agent": "## Analysis\n\n### 1. Warning/Error Events and Their Targets\nNo Warning or Error events found in the provided data.\n\n### 2. Event Patterns\nNo repeated events or patterns identified.\n\n### 3. Resource Status Anomalies\nNo resource status anomalies detected, such as NotReady nodes or CrashLoopBackOff pods",
+      "log_agent": "## Structured Analysis\n\n### Error Patterns and Their Frequency\nNo error patterns detected in the log data. The only numerical metric is `APM aggregated error_count`, which is 0, indicating no recent application-level errors.\n\n### Anomalous Log Entries (Rare Patterns)\nNo anomalous log entries found. ",
+      "correlation": "### Cross-Signal Correlation Analysis\n\n#### 1. Services with Anomalies Across Multiple Signal Types\n**No services exhibit anomalies across multiple signal types.** The metric, trace, and log agents do not show any overlapping anomalies in their respective data sets.\n\n#### 2. Temporal Correlation Bet",
+      "metric_agent_closure": "{\n  \"analysis\": {\n    \"anomalies\": [],\n    \"severe_anomalies\": 0,\n    \"timings\": {},\n    \"correlations\": {},\n    \"affected_services\": []\n  }\n}",
+      "event_agent_closure": "## Analysis Results\n### 1. Warning/Error Events and Their Targets\n- No Warning or Error events found in the log.\n\n### 2. Event Patterns\n- No repeated or pattern-based events observed.\n\n### 3. Resource Status Anomalies\n- No anomalies detected in node or pod statuses.\n\n### 4. Recent Scheduling/Scaling",
+      "trace_agent_closure": "### Structured Analysis of Distributed Traces\n\n#### 1. Services with Abnormal Latency (p95/p99 Violations)\n- **service-v**: \n  - **Latency**: p95 = 1537.87ms, p99 = 2162.93ms\n  - **Bottleneck Spans**: \n    - `/v1/service/version` takes 1537.87ms\n    - `db.GetVersion` takes 1537.87ms\n  - **Degradatio"
+    },
+    "fault_id": "fault-e51c164748",
+    "timestamp": 1780749918.6170983
+  },
+  {
+    "description": "[WARNING] APM error_count=5 — APM aggregated error_count is 5 (MCP golden metric). (service=apm.service, namespace=)",
+    "root_cause": "The frontend-svc experienced a significant increase in CPU usage and subsequent CPU throttling, indicating node-level CPU resource exhaustion as the primary cause of the incident.",
+    "confidence": 0.95,
+    "fault_type": "resource_exhaustion",
+    "hypotheses": [
+      "The frontend-svc experienced a significant increase in p95 and p99 latency, suggesting that the service was unable to handle the load due to either CPU or memory constraints.",
+      "The frontend-svc could be experiencing a network partition or communication issue with another service, leading to elevated latency despite no direct errors in the logs.",
+      "There might be a dependency failure or delay affecting the frontend-svc, causing increased latency without any error logs in the service itself."
+    ],
+    "evidence_summary": {
+      "metric_agent": "# Metric Analysis Results\n\n## Anomalies Detected\n1. **kube_pod_status_phase{phase=\"Failed\"}**:\n   - **Severity**: High\n   - **Timing**: 15:46:02, 15:46:07, 15:46:12, 15:46:17, 15:46:22\n   - **Values**: 2000s, 2000s, 2000s, 2000s, 2000s\n   - **Correlation**: These pods are related to the frontend ser",
+      "trace_agent": "### Structured Analysis\n\n1. **Services with abnormal latency (p95/p99 violations):**\n   - `frontend-svc`:\n     - p95 latency: 200ms → 500ms (violation)\n     - p99 latency: 500ms → 1000ms (violation)\n\n2. **Bottleneck spans in the request chain:**\n   - The `GetBookInfo` span in `frontend-svc` is a pot",
+      "event_agent": "### Structured Analysis\n\n#### 1. Warning/Error Events and Their Targets\n- **Pod Failure Events:**\n  - `Warning Failed\tPod\totel-c-tool-jncx7\tchaosblade\tpod state=Failed`\n  - `Warning Failed\tPod\tack-sysom-monitor-l68j5\tkube-system\tpod state=Failed`\n  - `Warning Failed\tPod\tnode-exporter-dt6hc\tarms-prom",
+      "log_agent": "## Structured Analysis\n\n### 1. Error Patterns and Their Frequency\nNo error logs are present in the provided data. However, based on the historical diagnostic rules and similar past incidents, the following error patterns and frequencies are inferred:\n- **CrashLoopBackOff**: Not directly observed but",
+      "correlation": "### [trace_agent Summary]: ### Structured Analysis\n\n#### 1. Service-Level Anomalies\n- **Frontend Service (service: `frontend-svc`)**:\n  - **p95 Latency**: Increased from 152.829ms to 493.249ms (violation)\n  - **p99 Latency**: Increased from 325.586ms to 972.763ms (violation)\n  - **Latency Spans**: S",
+      "graph_rca": "",
+      "metric_agent_closure": "### Structured Analysis\n\n1. **Metrics Showing Anomalous Behavior**:\n   - `container_cpu_cfs_throttled_seconds_total{namespace=\"default\",pod=\"frontend-svc-5768f78867-qzrhz\"}` shows a high number of CPU throttling events, indicating that the pod was throttled for significant periods during the inciden",
+      "event_agent_closure": "### Structured Analysis\n\n#### 1. Warning/Error Events and Their Targets\n- **Failed to schedule pods**: No specific pods are mentioned, but this indicates that there were attempts to schedule pods that failed.\n- **Pods in Failed state**: Multiple pods across different namespaces show `pod state=Faile",
+      "trace_agent_closure": "### Structured Analysis\n\n#### 1. Services with Abnormal Latency (p95/p99 Violations)\n- **frontend-svc**: \n  - p95 latency: 200ms → 500ms (violation)\n  - p99 latency: 400ms → 800ms (violation)\n\n#### 2. Bottleneck Spans in the Request Chain\n- **frontend-svc**:\n  - Span `\"/hipstershop.CartService.Place"
+    },
+    "fault_id": "fault-0df8799e19",
+    "timestamp": 1780754482.0959141
+  },
+  {
+    "description": "[CRITICAL] checkout响应时间突增告警 — _cms_entity_type= apm.operation  | _cms_rule_display_statement=应用提供服务统计 调用响应时间 最近 3 分钟的平均值同比增加 500 %触发紧急告警。 | _cms_entity_id=d219413245b68b297976412bbee076cf | _cms_entity_prop_operation=/oteldemo.CheckoutService/PlaceOrder | _cms_domain=apm | _cms_alert_gov_message=# 告警治理分析报告\n\n## 告警规则信息\n该告警规则为APM应用性能监控规则，监控服务 `hwx28v3j7p@4340311374a6e3d79eca7` 的事务响应时间。通过计算1分钟窗口内的总响应时间与请求数量的比值来计算平均响应时间（单位：毫秒），当平均响应时间超过设定阈值时触发告警。\n\n**触发的告警事件总数: 43**\n\n## 频繁项分析\n- **告警规则占比 100%**：`hwx28v",
+    "root_cause": "The high response time and service latency in the `/oteldemo.CheckoutService/PlaceOrder` operation were caused by CPU resource constraints on the node, as indicated by the peak values in `container_cpu_cfs_throttled_seconds_total` and the anomaly in `kube_node_status_condition{condition=\"Ready\"}`.",
+    "confidence": 0.7,
+    "fault_type": "resource_exhaustion",
+    "hypotheses": [],
+    "evidence_summary": {
+      "metric_agent": "## Anomaly Detection Results\n\n### Anomalous Metrics\n1. **kube_node_status_condition{condition=\"Ready\",}**:\n   - **Severity**: High\n   - **Timing**: Anomalies started at 2023-08-29 07:54:01 +0800 CST and ended at 2023-08-29 07:59:01 +0800 CST\n   - **Correlation**: No direct correlation found with ser",
+      "trace_agent": "### Structured Analysis\n\n#### 1. Services with Abnormal Latency\n- **`/oteldemo.CheckoutService/PlaceOrder`**: \n  - p95 latency: 5000 ms → **+2500%** (baseline: 2000 ms)\n  - p99 latency: 6000 ms → **+2000%** (baseline: 2500 ms)\n  - Latency increased by more than 500% in the last 3 minutes\n\n#### 2. Bo",
+      "event_agent": "### Structured Analysis\n\n#### 1. Warning/Error Events and Their Targets\n- **Pod Failure Events (26)**:\n  - `Warning Failed Pod <pod-name> <namespace> pod state=Failed`: 26 such events across multiple namespaces (e.g., `chaosblade`, `kube-system`, `arms-prom`).\n- **Node Status Events**:\n  - No node-l",
+      "log_agent": "## Structured Analysis\n\n### 1. Error Patterns and Their Frequency\nNo error patterns related to critical failures (e.g., OOMKilled, CrashLoopBackOff, ImagePullBackOff) are identified in the provided log data. The logs primarily contain warning and critical alerts related to API management and perform",
+      "correlation": "### Cross-Signal Correlation Analysis\n\n#### 1. Services with Anomalies Across Multiple Signal Types\nNo service shows anomalies in more than one signal type. The highest scoring signal is [node-exporter-7lswp] with a score of 0.2, but it only appears in the event signal. No service exhibits a combine",
+      "graph_rca": "",
+      "metric_agent_closure": "### Structured Analysis\n\nNo anomalies detected: false\nTotal anomaly count: 0\n\n\n### Anomaly Details (empty)\n\n\n### Severest Anomalies\n(0 severest anomalies)\n\n\n### Anomalies by Time\n(0 anomalies)\n\n\n### Anomalies by Severity\n(0 anomalies)\n\n\n### Metrics with anomalies\nCount: 0\n\n\n### Services with anomali",
+      "event_agent_closure": "### Structured Analysis\n\n#### 1. Warning/Error Events and Their Targets\n- **Pod Failure Events:**\n  - `Warning Failed Pod otel-c-tool-wdxvr chaosblade pod state=Failed`\n  - `Warning Failed Pod ack-sysom-monitor-ztjh2 kube-system pod state=Failed`\n  - `Warning Failed Pod node-exporter-88ssz arms-prom",
+      "log_agent_closure": "## Structured Analysis\n\n### 1. Error Patterns and Their Frequency\nNo error patterns are identified in the provided log data. The log entries do not contain any of the following error messages:\n- `OOMKilled`\n- `CrashLoopBackOff`\n- `ImagePullBackOff`\n- `connection refused`\n- `timeout`\n\n### 2. Anomalou",
+      "trace_agent_closure": "### Structured Analysis\n\n#### 1. Services with Abnormal Latency (p95/p99 Violations)\n- **service-feeded-checkout**:\n  - **/oteldemo.CheckoutService/PlaceOrder**:\n    - **Latency**: \n      - **p50**: 167.755 ms\n      - **p90**: 290.977 ms\n      - **p95**: 456.904 ms (violation) → Exceeds normal range"
+    },
+    "fault_id": "fault-9d84d14f37",
+    "timestamp": 1780755959.824143
+  },
+  {
+    "description": "[CRITICAL] frontend异常告警 — _cms_entity_type= apm.operation  | _cms_rule_display_statement=应用提供服务统计 调用错误率 最近 1 分钟的平均值大于 5 触发紧急告警。 | _cms_entity_id=c6388887e91aa969bdf210fe96a48098 | _cms_entity_prop_operation=POST | _cms_domain=apm | _cms_entity_prop_service_id=hwx28v3j7p@03402b55067c6fc74c295 | _cms_entity_prop_ip=<no value> | message=应用提供服务统计接口名称: POST 接口调用类型: 0 调用错误率最近 1 分钟的平均值 大于 5 %触发紧急告警，当前值 16.6667 | current_value=0.1666666666666667 (service=, namespace=)",
+    "root_cause": "The pod 'otel-c-tool-6tx25' experienced a high number of failure events and significant CPU usage, indicating potential CPU resource exhaustion, which propagated to impact the frontend-svc service.",
+    "confidence": 0.9,
+    "fault_type": "resource_exhaustion",
+    "hypotheses": [
+      "The frontend-svc experienced a significant increase in CPU usage, leading to CPU throttling and elevated response times, which directly impacted service availability and caused the critical error rate alert.",
+      "A dependency failure or external service degradation upstream of the frontend-svc could have triggered a chain reaction, causing increased error rates and latency despite no direct resource exhaustion on the node level.",
+      "Insufficient memory resources on the node hosting the frontend-svc might have caused performance degradation, even though the primary indicator was high CPU throttling. This could explain the observed error rates and increased latency."
+    ],
+    "evidence_summary": {
+      "metric_agent": "## Analysis Results\n### 1. Anomalous Metrics\n- No metrics show anomalous behavior in the \"CrITICAL\" severity level for the \"frontend\" service based on the provided PromQL queries and time window. The detected issue is related to a specific APM operation error rate, not a systemic resource or latency",
+      "trace_agent": "### Structured Analysis\n\n#### 1. Services with Abnormal Latency (p95/p99 Violations)\n- No services show p95 or p99 violations in the provided data.\n\n#### 2. Bottleneck Spans in the Request Chain\n- The `frontend-svc` shows a high error rate (`error_count=16`) and a significant increase in latency (`p",
+      "event_agent": "### Structured Analysis\n\n#### 1. Warning/Error Events and Their Targets\n- **Pod Failure Events**: 84 events of type `Warning Failed` with pod state `Failed`. Target resources: `otel-c-tool-6tx25`, `ack-sysom-monitor-k849n`, `node-exporter-7lswp`, `otel-c-tool-zxww9`, `ack-node-problem-detector-daemo",
+      "log_agent": "## Analysis\n\n### 1. Error Patterns and Their Frequency\n- No OOMKilled or crash-related errors are observed in the provided log data.\n- A high number of \"connection refused\" errors are present in the `nginx` container logs, indicating that the service is experiencing significant client connection iss",
+      "correlation": "### [Structured Analysis]\n\n#### 1. Services with Anomalies Across Multiple Signal Types\n- No service exhibits anomalies in more than one signal type (i.e., no service has metric, log, trace, and event anomalies simultaneously).\n\n#### 2. Temporal Correlation\n- **High Error Rate in Traces and Logs**: ",
+      "graph_rca": "",
+      "trace_agent_closure": "### Structured Analysis\n\n1. **Services with abnormal latency (p95/p99 violations):**\n   - `oteldemo.CheckoutService/PlaceOrder`: p95 = 2.178s, p99 = 2.862s\n   - `frontend-svc`: p95 = 1.234ms → 1.875ms, p99 = 3.456ms → 5.678ms\n\n2. **Bottleneck spans in the request chain:**\n   - `oteldemo.CheckoutServ",
+      "event_agent_closure": "### Structured Analysis\n\n#### 1. Warning/Error Events and Their Targets\n- **Pod Failure Events:**\n  - `Warning Failed Pod otel-c-tool-6tx25 chaosblade pod state=Failed`\n  - `Warning Failed Pod ack-sysom-monitor-k849n kube-system pod state=Failed`\n  - `Warning Failed Pod node-exporter-7lswp arms-prom",
+      "metric_agent_closure": "{\n  \"anomalies\": [\n    {\n      \"metric\": \"container_cpu_usage_seconds_total\",\n      \"time_window\": \"10m\",\n      \"severity\": \"HIGH\",\n      \"description\": \"The pod 'otel-c-tool-6tx25' shows a significant increase in CPU usage, reaching up to 97.333% over the last 10 minutes, indicating potential CPU r"
+    },
+    "fault_id": "fault-63ec6e06e0",
+    "timestamp": 1780756895.877113
+  },
+  {
+    "description": "[CRITICAL] APM slow_count=2633 — APM aggregated slow_count is 2633 (MCP golden metric). (service=apm.service, namespace=)",
+    "root_cause": "The otel-c-tool-6tx25 pod experienced high CPU usage and throttling, leading to increased latency in the frontend-svc service, which is a downstream dependency in the request flow.",
+    "confidence": 0.8,
+    "fault_type": "resource_exhaustion",
+    "hypotheses": [],
+    "evidence_summary": {
+      "metric_agent": "{\n  \"anomalies\": [\n    {\n      \"metric\": \"container_cpu_usage_seconds_total\",\n      \"time\": \"2023-06-27T12:30:00Z--2023-06-27T12:45:00Z\",\n      \"severity\": \"HIGH\",\n      \"value\": \"pod 'otel-c-tool-6tx25' shows high CPU usage (>90%) and throttling events\"\n    },\n    {\n      \"metric\": \"kube_pod_status",
+      "trace_agent": "### Structured Analysis\n\n1. **Services with abnormal latency (p95/p99 violations):**\n   - The `frontend-svc` shows a significant increase in p95 and p99 latency, indicating high request processing times. This is evident from the APM slow_count and latency metrics.\n   - The `pod 'otel-c-tool-6tx25'` ",
+      "event_agent": "### Structured Analysis\n\n#### 1. Warning/Error Events and Their Targets\n- **Failed to schedule pods**: 18 events (e.g., `Pod pod/pod-infoter-minikube-8697f79969-2q99t is not ready due to Unschedulable`)\n- **Pod liveness/readiness probe failures**: 0 events\n- **CrashLoopBackOff and ImagePullBackOff**",
+      "log_agent": "## Analysis\n\n### 1. Error Patterns and Their Frequency\n- No explicit error patterns are observed in the provided log entries. However, the following error-related patterns are noted from the historical and current incidents:\n  - `OOMKilled`: No relevant logs.\n  - `CrashLoopBackOff`: No relevant logs",
+      "correlation": "### Structured Analysis\n\n#### 1. Services with Abnormal Latency (p95/p99 Violations)\n- No services show p95 or p99 violations in the trace data. The `frontend-svc` has elevated latency in span counts, but this is not a violation.\n\n#### 2. Bottleneck Spans in the Request Chain\n- The only relevant spa",
+      "graph_rca": "",
+      "metric_agent_closure": "{\n  \"analysis\": {\n    \"anomalous_metrics\": [\n      {\n        \"metric_name\": \"container_cpu_usage_seconds_total\",\n        \"time_period\": \"2024-02-07T12:45:00Z-2024-02-07T12:52:00Z\",\n        \"values\": {\n          \"pod_name\": \"otel-c-tool-6tx25\",\n          \"cpu_usage\": [\n            {\"timestamp\": \"2024",
+      "event_agent_closure": "### Structured Analysis\n\n#### 1. Warning/Error Events and Their Targets\n- **Failed Pod Events**: A large number of pods such as `otel-c-tool-thvml`, `ack-node-problem-detector-daemonset-zm2mg`, `node-exporter-2fdr5`, etc., show `pod state=Failed`. These events are distributed across multiple pods an",
+      "trace_agent_closure": "### Structured Analysis\n\n1. **Services with abnormal latency (p95/p99 violations):**\n   - **frontend-svc:** \n     - p95 latency: 200ms → 500ms (violation)\n     - p99 latency: 400ms → 1000ms (violation)\n\n2. **Bottleneck spans in the request chain:**\n   - **frontend-svc**:\n     - Span `\"/hipstershop.C"
+    },
+    "fault_id": "fault-3d3b1fddd4",
+    "timestamp": 1780839861.9659662
+  }
+]

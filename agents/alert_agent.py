@@ -134,6 +134,10 @@ Respond in JSON:
         self.registry = registry
         from configs.config_loader import get_config
         cfg = config or get_config()
+        self.offline_mode = bool(
+            getattr(cfg.observability, "offline_mode", False)
+            and getattr(cfg.observability, "backend", "") == "alidata"
+        )
         self.time_window = cfg.alert.time_window
         self.similarity_threshold = cfg.alert.similarity_threshold
         self.max_group_size = cfg.alert.max_group_size
@@ -185,6 +189,24 @@ Respond in JSON:
     async def _collect_alerts(self, namespace: str = "") -> List[Alert]:
         """Collect alerts from Prometheus, K8s events, and ES."""
         alerts = []
+        if self.offline_mode:
+            from agents.detection_agent import DetectionAgent
+
+            detector = DetectionAgent(self.llm, self.registry)
+            signals = detector.detect(namespace)
+            for signal in signals:
+                alerts.append(Alert(
+                    name=signal.title,
+                    severity=signal.severity,
+                    source=signal.source,
+                    timestamp=signal.timestamp,
+                    labels={
+                        "namespace": signal.namespace,
+                        "service": signal.service,
+                    },
+                    message=signal.description,
+                ))
+            return alerts
         
         # Source 1: Prometheus alerts
         prom = self.registry.get("prometheus")

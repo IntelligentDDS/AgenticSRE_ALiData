@@ -6,7 +6,8 @@ Exports all tool classes and provides the build_tool_registry() factory.
 from tools.base_tool import SRETool, ToolResult, ToolRegistry
 from tools.llm_client import LLMClient
 from tools.k8s_tools import KubectlTool, K8sResourceTool, K8sHealthTool
-from tools.observability import PrometheusTool, ElasticsearchTool, JaegerTool
+from tools.mcp_observability import MCPMetricTool, MCPLogTool, MCPTraceTool
+from tools.mcp_client import MCPClient
 from tools.anomaly_detection import AnomalyDetectionTool
 from tools.hero_analysis import (
     HeroMetricAnalyzer, HeroLogAnalyzer,
@@ -19,7 +20,7 @@ __all__ = [
     "SRETool", "ToolResult", "ToolRegistry",
     "LLMClient",
     "KubectlTool", "K8sResourceTool", "K8sHealthTool",
-    "PrometheusTool", "ElasticsearchTool", "JaegerTool",
+    "MCPClient", "MCPMetricTool", "MCPLogTool", "MCPTraceTool",
     "AnomalyDetectionTool",
     "HeroMetricAnalyzer", "HeroLogAnalyzer",
     "HeroTraceAnalyzer", "HeroCrossSignalCorrelator",
@@ -32,15 +33,15 @@ __all__ = [
 def build_tool_registry(config=None, allow_write: bool = False) -> ToolRegistry:
     """
     Build and populate the global ToolRegistry with all tools.
-    
-    This is the single factory function that wires everything together.
+
+    Wires LLM, K8s, observability (via MCP backend), and analysis tools.
     """
     from configs.config_loader import get_config
     cfg = config or get_config()
-    
+
     registry = ToolRegistry.get_instance()
     registry.reset()  # Clean slate
-    
+
     # ── LLM Client ──
     llm = LLMClient(cfg.llm)
 
@@ -59,18 +60,57 @@ def build_tool_registry(config=None, allow_write: bool = False) -> ToolRegistry:
     registry.register(K8sResourceTool(kubectl), "kubernetes")
     registry.register(K8sHealthTool(kubectl), "kubernetes")
 
-    # ── Observability Tools ──
+    # ── Observability Tools (MCP backend) ──
+    backend = getattr(cfg.observability, "backend", "mcp")
+    if backend != "mcp":
+        raise ValueError(
+            f"observability.backend='{backend}' is not supported; "
+            "AgenticSRE_MCP only supports backend='mcp'"
+        )
+
+    mcp_client = MCPClient(
+        endpoint=getattr(cfg.observability, "mcp_endpoint",
+                         "http://localhost:7980/mcp"),
+        timeout=float(getattr(cfg.observability, "mcp_timeout_seconds", 60)),
+        retries=int(getattr(cfg.observability, "mcp_transport_retry", 3)),
+    )
+
+    region = getattr(cfg.observability, "default_region", "cn-hongkong")
+    workspace = getattr(cfg.observability, "default_workspace", "")
+    domain = getattr(cfg.observability, "default_domain", "apm")
+    entity_set = getattr(cfg.observability, "default_entity_set", "apm.service")
+    log_set_domain = getattr(cfg.observability, "default_log_set_domain", "apm")
+    log_set_name = getattr(cfg.observability, "default_log_set_name", "")
+    trace_set_domain = getattr(cfg.observability, "default_trace_set_domain", "apm")
+    trace_set_name = getattr(cfg.observability, "default_trace_set_name", "apm.trace.common")
+
     registry.register(
-        PrometheusTool(cfg.observability.prometheus_url, llm_client=llm),
-        "observability"
+        MCPMetricTool(
+            mcp_client,
+            default_region=region, default_workspace=workspace,
+            default_domain=domain, default_entity_set=entity_set,
+        ),
+        "observability",
     )
     registry.register(
-        ElasticsearchTool(cfg.observability.elasticsearch_url),
-        "observability"
+        MCPLogTool(
+            mcp_client,
+            default_region=region, default_workspace=workspace,
+            default_domain=domain, default_entity_set=entity_set,
+            default_log_set_domain=log_set_domain,
+            default_log_set_name=log_set_name,
+        ),
+        "observability",
     )
     registry.register(
-        JaegerTool(cfg.observability.jaeger_url),
-        "observability"
+        MCPTraceTool(
+            mcp_client,
+            default_region=region, default_workspace=workspace,
+            default_domain=domain, default_entity_set=entity_set,
+            default_trace_set_domain=trace_set_domain,
+            default_trace_set_name=trace_set_name,
+        ),
+        "observability",
     )
 
     # ── Analysis Tools ──

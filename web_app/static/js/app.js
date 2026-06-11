@@ -110,6 +110,8 @@ function refreshCurrentView() {
         llmfaultlab: loadLLMFaultLab,
         reports: loadReportList,
         events: () => { Promise.all([loadNamespaces('event-ns'), loadEvents()]); },
+        alidata: loadAliDataView,
+        chat: initChatView,
     };
     (loaders[state.currentView] || (() => {}))();
 }
@@ -155,7 +157,7 @@ async function api(path, options = {}) {
         }
         return data;
     } catch (e) {
-        console.error(`API error [${path}]:`, e);
+        if (e?.name !== 'AbortError') console.error(`API error [${path}]:`, e);
         if (options.throwOnError) throw e;
         return null;
     } finally {
@@ -170,8 +172,20 @@ function escapeHtml(text) {
 }
 
 function formatTime(ts) {
-    if (!ts) return '-';
-    try { return new Date(ts).toLocaleString('zh-CN'); } catch { return ts; }
+    if (!ts && ts !== 0) return '-';
+    let d;
+    try {
+        if (typeof ts === 'number' || /^\d+$/.test(String(ts))) {
+            const n = Number(ts);
+            d = new Date(n > 1e12 ? n : n * 1000);
+        } else {
+            d = new Date(ts);
+        }
+        if (!d || isNaN(d.getTime())) return String(ts);
+        return d.toLocaleString('zh-CN');
+    } catch {
+        return String(ts);
+    }
 }
 
 function badgeClass(phase) {
@@ -596,8 +610,7 @@ function renderTimeSeriesChart(canvasId, data, unit) {
         if (data?.anomalies?.length > 0) {
             const badge = document.createElement('span');
             badge.className = 'anomaly-badge';
-            const methods = [...new Set(data.anomalies.map(a => a.method || 'zscore'))].join('+');
-            badge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--danger-bg);color:var(--danger)">${data.anomalies.length} anomalies (${methods})</span>`;
+            badge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--danger-bg);color:var(--danger)">${data.anomalies.length} anomalies</span>`;
             const header = chartCard.querySelector('.chart-header');
             if (header) header.appendChild(badge);
         }
@@ -608,7 +621,7 @@ function renderTimeSeriesChart(canvasId, data, unit) {
             const info = document.createElement('div');
             info.className = 'detection-info';
             info.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:-8px;margin-bottom:8px;';
-            info.textContent = `detection: ${data.detection.methods?.join(', ') || '-'} | z=${data.detection.z_threshold} | ewma_span=${data.detection.ewma_span}`;
+            info.textContent = '';
             canvas.parentElement.insertBefore(info, canvas);
         }
     }
@@ -659,7 +672,7 @@ function renderTimeSeriesChart(canvasId, data, unit) {
                     borderColor: '#ffffff',
                     borderWidth: 2,
                     label: {
-                        content: `${a.severity} z=${a.zscore}`,
+                        content: `${a.severity}`,
                         display: true,
                         position: 'end',
                         font: { size: 9, weight: 'bold' },
@@ -830,10 +843,17 @@ async function runPromQL() {
 // ─────────────────────────────────────────
 
 async function loadNamespaces(selectId) {
-    const data = await api('/api/cluster/namespaces');
-    if (!data?.namespaces) return;
+    // Retry up to 3 times — the first call can be aborted by a parallel
+    // overview pre-fetch (controller.abort fires).
+    let data = null;
+    for (let i = 0; i < 3 && (!data || !data.namespaces || !data.namespaces.length); i++) {
+        if (i > 0) await new Promise(r => setTimeout(r, 1000));
+        data = await api('/api/cluster/namespaces');
+    }
+    if (!data?.namespaces?.length) return;
 
     const sel = document.getElementById(selectId);
+    if (!sel) return;
     const current = sel.value;
     const firstOpt = sel.querySelector('option')?.textContent || '选择命名空间';
     sel.innerHTML = `<option value="">${firstOpt}</option>` +
@@ -1023,7 +1043,7 @@ function alertDiagnosisKey(a) {
 function enrichHealPayloadWithDiagnosis(payload, diagnosis, key = '') {
     if (!diagnosis) return { ...payload, diagnosis_mode: 'alert_only' };
     const services = Array.isArray(diagnosis.affected_services) ? diagnosis.affected_services : [];
-    const evidence = Object.values(diagnosis.evidence_summary || {}).map(v => String(v || '')).filter(Boolean);
+    const evidence = Object.values(diagnosis.evidence_summary || {}).map(v => (typeof v === 'object' ? (v?.summary || JSON.stringify(v)) : String(v || ''))).filter(Boolean);
     return {
         ...payload,
         source: 'alert-rca',
@@ -1738,7 +1758,7 @@ function renderRCAFinalResult(result) {
     html += `<div class="rca-meta-grid">`;
     if (rca.fault_type) html += `<div class="rca-meta-item"><div class="meta-label">故障类型</div><div class="meta-value">${escapeHtml(rca.fault_type)}</div></div>`;
     if (rca.affected_services?.length) html += `<div class="rca-meta-item"><div class="meta-label">受影响服务</div><div class="meta-value">${rca.affected_services.map(s => escapeHtml(s)).join(', ')}</div></div>`;
-    if (rca.evidence_summary) { for (const [key, val] of Object.entries(rca.evidence_summary)) { if (val) html += `<div class="rca-meta-item"><div class="meta-label">${escapeHtml(key)}</div><div class="meta-value">${escapeHtml(String(val).substring(0, 200))}</div></div>`; } }
+    if (rca.evidence_summary) { for (const [key, val] of Object.entries(rca.evidence_summary)) { if (val) { let txt = (typeof val === 'object') ? (val.summary || JSON.stringify(val, null, 2)) : String(val); txt = txt.substring(0, 400); html += `<div class="rca-meta-item"><div class="meta-label">${escapeHtml(key)}</div><div class="meta-value"><pre style="white-space:pre-wrap;margin:0;font-size:12px">${escapeHtml(txt)}</pre></div></div>`; } } }
     html += `</div>`;
 
     if (rca.timeline?.length) {
@@ -1784,7 +1804,7 @@ function buildHealPayloadFromRCA(rca) {
         object: primary,
         pod: /pod/i.test(primary) ? primary : '',
         deployment: /deployment|deploy/i.test(primary) ? primary : '',
-        evidence: Object.values(rca?.evidence_summary || {}).map(v => String(v || '')),
+        evidence: Object.values(rca?.evidence_summary || {}).map(v => (typeof v === 'object' ? (v?.summary || JSON.stringify(v)) : String(v || ''))),
         diagnosis: rca,
     };
 }
@@ -1962,7 +1982,11 @@ async function stopDaemon() {
 // ─────────────────────────────────────────
 
 async function loadTracesView() {
-    const data = await api('/api/jaeger/services');
+    let data = null;
+    for (let i = 0; i < 3 && (!data || !data.services?.length); i++) {
+        if (i > 0) await new Promise(r => setTimeout(r, 1000));
+        data = await api('/api/jaeger/services');
+    }
     const sel = document.getElementById('trace-service');
     const source = document.getElementById('trace-source-badge');
     if (source) {
@@ -4033,4 +4057,735 @@ async function healthCheck() {
         dot.className = 'dot dot-red'; text.textContent = '连接异常';
         badge.className = 'badge badge-danger'; badge.textContent = '连接异常';
     }
+}
+
+// ─────────────────────────────────────────
+// Model Chat
+const chatState = {
+    sessionId: 'default',
+    isStreaming: false,
+    messages: [],
+};
+let chatListenersSetup = false;
+
+async function initChatView() {
+    await loadModelInfo();
+    await loadChatHistory();
+    await loadChatSessions();
+
+    if (chatListenersSetup) return;
+    chatListenersSetup = true;
+
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.addEventListener('input', () => {
+            autoResizeTextarea(input);
+            updateCharCount();
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+    }
+
+    const btn = document.getElementById('chat-send-btn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            sendChatMessage();
+        });
+    }
+}
+
+async function loadModelInfo() {
+    const statusEl = document.getElementById('chat-model-status');
+    if (!statusEl) return;
+
+    try {
+        const res = await fetch('/api/model/info');
+        const data = await res.json();
+
+        if (data && data.configured) {
+            statusEl.innerHTML = `
+                <span class="text-success">✅ 已连接</span> |
+                模型: <strong>${data.model || 'OpsLLM-7B'}</strong> |
+                端点: <code>${data.base_url || 'localhost:8888'}</code>
+            `;
+        } else {
+            statusEl.innerHTML = `
+                <span class="text-danger">❌ 未配置</span> — 请在 .env 中设置 LLM_API_KEY
+            `;
+        }
+    } catch (e) {
+        statusEl.innerHTML = `
+            <span class="text-danger">❌ 连接失败</span> — ${e.message}
+        `;
+    }
+}
+
+async function loadChatHistory() {
+    // CRITICAL: do NOT overwrite messages while streaming — the in-flight
+    // assistant message isn't in server history yet and would vanish.
+    if (chatState.isStreaming) return;
+    const data = await api(`/api/model/chat/history/${chatState.sessionId}`);
+    if (!data?.messages) return;
+    chatState.messages = data.messages;
+    renderChatMessages();
+}
+
+function renderChatMessages() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    if (chatState.messages.length === 0) {
+        container.innerHTML = `
+            <div class="chat-welcome">
+                <div class="welcome-icon">🤖</div>
+                <h3>欢迎使用 OpsLLM-7B 智能运维助手</h3>
+                <p>我是基于 OpsLLM-7B 本地模型的 SRE 智能助手，可以帮助您：</p>
+                <div class="quick-actions">
+                    <button class="quick-action-btn" onclick="sendQuickMessage('如何排查 Pod 一直处于 Pending 状态的问题？')">
+                        🔧 Pod 故障排查
+                    </button>
+                    <button class="quick-action-btn" onclick="sendQuickMessage('如何分析 Kubernetes 集群的性能瓶颈？')">
+                        📊 性能分析
+                    </button>
+                    <button class="quick-action-btn" onclick="sendQuickMessage('告警风暴如何处理和优化？')">
+                        🔔 告警优化
+                    </button>
+                    <button class="quick-action-btn" onclick="sendQuickMessage('如何设计高可用的 Kubernetes 集群？')">
+                        🏗️ 架构设计
+                    </button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = chatState.messages.map((msg, idx) => {
+        if (msg.role === 'user') {
+            return `<div class="chat-message user">
+                <div class="message-content">${escapeHtml(msg.content)}</div>
+            </div>`;
+        } else {
+            // While the LAST assistant message is still streaming, render as
+            // plain text (escaped + <br>) so half-arrived markdown tokens
+            // (** ` etc.) don't flicker between literal and parsed states.
+            const isLastStreaming = chatState.isStreaming && idx === chatState.messages.length - 1;
+            const isEmpty = !msg.content;
+            let rendered;
+            if (isEmpty && isLastStreaming) {
+                rendered = '<span class="typing-indicator"><span></span><span></span><span></span></span>';
+            } else {
+                // Always plain text + <br>; markdown applied separately
+                // by applyMarkdownToLastAssistant() after stream completes.
+                rendered = escapeHtml(msg.content || '').replace(/\n/g, '<br>');
+            }
+            const loadingCls = isEmpty && isLastStreaming ? ' loading' : '';
+            return `<div class="chat-message assistant${loadingCls}" data-msg-idx="${idx}">
+                <div class="message-avatar">🤖</div>
+                <div class="message-content">${rendered}</div>
+            </div>`;
+        }
+    }).join('');
+
+    container.scrollTop = container.scrollHeight;
+}
+
+function applyMarkdownToLastAssistant() {
+    // Re-render only the LAST assistant message's .message-content with
+    // markdown formatting (called once after stream done).
+    const msgs = document.querySelectorAll('#chat-messages .chat-message.assistant');
+    if (!msgs.length) return;
+    const last = msgs[msgs.length - 1];
+    const idx = parseInt(last.dataset.msgIdx || '-1', 10);
+    if (idx < 0 || !chatState.messages[idx]) return;
+    const contentEl = last.querySelector('.message-content');
+    if (contentEl) contentEl.innerHTML = formatMarkdown(chatState.messages[idx].content);
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input?.value?.trim();
+    if (!message || chatState.isStreaming) return;
+
+    input.value = '';
+    autoResizeTextarea(input);
+    updateCharCount();
+
+    chatState.messages.push({ role: 'user', content: message });
+    // Push the empty assistant bubble IMMEDIATELY so the user sees activity
+    chatState.messages.push({ role: 'assistant', content: '' });
+    const assistantMsgIdx = chatState.messages.length - 1;
+    chatState.isStreaming = true;
+    updateSendButton(true);
+    renderChatMessages();
+
+    const container = document.getElementById('chat-messages');
+    container.scrollTop = container.scrollHeight;
+
+    let accumulated = '';
+    try {
+        const response = await fetch('/api/model/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, session_id: chatState.sessionId, stream: true }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${response.status}`);
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+                if (!line.startsWith('data:')) continue;
+                const payload = line.slice(5).trim();
+                if (!payload || payload === '[DONE]') continue;
+                try {
+                    const msg = JSON.parse(payload);
+                    if (msg.type === 'chunk' && msg.content) {
+                        accumulated += msg.content;
+                        chatState.messages[assistantMsgIdx].content = accumulated;
+                        renderChatMessages();
+                    } else if (msg.type === 'error') {
+                        accumulated += `\n[error: ${msg.message}]`;
+                        chatState.messages[assistantMsgIdx].content = accumulated;
+                        renderChatMessages();
+                    }
+                } catch (e) { /* skip */ }
+            }
+        }
+    } catch (e) {
+        if (assistantMsgIdx >= 0) chatState.messages[assistantMsgIdx].content = `❌ 请求失败: ${e.message}`;
+        else chatState.messages.push({ role: 'assistant', content: `❌ 请求失败: ${e.message}` });
+    } finally {
+        const loading = document.getElementById('chat-loading');
+        if (loading) loading.remove();
+        chatState.isStreaming = false;
+        updateSendButton(false);
+        // Apply markdown directly to the existing DOM node (no re-render)
+        // — this avoids a brief white flash when innerHTML is replaced.
+        applyMarkdownToLastAssistant();
+    }
+}
+
+function sendQuickMessage(message) {
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = message;
+        sendChatMessage();
+    }
+}
+
+function handleChatKeydown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendChatMessage();
+    }
+}
+
+function autoResizeTextarea(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+}
+
+function updateCharCount() {
+    const input = document.getElementById('chat-input');
+    const countEl = document.getElementById('chat-char-count');
+    if (input && countEl) {
+        const len = input.value.length;
+        countEl.textContent = `${len} / 2000`;
+        countEl.style.color = len > 1800 ? 'var(--danger)' : 'var(--text-muted)';
+    }
+}
+
+function updateSendButton(loading) {
+    const btn = document.getElementById('chat-send-btn');
+    if (btn) {
+        btn.disabled = loading;
+        btn.textContent = loading ? '...' : '发送';
+    }
+}
+
+async function clearChatHistory() {
+    if (!confirm('确定要清空当前对话记录吗？')) return;
+
+    await api(`/api/model/chat/history/${chatState.sessionId}`, { method: 'DELETE' });
+    chatState.messages = [];
+    renderChatMessages();
+}
+
+function exportChatHistory() {
+    if (chatState.messages.length === 0) {
+        alert('暂无对话记录可导出');
+        return;
+    }
+
+    const content = chatState.messages.map(m =>
+        `【${m.role === 'user' ? '用户' : '助手'}】\n${m.content}`
+    ).join('\n\n---\n\n');
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-export-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+async function loadChatSessions() {
+    const data = await api('/api/model/chat/sessions');
+    const container = document.getElementById('chat-sessions');
+    if (!container || !data?.sessions?.length) {
+        container.innerHTML = '<p class="text-muted">暂无历史对话</p>';
+        return;
+    }
+
+    container.innerHTML = data.sessions.map(s => `
+        <div class="chat-session-item ${s.session_id === chatState.sessionId ? 'active' : ''}"
+             onclick="switchChatSession('${s.session_id}')">
+            <span class="session-id">${s.session_id}</span>
+            <span class="session-meta">${s.message_count} 条消息</span>
+        </div>
+    `).join('');
+}
+
+function switchChatSession(sessionId) {
+    chatState.sessionId = sessionId;
+    loadChatHistory();
+    loadChatSessions();
+}
+
+function formatMarkdown(text) {
+    if (!text) return '';
+    let html = escapeHtml(text);
+
+    // Code blocks
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
+
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Bold
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+    // Italic
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
+
+    return html;
+}
+
+// ─────────────────────────────────────────
+// AliData (Alibaba Cloud Logs & Traces & Metrics)
+// ─────────────────────────────────────────
+
+let _alidataRefreshTimer = null;
+const _alidataCharts = {};  // canvasId -> Chart instance
+
+async function loadAliDataView() {
+    const [statusData, servicesData] = await Promise.all([
+        api('/api/alidata/status'),
+        api('/api/alidata/services'),
+    ]);
+
+    if (statusData) {
+        document.getElementById('alidata-conn-status').innerHTML = statusData.connected
+            ? '<span class="text-success">已连接</span>' : '<span class="text-danger">未连接</span>';
+        document.getElementById('alidata-log-status').innerHTML = statusData.log_ok
+            ? '<span class="text-success">正常</span>' : '<span class="text-danger">异常</span>';
+        document.getElementById('alidata-trace-status').innerHTML = statusData.trace_ok
+            ? '<span class="text-success">正常</span>' : '<span class="text-danger">异常</span>';
+    }
+
+    if (servicesData?.services?.length) {
+        const services = servicesData.services.filter(s => s).sort();
+        const traceSel = document.getElementById('alidata-trace-service');
+        const traceCur = traceSel.value;
+        traceSel.innerHTML = '<option value="">选择服务</option>' +
+            services.map(s => `<option value="${s}" ${s === traceCur ? 'selected' : ''}>${s}</option>`).join('');
+        const metricSel = document.getElementById('alidata-metric-service');
+        if (metricSel) {
+            const metricCur = metricSel.value;
+            metricSel.innerHTML = '<option value="">所有服务</option>' +
+                services.map(s => `<option value="${s}" ${s === metricCur ? 'selected' : ''}>${s}</option>`).join('');
+        }
+    }
+
+    loadAliDataMetrics();
+    setAliDataAutoRefresh();
+}
+
+function setAliDataAutoRefresh() {
+    if (_alidataRefreshTimer) { clearInterval(_alidataRefreshTimer); _alidataRefreshTimer = null; }
+    const interval = parseInt(document.getElementById('alidata-refresh-interval')?.value || '0');
+    if (interval > 0) {
+        _alidataRefreshTimer = setInterval(() => {
+            if (state.currentView === 'alidata') loadAliDataMetrics();
+        }, interval * 1000);
+    }
+}
+
+async function loadAliDataMetrics() {
+    const emptyEl = document.getElementById('alidata-metrics-empty');
+    if (emptyEl) emptyEl.textContent = '加载中...';
+
+    const data = await api('/api/alidata/metrics');
+    if (!data || data.error) {
+        if (emptyEl) { emptyEl.style.display = 'block'; emptyEl.textContent = `错误: ${data?.error || '请求失败'}`; }
+        return;
+    }
+
+    const filterSvc = document.getElementById('alidata-metric-service')?.value || '';
+    const k8s = data.k8s_metrics || {};
+    const apm = data.apm_metrics || {};
+
+    // ── K8s CPU & Memory Charts ──
+    const cpuDatasets = [];
+    const memDatasets = [];
+    let colorIdx = 0;
+
+    for (const [svc, pods] of Object.entries(k8s)) {
+        if (filterSvc && svc !== filterSvc) continue;
+        for (const [pod, metrics] of Object.entries(pods)) {
+            const cpuData = metrics['pod_cpu_usage_rate'];
+            const memData = metrics['pod_memory_working_set_bytes'] || metrics['pod_memory_usage_bytes'];
+            const shortPod = pod.length > 25 ? pod.substring(0, 23) + '..' : pod;
+            const color = CHART_COLORS[colorIdx % CHART_COLORS.length];
+
+            if (cpuData?.values?.length) {
+                cpuDatasets.push({
+                    label: shortPod,
+                    data: cpuData.values.map(v => ({ x: v[0] * 1000, y: parseFloat(v[1]) })),
+                    borderColor: color, backgroundColor: color + '20',
+                    borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false,
+                });
+            }
+            if (memData?.values?.length) {
+                memDatasets.push({
+                    label: shortPod,
+                    data: memData.values.map(v => ({ x: v[0] * 1000, y: parseFloat(v[1]) / (1024 * 1024) })),
+                    borderColor: color, backgroundColor: color + '20',
+                    borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false,
+                });
+            }
+            colorIdx++;
+        }
+    }
+
+    renderChart('chart-k8s-cpu', 'Pod CPU 使用率 (%)', cpuDatasets, '%');
+    renderChart('chart-k8s-mem', 'Pod 内存使用 (MB)', memDatasets, 'MB');
+
+    // ── APM Charts ──
+    const reqDatasets = [];
+    const latDatasets = [];
+    colorIdx = 0;
+
+    for (const [svc, metrics] of Object.entries(apm)) {
+        if (filterSvc && svc !== filterSvc) continue;
+        const reqData = metrics['request_count'];
+        const latData = metrics['avg_request_latency_seconds'];
+        const color = CHART_COLORS[colorIdx % CHART_COLORS.length];
+
+        if (reqData?.values?.length) {
+            reqDatasets.push({
+                label: svc,
+                data: reqData.values.map(v => ({ x: v[0] * 1000, y: parseFloat(v[1]) })),
+                borderColor: color, backgroundColor: color + '30',
+                borderWidth: 2, pointRadius: 1, tension: 0.3, fill: true,
+            });
+        }
+        if (latData?.values?.length) {
+            latDatasets.push({
+                label: svc,
+                data: latData.values.map(v => ({ x: v[0] * 1000, y: parseFloat(v[1]) * 1000 })),
+                borderColor: color, backgroundColor: color + '20',
+                borderWidth: 2, pointRadius: 1, tension: 0.3, fill: false,
+            });
+        }
+        colorIdx++;
+    }
+
+    renderChart('chart-apm-requests', '服务请求量 (req/30s)', reqDatasets, '');
+    renderChart('chart-apm-latency', '平均延迟 (ms)', latDatasets, 'ms');
+
+    // ── APM Summary Table ──
+    const apmBody = document.getElementById('alidata-apm-body');
+    const apmEntries = Object.entries(apm).filter(([svc]) => !filterSvc || svc === filterSvc);
+    if (apmEntries.length) {
+        apmBody.innerHTML = apmEntries.sort((a, b) =>
+            (b[1]?.request_count?.current || 0) - (a[1]?.request_count?.current || 0)
+        ).map(([svc, metrics]) => {
+            const reqCount = metrics.request_count?.current || 0;
+            const latency = metrics.avg_request_latency_seconds?.current || 0;
+            const latencyMs = (latency * 1000).toFixed(1);
+            const latencyClass = latency > 1 ? 'text-danger' : latency > 0.5 ? 'text-warning' : '';
+            return `<tr>
+                <td><strong>${escapeHtml(svc)}</strong></td>
+                <td>${reqCount.toFixed(0)}</td>
+                <td class="${latencyClass}">${latency > 0 ? latency.toFixed(4) + ' (' + latencyMs + 'ms)' : '-'}</td>
+            </tr>`;
+        }).join('');
+        if (emptyEl) emptyEl.style.display = 'none';
+    } else if (cpuDatasets.length || memDatasets.length) {
+        apmBody.innerHTML = '<tr><td colspan="3" class="text-muted" style="text-align:center">暂无 APM 数据</td></tr>';
+        if (emptyEl) emptyEl.style.display = 'none';
+    } else {
+        if (emptyEl) { emptyEl.style.display = 'block'; emptyEl.textContent = '暂无指标数据'; }
+    }
+}
+
+function renderChart(canvasId, title, datasets, unit) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    if (_alidataCharts[canvasId]) { _alidataCharts[canvasId].destroy(); delete _alidataCharts[canvasId]; }
+    if (!datasets.length) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#5b5f73'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('暂无数据', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+    _alidataCharts[canvasId] = new Chart(canvas, {
+        type: 'line', data: { datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: 300 },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                title: { display: true, text: title, color: '#8b8fa3', font: { size: 13, weight: '600' } },
+                legend: { display: datasets.length <= 8, position: 'bottom',
+                    labels: { color: '#8b8fa3', font: { size: 10 }, boxWidth: 12, padding: 8 } },
+                tooltip: { backgroundColor: '#1e2130', titleColor: '#e4e6ef', bodyColor: '#8b8fa3',
+                    borderColor: '#2a2d3e', borderWidth: 1,
+                    callbacks: {
+                        title: function(ctx) { return ctx[0] ? new Date(ctx[0].parsed.x).toLocaleTimeString('zh-CN') : ''; },
+                        label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + (unit ? ' ' + unit : ''); }
+                    }
+                },
+            },
+            scales: {
+                x: { type: 'linear',
+                    ticks: { color: '#5b5f73', font: { size: 10 },
+                        callback: function(val) { return new Date(val).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); },
+                        maxTicksLimit: 8 },
+                    grid: { color: '#2a2d3e' } },
+                y: { ticks: { color: '#5b5f73', font: { size: 10 },
+                        callback: function(val) { return val.toFixed(1) + (unit ? ' ' + unit : ''); } },
+                    grid: { color: '#2a2d3e' }, beginAtZero: true },
+            },
+        },
+    });
+}
+
+async function loadAliDataLogs() {
+    const query = document.getElementById('alidata-log-query')?.value?.trim() || '';
+    const level = document.getElementById('alidata-log-level')?.value || '';
+    const timeRange = document.getElementById('alidata-log-timerange')?.value || '1h';
+    const ns = document.getElementById('alidata-log-ns')?.value?.trim() || '';
+    const size = document.getElementById('alidata-log-size')?.value || 200;
+
+    const tbody = document.getElementById('alidata-log-body');
+    const emptyEl = document.getElementById('alidata-log-empty');
+    const statsEl = document.getElementById('alidata-log-stats');
+
+    tbody.innerHTML = '';
+    emptyEl.style.display = 'block';
+    emptyEl.textContent = '加载中...';
+
+    let url = `/api/alidata/logs?time_range=${timeRange}&size=${size}`;
+    if (query) url += `&query=${encodeURIComponent(query)}`;
+    if (level) url += `&level=${encodeURIComponent(level)}`;
+    if (ns) url += `&namespace=${encodeURIComponent(ns)}`;
+
+    const data = await api(url);
+
+    if (!data || data.error) {
+        emptyEl.textContent = `错误: ${data?.error || '请求失败'}`;
+        statsEl.innerHTML = '';
+        return;
+    }
+
+    const entries = data.entries || [];
+    if (!entries.length) {
+        emptyEl.textContent = '未找到日志';
+        statsEl.innerHTML = `<span class="badge badge-gray">共 0 条</span>`;
+        return;
+    }
+
+    emptyEl.style.display = 'none';
+
+    // Stats
+    const levelCounts = {};
+    entries.forEach(e => { levelCounts[e.level] = (levelCounts[e.level] || 0) + 1; });
+    statsEl.innerHTML = `<span class="badge badge-info">共 ${entries.length} 条</span> ` +
+        Object.entries(levelCounts).map(([lv, cnt]) => {
+            const cls = lv === 'error' ? 'danger' : lv === 'warn' ? 'warning' : 'info';
+            return `<span class="badge badge-${cls}">${lv}: ${cnt}</span>`;
+        }).join(' ');
+
+    // Render table
+    tbody.innerHTML = entries.map(e => {
+        const lvCls = e.level === 'error' ? 'danger' : e.level === 'warn' ? 'warning' : 'info';
+        const ts = e.timestamp ? formatTime(
+            typeof e.timestamp === 'number' && e.timestamp < 2e10
+                ? e.timestamp * 1000 : e.timestamp
+        ) : '-';
+        return `<tr>
+            <td style="white-space:nowrap;font-size:11px">${ts}</td>
+            <td><span class="badge badge-${lvCls}">${e.level}</span></td>
+            <td>${escapeHtml(e.service || '-')}</td>
+            <td style="font-size:11px">${escapeHtml(e.pod || '-')}</td>
+            <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                title="${escapeHtml(e.message || '')}">${escapeHtml(e.message || '')}</td>
+        </tr>`;
+    }).join('');
+}
+
+async function searchAliDataTraces() {
+    const service = document.getElementById('alidata-trace-service')?.value;
+    if (!service) { alert('请先选择服务'); return; }
+
+    const lookback = document.getElementById('alidata-trace-lookback')?.value || '1h';
+    const limit = document.getElementById('alidata-trace-limit')?.value || 20;
+
+    const tbody = document.getElementById('alidata-trace-body');
+    const emptyEl = document.getElementById('alidata-trace-empty');
+    tbody.innerHTML = '';
+    emptyEl.style.display = 'block';
+    emptyEl.textContent = '搜索中...';
+
+    const data = await api(`/api/alidata/traces?service=${encodeURIComponent(service)}&lookback=${lookback}&limit=${limit}`);
+
+    if (!data?.traces?.length) {
+        emptyEl.textContent = data?.error ? `错误: ${data.error}` : '未找到 Trace';
+        return;
+    }
+
+    emptyEl.style.display = 'none';
+
+    tbody.innerHTML = data.traces.map(t => {
+        const durationMs = (t.total_duration_us / 1000).toFixed(1);
+        const shortId = t.traceID?.substring(0, 16) || '';
+        const services = (t.services || []).slice(0, 3).join(', ');
+        const moreServices = t.services?.length > 3 ? ` +${t.services.length - 3}` : '';
+        const errorRate = t.error_rate != null ? `${(t.error_rate * 100).toFixed(1)}%` : '-';
+        const errorCls = t.error_rate > 0 ? 'text-danger' : '';
+        return `<tr>
+            <td><code style="font-size:11px">${escapeHtml(shortId)}</code></td>
+            <td>${t.span_count}</td>
+            <td style="font-size:11px">${escapeHtml(services)}${moreServices}</td>
+            <td>${durationMs} ms</td>
+            <td class="${errorCls}">${errorRate}</td>
+            <td><button class="btn btn-sm" onclick="viewAliDataTraceDetail('${t.traceID}')">详情</button></td>
+        </tr>`;
+    }).join('');
+}
+
+async function lookupAliDataTraceById() {
+    const traceId = document.getElementById('alidata-trace-id-input')?.value?.trim();
+    if (!traceId) { alert('请输入 Trace ID'); return; }
+    await viewAliDataTraceDetail(traceId);
+}
+
+async function viewAliDataTraceDetail(traceId) {
+    const card = document.getElementById('alidata-trace-detail-card');
+    const content = document.getElementById('alidata-trace-detail-content');
+    card.style.display = 'block';
+    content.innerHTML = '<p class="text-muted">加载中...</p>';
+
+    const data = await api(`/api/alidata/trace/${traceId}`);
+
+    if (!data || data.error) {
+        content.innerHTML = `<p class="text-danger">加载失败: ${data?.error || '未知错误'}</p>`;
+        return;
+    }
+
+    const traces = data.traces || [];
+    if (!traces.length) {
+        content.innerHTML = '<p class="text-muted">无 Trace 数据</p>';
+        return;
+    }
+
+    const trace = traces[0];
+    const services = trace.services || [];
+    const operations = trace.operations || [];
+    const endpoints = trace.endpoints || [];
+    const errorSpans = trace.error_spans || [];
+    const statusDist = trace.http_status_distribution || {};
+    const durationMs = (trace.total_duration_us / 1000).toFixed(1);
+    const errorRate = trace.error_rate != null ? `${(trace.error_rate * 100).toFixed(1)}%` : '-';
+
+    let html = `
+        <div style="margin-bottom:12px">
+            <strong>Trace ID:</strong> <code>${escapeHtml(traceId)}</code>
+            &nbsp; <strong>Span数:</strong> ${trace.span_count}
+            &nbsp; <strong>总耗时:</strong> ${durationMs} ms
+            &nbsp; <strong>错误率:</strong> <span class="${trace.error_rate > 0 ? 'text-danger' : ''}">${errorRate}</span>
+        </div>`;
+
+    // Services
+    html += `<div style="margin-bottom:8px">
+        <strong>涉及服务:</strong> ${services.map(s => `<span class="badge badge-info" style="margin:2px">${escapeHtml(s)}</span>`).join(' ')}
+    </div>`;
+
+    // Operations
+    if (operations.length) {
+        html += `<div style="margin-bottom:8px">
+            <strong>操作:</strong> ${operations.slice(0, 10).map(o => `<span class="badge badge-gray" style="margin:2px">${escapeHtml(o)}</span>`).join(' ')}
+        </div>`;
+    }
+
+    // HTTP Status Distribution
+    if (Object.keys(statusDist).length) {
+        html += `<div style="margin-bottom:8px">
+            <strong>HTTP状态分布:</strong> ${Object.entries(statusDist).map(([code, cnt]) => {
+                const cls = code.startsWith('2') ? 'success' : code.startsWith('4') ? 'warning' : code.startsWith('5') ? 'danger' : 'info';
+                return `<span class="badge badge-${cls}" style="margin:2px">${code}: ${cnt}</span>`;
+            }).join(' ')}
+        </div>`;
+    }
+
+    // Error Spans
+    if (errorSpans.length) {
+        html += `<div style="margin-top:12px">
+            <h4 style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">错误 Spans</h4>
+            <table class="data-table">
+                <thead><tr><th>服务</th><th>操作</th><th>状态码</th><th>耗时</th><th>URL</th></tr></thead>
+                <tbody>${errorSpans.map(es => `
+                    <tr>
+                        <td>${escapeHtml(es.service || '')}</td>
+                        <td>${escapeHtml(es.operation || '')}</td>
+                        <td><span class="badge badge-danger">${es.status_code}</span></td>
+                        <td>${es.duration_ms} ms</td>
+                        <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                            title="${escapeHtml(es.url || '')}">${escapeHtml(es.url || '-')}</td>
+                    </tr>
+                `).join('')}</tbody>
+            </table>
+        </div>`;
+    }
+
+    // Endpoints
+    if (endpoints.length) {
+        html += `<details style="margin-top:12px;font-size:12px">
+            <summary style="cursor:pointer;color:var(--text-muted)">查看请求端点 (${endpoints.length})</summary>
+            <div style="margin-top:6px">
+                ${endpoints.map(ep => `<div class="signal-item" style="font-size:11px">${escapeHtml(ep)}</div>`).join('')}
+            </div>
+        </details>`;
+    }
+
+    content.innerHTML = html;
 }

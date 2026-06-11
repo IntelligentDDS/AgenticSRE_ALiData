@@ -6,7 +6,7 @@
     <title>AgenticSRE Dashboard · v20260527</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=23">
+    <link rel="stylesheet" href="/static/css/style.css?v=35">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
@@ -46,6 +46,10 @@
             <li class="nav-section">实验评测</li>
             <li class="nav-item" data-view="faultlab"><span class="nav-icon">GC</span><span class="nav-text">通算故障实验</span></li>
             <li class="nav-item" data-view="llmfaultlab"><span class="nav-icon">LL</span><span class="nav-text">智算故障实验</span></li>
+
+            <li class="nav-section">Ali环境</li>
+            <li class="nav-item" data-view="chat"><span class="nav-icon">LM</span><span class="nav-text">模型交互</span></li>
+            <li class="nav-item" data-view="alidata"><span class="nav-icon">AL</span><span class="nav-text">AliData</span></li>
         </ul>
         <div class="sidebar-footer">
             <div class="health-indicator" id="health-dot">
@@ -1047,6 +1051,210 @@
                     <button class="btn btn-primary" onclick="hermesSendInput()" id="hermes-send-btn">发送</button>
                 </div>
             </div>
+        </section><!-- ═══ Model Chat Section ═══ -->
+        <section id="view-chat" class="view">
+            <div class="chat-main">
+                <div class="simple-chat-wrapper">
+                    <div class="simple-chat-header">
+                        <h3>OpsLLM-7B 智能运维助手</h3>
+                        <div>
+                            <button class="btn btn-sm" onclick="clearChatHistory()">清空对话</button>
+                            <button class="btn btn-sm" onclick="exportChatHistory()">导出记录</button>
+                        </div>
+                    </div>
+                    <div class="simple-chat-messages" id="chat-messages">
+                        <div class="chat-placeholder-msg">
+                            <p>欢迎使用 OpsLLM-7B 智能运维助手</p>
+                            <div class="quick-suggestions">
+                                <button onclick="sendQuickMessage('如何排查 Pod 一直处于 Pending 状态的问题？')">Pod 故障排查</button>
+                                <button onclick="sendQuickMessage('如何分析 Kubernetes 集群的性能瓶颈？')">性能分析</button>
+                                <button onclick="sendQuickMessage('告警风暴如何处理和优化？')">告警优化</button>
+                                <button onclick="sendQuickMessage('如何设计高可用的 Kubernetes 集群？')">架构设计</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="simple-chat-input">
+                        <textarea id="chat-input" placeholder="输入您的问题，按 Enter 发送..." rows="3"></textarea>
+                        <button id="chat-send-btn">发送</button>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-history">
+                <div class="card chat-history-card">
+                    <div class="card-header">
+                        <h3>对话历史</h3>
+                        <button class="btn btn-sm" onclick="loadChatSessions()">🔄 刷新</button>
+                    </div>
+                    <div class="chat-sessions" id="chat-sessions">
+                        <p class="text-muted">暂无历史对话</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- ═══ AliData Section ═══ -->
+        <section id="view-alidata" class="view">
+            <!-- Status -->
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-label">AliData 连接</div>
+                    <div class="stat-value" id="alidata-conn-status">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">日志源</div>
+                    <div class="stat-value" id="alidata-log-status">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">链路源</div>
+                    <div class="stat-value" id="alidata-trace-status">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">自动刷新</div>
+                    <div class="stat-value">
+                        <select id="alidata-refresh-interval" class="select-sm" onchange="setAliDataAutoRefresh()"
+                            style="font-size:12px">
+                            <option value="0" selected>关闭</option>
+                            <option value="30">30秒</option>
+                            <option value="60">60秒</option>
+                            <option value="120">2分钟</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <!-- Metrics Overview -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>指标监控 (ARMS K8s + APM)</h3>
+                    <div>
+                        <select id="alidata-metric-service" class="select-sm" onchange="loadAliDataMetrics()"
+                            style="margin-right:6px">
+                            <option value="">所有服务</option>
+                        </select>
+                        <button class="btn btn-sm btn-primary" onclick="loadAliDataMetrics()">🔄 刷新指标</button>
+                    </div>
+                </div>
+                <!-- K8s Charts -->
+                <h4 style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">Pod 资源使用趋势</h4>
+                <div class="grid-2col">
+                    <div class="chart-container">
+                        <canvas id="chart-k8s-cpu"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chart-k8s-mem"></canvas>
+                    </div>
+                </div>
+                <!-- APM Charts -->
+                <h4 style="font-size:13px;color:var(--text-secondary);margin:16px 0 8px">服务 APM 趋势</h4>
+                <div class="grid-2col">
+                    <div class="chart-container">
+                        <canvas id="chart-apm-requests"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chart-apm-latency"></canvas>
+                    </div>
+                </div>
+                <!-- Summary Table -->
+                <h4 style="font-size:13px;color:var(--text-secondary);margin:16px 0 8px">服务指标汇总</h4>
+                <table class="data-table" id="alidata-apm-table">
+                    <thead>
+                        <tr>
+                            <th>服务</th>
+                            <th>请求量 (req/30s)</th>
+                            <th>平均延迟 (s)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alidata-apm-body"></tbody>
+                </table>
+                <p class="text-muted" id="alidata-metrics-empty" style="padding:12px;text-align:center">加载中...</p>
+            </div>
+            <!-- Log Query -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>日志查询 (SLS/ARMS)</h3>
+                    <button class="btn btn-sm btn-primary" onclick="loadAliDataLogs()">🔍 查询</button>
+                </div>
+                <div class="filter-row">
+                    <input type="text" id="alidata-log-query" class="input-sm" style="flex:1"
+                        placeholder="关键词搜索 (服务名、Pod名、日志内容)">
+                    <select id="alidata-log-level" class="select-sm">
+                        <option value="">所有级别</option>
+                        <option value="error">Error</option>
+                        <option value="warn">Warn</option>
+                        <option value="info">Info</option>
+                    </select>
+                    <select id="alidata-log-timerange" class="select-sm">
+                        <option value="15m">最近 15 分钟</option>
+                        <option value="1h" selected>最近 1 小时</option>
+                        <option value="6h">最近 6 小时</option>
+                        <option value="24h">最近 24 小时</option>
+                    </select>
+                    <input type="text" id="alidata-log-ns" class="input-sm" placeholder="命名空间 (可选)" style="width:120px">
+                    <input type="number" id="alidata-log-size" class="input-sm" value="200" style="width:60px"
+                        placeholder="条数">
+                </div>
+                <div class="alidata-log-stats" id="alidata-log-stats" style="margin-bottom:8px"></div>
+                <table class="data-table" id="alidata-log-table">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>级别</th>
+                            <th>服务</th>
+                            <th>Pod</th>
+                            <th>消息</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alidata-log-body"></tbody>
+                </table>
+                <p class="text-muted" id="alidata-log-empty" style="padding:20px;text-align:center">输入查询条件后点击查询...</p>
+            </div>
+            <!-- Trace Query -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>链路追踪 (ARMS)</h3>
+                    <button class="btn btn-sm btn-primary" onclick="searchAliDataTraces()">🔍 搜索</button>
+                </div>
+                <div class="filter-row">
+                    <select id="alidata-trace-service" class="select-sm" style="min-width:150px">
+                        <option value="">选择服务</option>
+                    </select>
+                    <select id="alidata-trace-lookback" class="select-sm">
+                        <option value="1h">最近 1 小时</option>
+                        <option value="6h">最近 6 小时</option>
+                        <option value="12h">最近 12 小时</option>
+                        <option value="24h">最近 24 小时</option>
+                    </select>
+                    <input type="number" id="alidata-trace-limit" class="input-sm" value="20" style="width:60px"
+                        placeholder="条数">
+                </div>
+                <div class="filter-row" style="margin-top:8px">
+                    <input type="text" id="alidata-trace-id-input" class="input-sm" style="flex:1"
+                        placeholder="直接输入 Trace ID 查询">
+                    <button class="btn btn-sm" onclick="lookupAliDataTraceById()">查找 Trace</button>
+                </div>
+                <table class="data-table" id="alidata-trace-table">
+                    <thead>
+                        <tr>
+                            <th>Trace ID</th>
+                            <th>Span数</th>
+                            <th>涉及服务</th>
+                            <th>总耗时</th>
+                            <th>错误率</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alidata-trace-body"></tbody>
+                </table>
+                <p class="text-muted" id="alidata-trace-empty" style="padding:20px;text-align:center">选择服务后搜索Trace...
+                </p>
+            </div>
+            <!-- Trace detail panel -->
+            <div class="card" id="alidata-trace-detail-card" style="display:none;">
+                <div class="card-header">
+                    <h3>Trace 详情 (AliData)</h3>
+                    <button class="btn btn-sm"
+                        onclick="document.getElementById('alidata-trace-detail-card').style.display='none'">关闭</button>
+                </div>
+                <div id="alidata-trace-detail-content"></div>
+            </div>
         </section>
     </main>
 
@@ -1128,6 +1336,6 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=28"></script>
+    <script src="/static/js/app.js?v=39"></script>
 </body>
 </html>

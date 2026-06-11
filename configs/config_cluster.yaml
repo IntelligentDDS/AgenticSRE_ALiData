@@ -5,8 +5,8 @@
 
 llm:
   api_key: "${LLM_API_KEY}"
-  base_url: "https://api.deepseek.com"
-  model: "deepseek-v4-pro"
+  base_url: "http://localhost:8000/v1"
+  model: "OpsLLM-7B"
   temperature: 0.1
   max_tokens: 65536
   timeout: 300
@@ -32,6 +32,12 @@ kubernetes:
   target_host: ""
 
 observability:
+  backend: "native"
+  alidata_env_file: ".env"
+  offline_mode: false
+  offline_data_dir: ""
+  offline_problem_id: ""
+  offline_data_type: "auto"
   prometheus_url: "http://10.10.3.146:30290"
   elasticsearch_url: "http://localhost:9200"
   jaeger_url: "http://10.10.3.146:30686"

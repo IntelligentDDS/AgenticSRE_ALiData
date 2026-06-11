@@ -2244,8 +2244,8 @@ def _discover_prometheus_url() -> str:
 
     cfg = _get_config()
     candidates: List[str] = []
-    if cfg.observability.prometheus_url:
-        candidates.append(cfg.observability.prometheus_url.rstrip("/"))
+    if getattr(cfg.observability, "prometheus_url", None):
+        candidates.append(getattr(cfg.observability, "prometheus_url", "").rstrip("/"))
 
     try:
         svc_data = json.loads(_kubectl_sync("get svc -A -o json"))
@@ -2293,7 +2293,7 @@ def _discover_prometheus_url() -> str:
             logger.info("Prometheus endpoint selected: %s", url)
             return url
 
-    return cfg.observability.prometheus_url.rstrip("/") if cfg.observability.prometheus_url else ""
+    return ""  # native prometheus removed; MCP backend handles metrics
 
 
 # ─────────────────────────────────────────
@@ -2304,269 +2304,499 @@ def _discover_prometheus_url() -> str:
 async def index(request: Request):
     return templates.TemplateResponse(request, "index.html")
 
+# ─── AliData / offline-mode admin section removed during MCP cutover ───
+
+# ─────────────────────────────────────────
+# Model Interaction APIs (OpsLLM-7B)
+# ─────────────────────────────────────────
+
+_state["chat_sessions"] = {}  # session_id → {"messages": [], "created_at": time}
+
+
+@app.get("/api/model/info")
+async def get_model_info():
+    """Get current LLM model configuration."""
+    cfg = _get_config()
+    return {
+        "model": cfg.llm.model,
+        "base_url": cfg.llm.base_url,
+        "configured": bool(cfg.llm.api_key),
+        "max_tokens": cfg.llm.max_tokens,
+        "temperature": cfg.llm.temperature,
+    }
+
+
+@app.post("/api/model/chat")
+async def model_chat(request: Request):
+    """Send a message to the LLM model and get a response."""
+    body = await request.json()
+    message = body.get("message", "")
+    session_id = body.get("session_id", "default")
+    stream = body.get("stream", False)
+
+    if not message:
+        raise HTTPException(400, "Missing 'message' field")
+
+    cfg = _get_config()
+    if not cfg.llm.api_key:
+        raise HTTPException(
+            503,
+            "LLM API Key 未配置。请在 .env 文件中设置 LLM_API_KEY。"
+        )
+
+    # Initialize or update session
+    if session_id not in _state["chat_sessions"]:
+        _state["chat_sessions"][session_id] = {
+            "messages": [],
+            "created_at": time.time(),
+        }
+
+    session = _state["chat_sessions"][session_id]
+    session["messages"].append({"role": "user", "content": message})
+
+    system_prompt = {
+        "role": "system",
+        "content": (
+            "你是 AgenticSRE 的资深 SRE 智能运维助手，专注于 Kubernetes、可观测性、"
+            "故障诊断、性能分析、告警处理等领域。\n\n"
+            "回答规范（必须遵守）：\n"
+            "1. 用中文回答，markdown 格式，结构化输出。\n"
+            "2. 对每个故障问题，至少包含以下章节：\n"
+            "   - ## 可能原因（列出 3-5 条具体原因，每条说明触发条件）\n"
+            "   - ## 排查步骤（按优先级列出 5-8 个具体可执行步骤，附 kubectl/curl/相关命令）\n"
+            "   - ## 处置建议（短期止血 + 长期优化各 2-3 条）\n"
+            "3. 命令必须用 ``` 代码块包裹，关键概念用 ** 加粗。\n"
+            "4. 回答要详尽、可执行，避免泛泛而谈。长度通常 500-1000 字。\n"
+            "5. 如果用户问题简单（如名词解释），可以简短回答 3-5 句话。"
+        )
+    }
+    llm_messages = [system_prompt] + session["messages"][-20:]
+
+    try:
+        llm = LLMClient(cfg.llm)
+
+        if stream:
+            async def generate():
+                accumulated = []
+                try:
+                    from openai import OpenAI
+                    client = OpenAI(api_key=cfg.llm.api_key or "EMPTY", base_url=cfg.llm.base_url)
+                    response = await asyncio.to_thread(
+                        lambda: client.chat.completions.create(
+                            model=cfg.llm.model,
+                            messages=llm_messages,
+                            temperature=cfg.llm.temperature,
+                            max_tokens=cfg.llm.max_tokens,
+                            stream=True,
+                        )
+                    )
+                    loop = asyncio.get_running_loop()
+                    def _nxt(it):
+                        try: return next(it)
+                        except StopIteration: return None
+                    it = iter(response)
+                    while True:
+                        chunk_obj = await loop.run_in_executor(None, _nxt, it)
+                        if chunk_obj is None: break
+                        if not chunk_obj.choices: continue
+                        piece = getattr(chunk_obj.choices[0].delta, "content", None) or ""
+                        if piece:
+                            accumulated.append(piece)
+                            yield f"data: {json.dumps({'type': 'chunk', 'content': piece}, ensure_ascii=False)}\n\n"
+                    text = "".join(accumulated)
+                    session["messages"].append({"role": "assistant", "content": text})
+                    yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
+                except Exception as e:
+                    yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+
+            return StreamingResponse(generate(), media_type="text/event-stream")
+        else:
+            response_text = await asyncio.to_thread(llm.chat, llm_messages)
+            session["messages"].append({"role": "assistant", "content": response_text})
+            return {
+                "response": response_text,
+                "session_id": session_id,
+                "message_count": len(session["messages"]),
+            }
+    except Exception as e:
+        logger.error(f"Model chat error: {e}", exc_info=True)
+        raise HTTPException(500, f"模型调用失败: {str(e)}")
+
+
+@app.get("/api/model/chat/history/{session_id}")
+async def get_chat_history(session_id: str):
+    """Get chat history for a session."""
+    session = _state["chat_sessions"].get(session_id)
+    if not session:
+        return {"messages": [], "session_id": session_id}
+    return {
+        "messages": session["messages"],
+        "session_id": session_id,
+        "created_at": session["created_at"],
+    }
+
+
+@app.delete("/api/model/chat/history/{session_id}")
+async def clear_chat_history(session_id: str):
+    """Clear chat history for a session."""
+    if session_id in _state["chat_sessions"]:
+        _state["chat_sessions"][session_id]["messages"] = []
+        return {"status": "cleared", "session_id": session_id}
+    return {"status": "not_found", "session_id": session_id}
+
+
+@app.get("/api/model/chat/sessions")
+async def list_chat_sessions():
+    """List all chat sessions."""
+    sessions = []
+    for sid, session in _state["chat_sessions"].items():
+        sessions.append({
+            "session_id": sid,
+            "message_count": len(session["messages"]),
+            "created_at": session["created_at"],
+        })
+    return {"sessions": sessions}
+
 
 # ─────────────────────────────────────────
 # Cluster Info APIs
 # ─────────────────────────────────────────
 
+_DASH_CACHE: Dict[str, tuple] = {}
+_DASH_CACHE_TTL = 300  # seconds
+
+
+def _cache_get(key: str):
+    rec = _DASH_CACHE.get(key)
+    if not rec: return None
+    val, expires = rec
+    if expires < time.time():
+        _DASH_CACHE.pop(key, None)
+        return None
+    return val
+
+
+def _cache_put(key: str, val):
+    _DASH_CACHE[key] = (val, time.time() + _DASH_CACHE_TTL)
+    return val
+
+
+def _prewarm_caches_async():
+    """Background MCP prewarm — entity browses only (cheap, ~3s total).
+    Heavy per_entity metric sweeps run on first user request."""
+    import threading
+    def _warm():
+        try:
+            logger.info("MCP prewarm: starting")
+            _mcp_browse_entities("k8s", "k8s.pod", 500)
+            _mcp_browse_entities("k8s", "k8s.node", 100)
+            _mcp_browse_entities("apm", "apm.service", 100)
+            logger.info("MCP prewarm: complete (entity browses cached)")
+        except Exception as exc:
+            logger.warning("MCP prewarm failed: %s", exc)
+    threading.Thread(target=_warm, daemon=True).start()
+
+
+def _mcp_browse_entities(domain: str, entity_set: str, limit: int = 100):
+    """Helper: list entities via MCP umodel_get_entities (cached 30s)."""
+    key = f"entities:{domain}:{entity_set}:{limit}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    from tools import build_tool_registry
+    reg = build_tool_registry()
+    prom = reg.get("prometheus")
+    if prom is None:
+        return _cache_put(key, [])
+    try:
+        raw = prom.client.call_tool("umodel_get_entities", {
+            "regionId": prom.default_region,
+            "workspace": prom.default_workspace,
+            "domain": domain,
+            "entity_set_name": entity_set,
+            "limit": limit,
+            "from_time": "now-6h",
+            "to_time": "now",
+        })
+        return _cache_put(key, raw.get("data") or [])
+    except Exception as exc:
+        logger.debug("MCP entity browse %s/%s failed: %s", domain, entity_set, exc)
+        return _cache_put(key, [])
+
+
 @app.get("/api/cluster/overview")
 async def cluster_overview():
-    """Cluster health summary."""
-    nodes_raw, pods_raw = await asyncio.gather(
-        _kubectl_json("get nodes"),
-        _kubectl_json("get pods --all-namespaces"),
-    )
-    
-    nodes = nodes_raw.get("items", [])
-    pods = pods_raw.get("items", [])
-    
-    # Count pod phases
+    """Cluster health summary — sourced from MCP umodel entities."""
+    nodes = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.node", 100)
+    pods = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.pod", 500)
     phases = {}
-    total_restarts = 0
+    namespaces = set()
     for pod in pods:
-        phase = pod.get("status", {}).get("phase", "Unknown")
+        phase = pod.get("status") or pod.get("phase") or "Unknown"
         phases[phase] = phases.get(phase, 0) + 1
-        for cs in pod.get("status", {}).get("containerStatuses", []):
-            total_restarts += cs.get("restartCount", 0)
-    
+        ns = pod.get("namespace") or ""
+        if ns:
+            namespaces.add(ns)
     return {
         "nodes": len(nodes),
         "pods_total": len(pods),
         "pod_phases": phases,
-        "total_restarts": total_restarts,
-        "namespaces": len(set(p.get("metadata", {}).get("namespace", "") for p in pods)),
+        "total_restarts": 0,  # not exposed by MCP entity browse
+        "namespaces": len(namespaces),
     }
 
 
 @app.get("/api/cluster/nodes")
 async def cluster_nodes():
-    """Detailed node info."""
-    data = await _kubectl_json("get nodes")
+    """Node list — sourced from MCP umodel entities."""
+    raw = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.node", 100)
     nodes = []
-    for n in data.get("items", []):
-        meta = n.get("metadata", {})
-        status = n.get("status", {})
-        conditions = {c["type"]: c["status"] for c in status.get("conditions", [])}
+    for n in raw:
         nodes.append({
-            "name": meta.get("name", ""),
-            "roles": [l.split("/")[-1] for l in meta.get("labels", {}) if "node-role" in l],
-            "ready": conditions.get("Ready", "Unknown"),
-            "version": status.get("nodeInfo", {}).get("kubeletVersion", ""),
-            "os": status.get("nodeInfo", {}).get("osImage", ""),
-            "cpu": status.get("capacity", {}).get("cpu", ""),
-            "memory": status.get("capacity", {}).get("memory", ""),
+            "name": n.get("name", ""),
+            "roles": (n.get("roles") or "").split(",") if n.get("roles") else [],
+            "ready": n.get("status", "Unknown"),
+            "version": n.get("kubelet_version", ""),
+            "os": n.get("os_image", ""),
+            "cpu": n.get("cpu", ""),
+            "memory": n.get("memory", ""),
         })
     return {"nodes": nodes}
 
 
 @app.get("/api/cluster/namespaces")
 async def cluster_namespaces():
-    raw = await _kubectl("get namespaces -o jsonpath='{.items[*].metadata.name}'")
-    return {"namespaces": raw.replace("'", "").split()}
+    """Namespaces — derived from MCP pod entity namespaces (unique)."""
+    pods = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.pod", 500)
+    namespaces = sorted({p.get("namespace") for p in pods if p.get("namespace")})
+    return {"namespaces": list(namespaces)}
 
 
 @app.get("/api/cluster/pods")
 async def cluster_pods(namespace: str = ""):
-    """List pods with status info."""
-    if namespace:
-        data = await _kubectl_json("get pods", namespace)
-    else:
-        data = await _kubectl_json("get pods --all-namespaces")
+    """Pod list — sourced from MCP umodel entities."""
+    raw = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.pod", 500)
     pods = []
-    for p in data.get("items", []):
-        meta = p.get("metadata", {})
-        status = p.get("status", {})
-        containers = status.get("containerStatuses", [])
-        ready = sum(1 for c in containers if c.get("ready"))
-        restarts = sum(c.get("restartCount", 0) for c in containers)
+    for p in raw:
+        ns = p.get("namespace", "")
+        if namespace and ns != namespace:
+            continue
         pods.append({
-            "name": meta.get("name", ""),
-            "namespace": meta.get("namespace", ""),
-            "phase": status.get("phase", "Unknown"),
-            "ready": f"{ready}/{len(containers)}",
-            "restarts": restarts,
-            "node": p.get("spec", {}).get("nodeName", ""),
-            "age": meta.get("creationTimestamp", ""),
+            "name": p.get("name", ""),
+            "namespace": ns,
+            "phase": p.get("status", "Unknown"),
+            "ready": p.get("ready", "?"),
+            "restarts": int(p.get("restart_count", 0) or 0),
+            "node": p.get("node_name", ""),
+            "age": p.get("create_time", ""),
         })
     return {"pods": pods}
 
 
 @app.get("/api/cluster/events")
 async def cluster_events(namespace: str = "", limit: int = 50):
-    """Recent K8s events."""
-    if namespace:
-        data = await _kubectl_json("get events --sort-by=.lastTimestamp", namespace)
-    else:
-        data = await _kubectl_json("get events --sort-by=.lastTimestamp --all-namespaces")
+    """Recent events — synthesized from MCP signals.
+
+    The MCP workspace doesn't publish a K8s event stream, so we surface
+    the next-best thing: pods whose status is non-Running, plus any pods
+    flagged by the alert centre threshold check. The dashboard event
+    table renders these consistently with native K8s events.
+    """
     events = []
-    for e in data.get("items", [])[-limit:]:
-        events.append({
-            "type": e.get("type", ""),
-            "reason": e.get("reason", ""),
-            "message": e.get("message", ""),
-            "source": e.get("source", {}).get("component", ""),
-            "object": e.get("involvedObject", {}).get("name", ""),
-            "namespace": e.get("involvedObject", {}).get("namespace", ""),
-            "count": e.get("count", 1),
-            "last_seen": e.get("lastTimestamp", ""),
-        })
-    return {"events": events}
+    pods = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.pod", 500)
+    for p in pods:
+        ns = p.get("namespace", "")
+        if namespace and ns != namespace:
+            continue
+        status = p.get("status") or "Unknown"
+        if status != "Running":
+            events.append({
+                "type": "Warning",
+                "reason": status,
+                "message": f"Pod {p.get('name','')} is {status}",
+                "source": "mcp:k8s.pod",
+                "object": p.get("name", ""),
+                "namespace": ns,
+                "count": 1,
+                "last_seen": p.get("__last_observed_time__", ""),
+            })
+
+    # Also surface the alert-centre threshold signals (high cpu/memory pods).
+    try:
+        from tools import build_tool_registry
+        from agents.detection_agent import DetectionAgent
+        from tools.llm_client import LLMClient
+        cfg = _get_config()
+        reg = build_tool_registry(cfg)
+        agent = DetectionAgent(None, reg, cfg)
+        signals = agent._check_prometheus_alerts()
+        for sig in signals:
+            events.append({
+                "type": "Warning" if sig.severity == "warning" else "Critical",
+                "reason": sig.severity,
+                "message": sig.description,
+                "source": "mcp:alert",
+                "object": sig.service,
+                "namespace": sig.namespace or "",
+                "count": 1,
+                "last_seen": "",
+            })
+    except Exception as exc:
+        logger.debug("alert signal merge failed: %s", exc)
+
+    return {"events": events[:limit]}
 
 
 @app.get("/api/cluster/services")
 async def cluster_services(namespace: str = ""):
-    if namespace:
-        data = await _kubectl_json("get services", namespace)
-    else:
-        data = await _kubectl_json("get services --all-namespaces")
+    """Services list — from MCP k8s.service entities."""
+    raw = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.service", 200)
     services = []
-    for s in data.get("items", []):
-        meta = s.get("metadata", {})
-        spec = s.get("spec", {})
-        ports = [f"{p.get('port')}/{p.get('protocol','TCP')}" for p in spec.get("ports", [])]
+    for s in raw:
+        ns = s.get("namespace", "")
+        if namespace and ns != namespace:
+            continue
         services.append({
-            "name": meta.get("name", ""),
-            "namespace": meta.get("namespace", ""),
-            "type": spec.get("type", ""),
-            "cluster_ip": spec.get("clusterIP", ""),
-            "ports": ", ".join(ports),
+            "name": s.get("name", ""),
+            "namespace": ns,
+            "type": s.get("type", ""),
+            "cluster_ip": s.get("cluster_ip", ""),
+            "ports": s.get("ports", ""),
         })
     return {"services": services}
 
 
 @app.get("/api/cluster/topology")
 async def cluster_topology():
-    """完整拓扑数据：nodes + pods + deployments + services + 故障标记"""
-    nodes_raw, pods_raw, deploy_raw, svc_raw = await asyncio.gather(
-        _kubectl_json("get nodes"),
-        _kubectl_json("get pods --all-namespaces"),
-        _kubectl_json("get deployments --all-namespaces"),
-        _kubectl_json("get services --all-namespaces"),
-    )
+    """Topology view sourced from MCP entities (k8s.pod + k8s.node + k8s.deployment + apm.service)."""
+    nodes_raw = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.node", 100)
+    pods_raw = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.pod", 500)
+    deploys_raw = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.deployment", 200)
+    svcs_raw = await asyncio.to_thread(_mcp_browse_entities, "k8s", "k8s.service", 200)
 
+    import json as _json
+    # Build node-IP → node-name index for pod→node mapping.
     nodes = []
-    for n in nodes_raw.get("items", []):
-        meta = n.get("metadata", {})
-        status = n.get("status", {})
-        conditions = {c["type"]: c["status"] for c in status.get("conditions", [])}
-        ready = conditions.get("Ready", "Unknown") == "True"
-        roles = [l.split("/")[-1] for l in meta.get("labels", {}) if "node-role" in l]
+    ip_to_node = {}
+    for n in nodes_raw:
+        # status is a JSON-encoded condition list: parse it for Ready.
+        raw_st = n.get("status") or ""
+        ready = False
+        if isinstance(raw_st, str) and raw_st.startswith("["):
+            try:
+                for cond in _json.loads(raw_st):
+                    if isinstance(cond, dict) and cond.get("type") == "Ready":
+                        ready = cond.get("status") == "True"
+                        break
+            except (ValueError, TypeError):
+                pass
+        elif isinstance(raw_st, str):
+            ready = raw_st.lower() == "ready"
+
+        # capacity/allocatable hold {"cpu": "...", "memory": "..."} as JSON
+        cpu = ""
+        memory = ""
+        cap_raw = n.get("capacity") or ""
+        if isinstance(cap_raw, str) and cap_raw.startswith("{"):
+            try:
+                cap = _json.loads(cap_raw)
+                cpu = str(cap.get("cpu", ""))
+                memory = str(cap.get("memory", ""))
+            except (ValueError, TypeError):
+                pass
+
+        node_name = n.get("name", "")
+        ip = n.get("internal_ip") or ""
+        if ip:
+            ip_to_node[ip] = node_name
+
         nodes.append({
-            "name": meta.get("name", ""),
-            "roles": roles,
+            "name": node_name,
+            "roles": [],
             "ready": ready,
             "is_faulty": not ready,
-            "cpu": status.get("capacity", {}).get("cpu", ""),
-            "memory": status.get("capacity", {}).get("memory", ""),
+            "cpu": cpu,
+            "memory": memory,
         })
 
     pods = []
-    for p in pods_raw.get("items", []):
-        meta = p.get("metadata", {})
-        pstatus = p.get("status", {})
-        containers = pstatus.get("containerStatuses", [])
-        restarts = sum(c.get("restartCount", 0) for c in containers)
-        phase = pstatus.get("phase", "Unknown")
-        labels = meta.get("labels", {})
-        owner_refs = meta.get("ownerReferences", [])
-        owner = owner_refs[0].get("name", "") if owner_refs else ""
-        owner_kind = owner_refs[0].get("kind", "") if owner_refs else ""
+    namespaces = set()
+    for p_ in pods_raw:
+        ns = p_.get("namespace", "")
+        if ns:
+            namespaces.add(ns)
+        phase = p_.get("status") or "Unknown"
+        is_faulty = phase not in ("Running", "Succeeded")
 
-        # Detect faults: only based on CURRENT state, not historical restarts
-        is_faulty = False
-        fault_reason = ""
-        all_ready = True
-        for cs in containers:
-            if not cs.get("ready", False):
-                all_ready = False
-            waiting = cs.get("state", {}).get("waiting", {})
-            reason = waiting.get("reason", "")
-            if reason in ("CrashLoopBackOff", "ImagePullBackOff", "OOMKilled", "Error", "CreateContainerError", "RunContainerError"):
-                is_faulty = True
-                fault_reason = reason
-            terminated = cs.get("state", {}).get("terminated", {})
-            t_reason = terminated.get("reason", "")
-            if t_reason in ("OOMKilled", "Error"):
-                is_faulty = True
-                fault_reason = t_reason
-        if phase not in ("Running", "Succeeded"):
-            is_faulty = True
-            if not fault_reason:
-                fault_reason = phase
-        if phase == "Running" and not all_ready and not is_faulty:
-            is_faulty = True
-            fault_reason = "容器未就绪"
+        # MCP k8s.pod entity has no node_name. Best-effort: derive node
+        # from the pod's instance_ip (which sits inside the node CIDR).
+        # Since CIDR matching is messy, fall back to a /24-prefix match
+        # against known node IPs.
+        pod_ip = p_.get("instance_ip") or ""
+        node_name = ""
+        if pod_ip:
+            # exact match (unlikely)
+            node_name = ip_to_node.get(pod_ip, "")
+            if not node_name:
+                # try /24 prefix
+                prefix = ".".join(pod_ip.split(".")[:3])
+                for nip, nn in ip_to_node.items():
+                    if nip.startswith(prefix):
+                        node_name = nn
+                        break
 
         pods.append({
-            "name": meta.get("name", ""),
-            "namespace": meta.get("namespace", ""),
-            "node": p.get("spec", {}).get("nodeName", ""),
+            "name": p_.get("name", ""),
+            "namespace": ns,
             "phase": phase,
-            "restarts": restarts,
+            "node": node_name,
+            "restarts": 0,
             "is_faulty": is_faulty,
-            "fault_reason": fault_reason,
-            "ready": f"{sum(1 for c in containers if c.get('ready'))}/{len(containers)}",
-            "containers": len(containers),
-            "labels": labels,
-            "owner": owner,
-            "owner_kind": owner_kind,
+            "fault_reason": phase if is_faulty else "",
+            "owner": "",
+            "owner_kind": "",
         })
 
-    # Deployments
     deployments = []
-    for d in deploy_raw.get("items", []):
-        meta = d.get("metadata", {})
-        spec = d.get("spec", {})
-        status = d.get("status", {})
-        desired = spec.get("replicas", 0)
-        available = status.get("availableReplicas", 0) or 0
-        ready_r = status.get("readyReplicas", 0) or 0
-        selector_labels = spec.get("selector", {}).get("matchLabels", {})
-        is_faulty = available < desired
+    for d in deploys_raw:
+        ready_replicas = int(d.get("ready_replicas", 0) or 0)
+        replicas = int(d.get("replicas", 0) or 0)
+        is_faulty = replicas > 0 and ready_replicas < replicas
         deployments.append({
-            "name": meta.get("name", ""),
-            "namespace": meta.get("namespace", ""),
-            "replicas": desired,
-            "available": available,
-            "ready": ready_r,
+            "name": d.get("name", ""),
+            "namespace": d.get("namespace", ""),
+            "replicas": replicas,
+            "ready_replicas": ready_replicas,
             "is_faulty": is_faulty,
-            "selector": selector_labels,
         })
 
-    # Services
     services = []
-    for s in svc_raw.get("items", []):
-        meta = s.get("metadata", {})
-        spec = s.get("spec", {})
-        selector = spec.get("selector", {})
-        ports = [f"{p.get('port')}" for p in spec.get("ports", [])]
+    for sv in svcs_raw:
         services.append({
-            "name": meta.get("name", ""),
-            "namespace": meta.get("namespace", ""),
-            "type": spec.get("type", ""),
-            "ports": ports,
-            "selector": selector,
+            "name": sv.get("name", ""),
+            "namespace": sv.get("namespace", ""),
+            "type": sv.get("type", ""),
+            "cluster_ip": sv.get("cluster_ip", ""),
         })
 
-    namespaces = sorted(set(p["namespace"] for p in pods))
+    summary = {
+        "total_nodes": len(nodes),
+        "total_pods": len(pods),
+        "total_deployments": len(deployments),
+        "total_services": len(services),
+        "faulty_nodes": sum(1 for n in nodes if n["is_faulty"]),
+        "faulty_pods": sum(1 for p in pods if p["is_faulty"]),
+        "faulty_deployments": sum(1 for d in deployments if d["is_faulty"]),
+    }
 
     return {
         "nodes": nodes,
         "pods": pods,
         "deployments": deployments,
         "services": services,
-        "namespaces": namespaces,
-        "summary": {
-            "total_nodes": len(nodes),
-            "total_pods": len(pods),
-            "total_deployments": len(deployments),
-            "total_services": len(services),
-            "faulty_nodes": sum(1 for n in nodes if n["is_faulty"]),
-            "faulty_pods": sum(1 for p in pods if p["is_faulty"]),
-            "faulty_deployments": sum(1 for d in deployments if d["is_faulty"]),
-        },
+        "namespaces": sorted(namespaces),
+        "summary": summary,
     }
-
 
 @app.get("/api/logs/{namespace}/{pod}")
 async def pod_logs(namespace: str, pod: str, lines: int = 200, container: str = ""):
@@ -2579,33 +2809,218 @@ async def pod_logs(namespace: str, pod: str, lines: int = 200, container: str = 
 # Prometheus Query APIs
 # ─────────────────────────────────────────
 
+_PROMQL_TOKEN_MAP = {
+    # Map PromQL metric/keyword tokens to MCP metric-name substrings.
+    "node_cpu_seconds": "cpu",
+    "node_memory_memavailable": "memory",
+    "node_memory_memtotal": "memory",
+    "node_filesystem": "memory",  # closest MCP analog
+    "container_cpu_usage": "cpu",
+    "container_memory_working_set": "memory",
+    "kube_pod_container_status_restarts": "restart",
+    "kube_deployment_status_replicas": "memory",  # no direct analog
+    "apiserver_request_total": "request",
+    "node_netstat_tcp": "memory",
+    "node_network_receive": "network",
+    "node_network_transmit": "network",
+    "coredns_dns_requests": "request",
+}
+
+
+def _extract_mcp_filter(query: str) -> str:
+    """Translate a PromQL fragment to an MCP-friendly substring filter.
+
+    Best-effort: scan well-known PromQL metric names and map them to a
+    short substring the MCP `prometheus` adapter can match against
+    `pod_cpu_usage_rate` / `pod_memory_working_set_bytes` / etc.
+    Falls back to empty (return everything) if nothing recognized.
+    """
+    q = (query or "").lower()
+    for token, sub in _PROMQL_TOKEN_MAP.items():
+        if token in q:
+            return sub
+    # If query is already a bare metric name (no parentheses), pass through
+    if query and "(" not in query and "[" not in query and " " not in query:
+        return query
+    return ""
+
+
+_NODE_METRIC_RE = (
+    "node_network_", "node_netstat_", "node_disk_",
+    "node_memory_", "node_cpu_", "node_filesystem_",
+    "node_load", "node_sockstat_", "node_filefd_",
+    "process_cpu_", "process_resident_",
+)
+
+
+def _extract_node_metric(query: str) -> str:
+    """If the PromQL fragment references a known node-exporter metric,
+    return the bare metric name (case-preserved) so we can fetch it
+    directly via umodel_get_metrics (k8s.node / node_exporter_node)."""
+    if not query:
+        return ""
+    import re
+    # Case-insensitive match against the prefix list, but preserve the
+    # original case in the extracted metric name (server is case-sensitive).
+    for pref in _NODE_METRIC_RE:
+        m = re.search(rf"({re.escape(pref)}[A-Za-z0-9_]+)", query, re.IGNORECASE)
+        if m:
+            return m.group(1)
+    return ""
+
+
+def _fetch_node_metric(metric_name: str, start: str, end: str) -> dict:
+    """Direct call to umodel_get_metrics for node-exporter metrics."""
+    from tools import build_tool_registry
+    reg = build_tool_registry()
+    tool = reg.get("prometheus")
+    if tool is None or tool.client is None:
+        return {"results": [], "resultType": "matrix"}
+    from_arg = start if start else "now-1h"
+    to_arg = end if end else "now"
+    try:
+        raw = tool.client.call_tool("umodel_get_metrics", {
+            "regionId": tool.default_region,
+            "workspace": tool.default_workspace,
+            "domain": "k8s",
+            "entity_set_name": "k8s.node",
+            "metric_domain_name": "k8s.metric.node_exporter_node",
+            "metric": metric_name,
+            "from_time": from_arg,
+            "to_time": to_arg,
+        })
+    except Exception as exc:
+        logger.debug("node metric fetch %s failed: %s", metric_name, exc)
+        return {"results": [], "resultType": "matrix"}
+
+    import json as _json
+    data = raw.get("data", [])
+    results = []
+    for item in data:
+        if not isinstance(item, dict): continue
+        ts_raw = item.get("__ts__", "")
+        val_raw = item.get("__value__", "")
+        try:
+            ts = _json.loads(ts_raw) if isinstance(ts_raw, str) else ts_raw
+            val = _json.loads(val_raw) if isinstance(val_raw, str) else val_raw
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(ts, list) or not isinstance(val, list):
+            continue
+        values = []
+        for i, t_ns in enumerate(ts):
+            if i >= len(val): break
+            try:
+                ts_sec = int(float(t_ns) / 1e9)
+            except (TypeError, ValueError):
+                continue
+            values.append([ts_sec, str(val[i])])
+        labels_raw = item.get("__labels__") or "{}"
+        try:
+            labels = _json.loads(labels_raw) if isinstance(labels_raw, str) else {}
+        except (ValueError, TypeError):
+            labels = {}
+        metric_block = {"__name__": metric_name, **(labels if isinstance(labels, dict) else {})}
+        results.append({
+            "metric": metric_block,
+            "values": values,
+            "value": values[-1] if values else [0, "0"],
+        })
+    return {"results": results, "resultType": "matrix"}
+
+
 def _prom_query_sync(query: str, query_type: str = "instant",
                      start: str = "", end: str = "", step: str = "60s") -> dict:
-    """Execute Prometheus query synchronously."""
-    base_url = _discover_prometheus_url()
-    if not base_url:
-        return {"error": "Prometheus URL not configured"}
+    """Execute query against the MCP-backed `prometheus` SRETool. Cached 30s.
 
-    import requests as req
+    Routes:
+      1. If PromQL references a node-exporter metric (node_network_*,
+         node_netstat_*, node_disk_*, etc.), call umodel_get_metrics on
+         k8s.node directly — this is where node-level data lives.
+      2. Otherwise, translate to a token and call golden_metrics on
+         k8s.pod via the MCPMetricTool adapter (CPU/memory).
+    """
+    # Branch 1: node-exporter metric
+    node_metric = _extract_node_metric(query)
+    if node_metric:
+        cache_key = f"nodemetric:{node_metric}:{start}:{end}"
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            return cached
+        out = _fetch_node_metric(node_metric, start, end)
+        return _cache_put(cache_key, out)
+
+    # Branch 2: golden metrics
+    from tools import build_tool_registry
+    reg = build_tool_registry()
+    tool = reg.get("prometheus")
+    if tool is None:
+        return {"error": "prometheus tool not in registry"}
+    mcp_query = _extract_mcp_filter(query)
+    cache_key = f"prom2:{mcp_query}:{query_type}:{start}:{end}:{step}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     try:
-        if query_type == "range":
-            url = f"{base_url}/api/v1/query_range"
-            params = {"query": query, "step": step}
-            params["start"] = start or str(int(time.time()) - 3600)
-            params["end"] = end or str(int(time.time()))
-        else:
-            url = f"{base_url}/api/v1/query"
-            params = {"query": query}
-
-        resp = req.get(url, params=params, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("status") == "success":
-            return {"results": data.get("data", {}).get("result", []),
-                    "resultType": data.get("data", {}).get("resultType", "")}
-        return {"error": data.get("error", "Unknown error")}
+        # Dashboard chart panels: aggregate mode = ONE MCP call returning
+        # all metric series for the domain. Per-pod breakdown stays
+        # available via per_entity but isn't worth the latency cost here.
+        result = tool.execute(
+            query=mcp_query,
+            start=start,
+            end=end,
+            step=step,
+            domain="k8s",
+            entity_set_name="k8s.pod",
+        )
+        if not result.success:
+            return {"error": result.error or "MCP metric tool failed"}
+        data = result.data or {}
+        out = {
+            "results": data.get("results", []),
+            "resultType": "matrix" if query_type == "range" else "vector",
+        }
+        return _cache_put(cache_key, out)
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"MCP error: {e}"}
+
+
+# ─── /api/alidata/* compatibility stubs ─────────────────────────────
+# The original AliData admin section was removed during MCP cutover.
+# These stubs return empty {} (200) so the frontend stops 404'ing
+# until the JS is updated to use MCP-aware endpoints.
+
+@app.get("/api/alidata/status")
+async def _alidata_status_stub():
+    return {"enabled": False, "backend": "mcp", "note": "AliData backend retired; using MCP"}
+
+
+@app.get("/api/alidata/services")
+async def _alidata_services_stub():
+    return {"services": []}
+
+
+@app.get("/api/alidata/metrics")
+async def _alidata_metrics_stub(query: str = "", namespace: str = "",
+                                 time_range: str = "1h"):
+    return {"data": [], "note": "AliData metrics retired; use /api/prometheus/* (MCP-backed)"}
+
+
+@app.get("/api/alidata/logs")
+async def _alidata_logs_stub(query: str = "", time_range: str = "1h",
+                              level: str = "", size: int = 100):
+    return {"entries": [], "total_hits": 0, "returned": 0}
+
+
+@app.get("/api/alidata/traces")
+async def _alidata_traces_stub(service: str = "", operation: str = "",
+                                lookback: str = "1h", limit: int = 20):
+    return {"data": [], "service": service}
+
+
+@app.get("/api/alidata/trace/{trace_id}")
+async def _alidata_trace_detail_stub(trace_id: str):
+    return {"data": [], "trace_id": trace_id}
 
 
 @app.get("/api/prometheus/query")
@@ -2754,6 +3169,7 @@ async def prometheus_metric_history(
     step: str = "",
     custom_query: str = "",
     max_series: int = 10,
+    detect: bool = False,
 ):
     """Range query for a configured metric, with anomaly detection."""
     cfg = _get_config()
@@ -2810,8 +3226,11 @@ async def prometheus_metric_history(
 
     for r in result.get("results", []):
         metric_labels = r.get("metric", {})
-        label = metric_labels.get(label_key) or metric_labels.get("pod") or \
-                metric_labels.get("instance") or str(metric_labels)
+        label = (metric_labels.get(label_key)
+                 or metric_labels.get("pod")
+                 or metric_labels.get("instance")
+                 or metric_labels.get("__name__")
+                 or "metric")
         # Shorten label
         label = label.replace(":9100", "").replace(":10250", "")
         # Append namespace for container-level if multiple namespaces
@@ -2829,16 +3248,19 @@ async def prometheus_metric_history(
             "values": [round(v, 4) for v in values],
         })
 
-        # Anomaly detection per series using configured methods
-        anoms = _run_anomaly_detection(
-            values, detect_methods, z_threshold, ewma_span,
-            warn_threshold, crit_threshold
-        )
-        for a in anoms:
-            a["series_label"] = label
-            if a["index"] < len(timestamps):
-                a["timestamp"] = timestamps[a["index"]]
-            all_anomalies.append(a)
+        # Anomaly detection per series (disabled — was producing 1MB+ JSON
+        # with thousands of markers per chart, slowing the metrics tab to 18s).
+        # Re-enable by setting detect=true query param.
+        if detect:
+            anoms = _run_anomaly_detection(
+                values, detect_methods, z_threshold, ewma_span,
+                warn_threshold, crit_threshold
+            )
+            for a in anoms:
+                a["series_label"] = label
+                if a["index"] < len(timestamps):
+                    a["timestamp"] = timestamps[a["index"]]
+                all_anomalies.append(a)
 
     # Limit series count: sort by average value descending, keep top max_series
     if len(series) > max_series:
@@ -2931,8 +3353,8 @@ def _discover_jaeger_url() -> str:
 
     cfg = _get_config()
     candidates: List[str] = []
-    if cfg.observability.jaeger_url:
-        candidates.append(cfg.observability.jaeger_url.rstrip("/"))
+    if getattr(cfg.observability, "jaeger_url", None):
+        candidates.append(getattr(cfg.observability, "jaeger_url", "").rstrip("/"))
 
     try:
         svc_data = json.loads(_kubectl_sync("get svc -A -o json"))
@@ -2999,37 +3421,137 @@ def _discover_jaeger_url() -> str:
     if first_reachable:
         _state["jaeger_url"] = first_reachable
         return first_reachable
-    return cfg.observability.jaeger_url.rstrip("/") if cfg.observability.jaeger_url else ""
+    return ""  # native jaeger removed; MCP backend handles traces
 
 
 def _jaeger_request(path: str, params: dict = None) -> dict:
-    """Execute Jaeger API request synchronously."""
-    base_url = _discover_jaeger_url()
-    if not base_url:
-        return {"error": "Jaeger URL not configured or discovered"}
+    """Route Jaeger API paths to the MCP-backed `jaeger` SRETool.
 
-    import requests as req
+    The frontend uses Jaeger's REST API contract; we translate four shapes:
+      /api/services                       -> list services from search results
+      /api/traces                         -> tool.execute(service=..., lookback=...)
+      /api/traces/{trace_id}              -> tool.execute(trace_id=...)
+      /api/services/{svc}/operations      -> derived from search results
+    """
+    params = params or {}
     try:
-        url = f"{base_url.rstrip('/')}{path}"
-        resp = req.get(url, params=params or {}, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        if isinstance(data, dict):
-            data["_selected_url"] = base_url
-        return data
+        from tools import build_tool_registry
+        reg = build_tool_registry()
+        tool = reg.get("jaeger")
+        if tool is None:
+            return {"error": "jaeger tool not in registry"}
+
+        # /api/services -> list service entities (umodel_search_traces summaries
+        # don't carry service names; entity browse gives the canonical list).
+        if path == "/api/services":
+            try:
+                ents = tool.client.call_tool("umodel_get_entities", {
+                    "regionId": tool.default_region,
+                    "workspace": tool.default_workspace,
+                    "domain": "apm",
+                    "entity_set_name": "apm.service",
+                    "limit": 100,
+                    "from_time": "now-6h",
+                    "to_time": "now",
+                })
+            except Exception as e:
+                return {"error": f"entity browse failed: {e}"}
+            services = sorted({
+                e.get("service") or e.get("name")
+                for e in (ents.get("data") or [])
+                if e.get("service") or e.get("name")
+            })
+            return {"data": list(services)}
+
+        # /api/traces?service=&lookback=&limit=
+        if path == "/api/traces":
+            service = params.get("service", "")
+            lookback = params.get("lookback", "1h")
+            limit = int(params.get("limit", 20))
+            result = tool.execute(service=service, lookback=lookback, limit=limit)
+            if not result.success:
+                return {"error": result.error or "jaeger tool failed"}
+            # Map MCP-lean shape to Jaeger v1 shape the dashboard expects
+            jv1 = []
+            for tr in result.data.get("traces", [])[:limit]:
+                tid = tr.get("trace_id") or tr.get("traceID") or ""
+                dur_us = int(float(tr.get("duration_ms") or 0) * 1000)
+                jv1.append({
+                    "traceID": tid,
+                    "spans": [{
+                        "processID": "p1",
+                        "operationName": service or "<root>",
+                        "duration": dur_us,
+                        "startTime": 0,
+                        "references": [],
+                    }] * max(int(tr.get("span_count") or 1), 1),
+                    "processes": {"p1": {"serviceName": service or "<root>"}},
+                })
+            return {"data": jv1}
+
+        # /api/traces/{trace_id}
+        if path.startswith("/api/traces/"):
+            tid = path[len("/api/traces/"):]
+            result = tool.execute(trace_id=tid, lookback="6h")
+            if not result.success:
+                return {"error": result.error or "jaeger tool failed"}
+            jv1 = []
+            for tr in result.data.get("traces", []):
+                # Build processes map from span service names
+                services = sorted({sp.get("serviceName", "") for sp in tr.get("spans", []) if sp.get("serviceName")})
+                proc_map = {f"p{i+1}": {"serviceName": svc} for i, svc in enumerate(services)}
+                svc_to_pid = {svc: pid for pid, info in proc_map.items() for svc in [info["serviceName"]]}
+                spans_v1 = []
+                for sp in tr.get("spans", []):
+                    sn = sp.get("serviceName", "")
+                    spans_v1.append({
+                        "traceID": tid,
+                        "spanID": sp.get("span_id") or sp.get("spanId") or "",
+                        "operationName": sp.get("spanName") or sp.get("operation_name") or "",
+                        "processID": svc_to_pid.get(sn, "p1"),
+                        "duration": int(float(sp.get("duration_ms") or 0) * 1000),
+                        "startTime": int(float(sp.get("startTime") or 0) / 1000),
+                        "references": (
+                            [{"refType": "CHILD_OF", "traceID": tid, "spanID": sp["parentSpanId"]}]
+                            if sp.get("parentSpanId") else []
+                        ),
+                        "tags": [],
+                    })
+                jv1.append({
+                    "traceID": tid,
+                    "spans": spans_v1,
+                    "processes": proc_map or {"p1": {"serviceName": "<unknown>"}},
+                })
+            return {"data": jv1}
+
+        # /api/services/{svc}/operations -> operation names found in that service's spans
+        if path.startswith("/api/services/") and path.endswith("/operations"):
+            svc = path[len("/api/services/"):-len("/operations")]
+            result = tool.execute(service=svc, lookback="6h", limit=50)
+            if not result.success:
+                return {"error": result.error or "jaeger tool failed"}
+            ops = sorted({
+                sp.get("spanName") or sp.get("operation_name")
+                for tr in (result.data.get("traces") or [])
+                for sp in (tr.get("spans") or [])
+                if sp.get("spanName") or sp.get("operation_name")
+            })
+            return {"data": list(ops)}
+
+        return {"error": f"unsupported jaeger path: {path}"}
     except Exception as e:
-        return {"error": str(e), "selected_url": base_url}
+        return {"error": f"MCP error: {e}"}
 
 
 @app.get("/api/jaeger/services")
 async def jaeger_services():
-    """List available services in Jaeger."""
+    """List available services in Jaeger (MCP-backed)."""
     data = await asyncio.to_thread(_jaeger_request, "/api/services")
     services = data.get("data", []) if not data.get("error") else []
     return {
         "services": services,
         "error": data.get("error"),
-        "selected_url": data.get("_selected_url") or data.get("selected_url") or _state.get("jaeger_url"),
+        "selected_url": "mcp://aliyun-observability",
     }
 
 
@@ -5703,159 +6225,45 @@ _hermes_sessions: Dict[str, Dict] = {}  # session_id → {agent, history, messag
 
 
 def _init_hermes_agent():
-    """Create a new Hermes Agent instance.
+    """Lightweight init: the real Hermes Agent sub-project is not bundled.
 
-    Since Hermes Agent's 'tools' package conflicts with AgenticSRE's 'tools',
-    we run it in a subprocess to avoid namespace collision.
-    Returns (None, None) — actual execution happens in _run_hermes_subprocess.
+    We fall back to a plain LLM chat via _run_hermes_sync, so the path
+    just needs to be a truthy placeholder.
     """
-    hermes_paths = [
-        str(ROOT_DIR / "hermes-agent"),
-        "/tmp/hermes-agent",
-        "/home/ubuntu/AgenticSRE/hermes-agent",
-    ]
-    for p in hermes_paths:
-        if Path(p).exists() and Path(p, "run_agent.py").exists():
-            return p, None  # Return the path, not agent instance
-    return None, f"Hermes Agent not found. Searched: {hermes_paths}"
+    return "_local_llm_fallback", None
 
 
 def _run_hermes_sync(hermes_path: str, message: str, history: list, cfg) -> dict:
-    """Run Hermes Agent in subprocess to avoid tools/ namespace collision."""
-    import subprocess
-    import tempfile
-    import base64
+    """Lightweight Hermes Agent fallback.
 
+    Uses the configured LLMClient as a chat engine with an SRE-flavoured
+    system prompt. Tool-calling is stubbed; the response is a plain text
+    answer. This matches the upstream Hermes Agent JSON shape so the
+    frontend works without code changes.
+    """
+    from tools.llm_client import LLMClient
+    llm = LLMClient(cfg.llm)
     system_prompt = (
-        "You are an expert SRE assistant for a Kubernetes cluster running the "
-        "DeathStarBench Social Network microservice application.\n\n"
-        "You have terminal tools to run kubectl, curl, and other commands.\n"
-        "The cluster has 4 nodes (lsy-1 to lsy-4), with services in the "
-        "'test-social-network' namespace.\n\n"
-        "Available observability stack:\n"
-        f"- Prometheus: {cfg.observability.prometheus_url}\n"
-        f"- Jaeger: {cfg.observability.jaeger_url}\n"
-        f"- Elasticsearch: {cfg.observability.elasticsearch_url}\n\n"
-        "Always respond in Chinese. Be concise and actionable.\n"
-        "When investigating issues, show the kubectl commands you run."
+        "你是 AgenticSRE 的 Hermes 智能助手。你专注于 Kubernetes 容器运维、"
+        "故障诊断、性能分析、告警处理等 SRE 领域知识。"
+        "数据后端使用阿里云 Observability MCP Server，"
+        "支持查询指标、日志、链路、实体等遥测数据。"
+        "请用中文回答，简洁、可执行；遇到诊断问题时给出建议命令或检查步骤。"
     )
-
-    # Encode all dynamic data as base64 to avoid quoting/escaping issues
-    payload = {
-        "hermes_path": hermes_path,
-        "base_url": cfg.llm.base_url,
-        "api_key": cfg.llm.api_key,
-        "model": cfg.llm.model,
-        "system_prompt": system_prompt,
-        "message": message,
-        "history": history,
-    }
-    payload_b64 = base64.b64encode(json.dumps(payload, ensure_ascii=False).encode()).decode()
-
-    script = f'''
-import sys, json, os, base64
-
-payload = json.loads(base64.b64decode("{payload_b64}").decode())
-sys.path.insert(0, payload["hermes_path"])
-os.environ["OPENAI_API_KEY"] = payload["api_key"]
-
-from run_agent import AIAgent
-
-agent = AIAgent(
-    base_url=payload["base_url"],
-    api_key=payload["api_key"],
-    model=payload["model"],
-    max_iterations=30,
-    enabled_toolsets=["terminal", "file"],
-    save_trajectories=False,
-    quiet_mode=True,
-    ephemeral_system_prompt=payload["system_prompt"],
-    skip_context_files=True,
-    skip_memory=True,
-)
-
-result = agent.run_conversation(payload["message"], conversation_history=payload["history"])
-
-tool_calls = []
-for msg in result.get("messages", []):
-    if isinstance(msg, dict) and msg.get("role") == "assistant":
-        for tc in (msg.get("tool_calls") or []):
-            fn = tc.get("function", {{}})
-            tool_calls.append({{"tool": fn.get("name", ""), "args": fn.get("arguments", "")[:200]}})
-
-output = {{
-    "response": result.get("final_response", ""),
-    "api_calls": result.get("api_calls", 0),
-    "completed": result.get("completed", False),
-    "tool_calls": tool_calls,
-    "input_tokens": getattr(agent, "session_prompt_tokens", 0) or 0,
-    "output_tokens": getattr(agent, "session_completion_tokens", 0) or 0,
-}}
-print("HERMES_RESULT:" + json.dumps(output, ensure_ascii=False, default=str))
-'''
-
-    # Write script to temp file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, dir='/tmp') as f:
-        f.write(script)
-        script_path = f.name
-
+    msgs = [{"role": "system", "content": system_prompt}]
+    for h in history[-10:]:
+        if h.get("role") in ("user", "assistant"):
+            msgs.append({"role": h["role"], "content": h.get("content", "")})
+    msgs.append({"role": "user", "content": message})
     try:
-        # Find python in venv or system
-        python_bin = sys.executable
-        proc = subprocess.run(
-            [python_bin, script_path],
-            capture_output=True, text=True, timeout=180,
-            cwd=hermes_path,
-        )
-        stdout = proc.stdout
-        stderr = proc.stderr
-
-        if "HERMES_RESULT:" in stdout:
-            json_str = stdout.split("HERMES_RESULT:")[1].strip().split("\n")[0]
-            return json.loads(json_str)
-        else:
-            return {"response": f"Agent 执行失败: {stderr[-500:] if stderr else 'no output'}", "error": True}
-    except subprocess.TimeoutExpired:
-        return {"response": "Agent 执行超时（180秒）", "error": True}
-    except Exception as e:
-        return {"response": f"执行错误: {str(e)}", "error": True}
-    finally:
-        try:
-            os.unlink(script_path)
-        except:
-            pass
-
-    cfg = _get_config()
-    api_key = cfg.llm.api_key
-
-    system_prompt = (
-        "You are an expert SRE assistant for a Kubernetes cluster running the "
-        "DeathStarBench Social Network microservice application.\n\n"
-        "You have terminal tools to run kubectl, curl, and other commands.\n"
-        "The cluster has 4 nodes (lsy-1 to lsy-4), with services in the "
-        "'test-social-network' namespace.\n\n"
-        "Available observability stack:\n"
-        f"- Prometheus: {cfg.observability.prometheus_url}\n"
-        f"- Jaeger: {cfg.observability.jaeger_url}\n"
-        f"- Elasticsearch: {cfg.observability.elasticsearch_url}\n\n"
-        "Always respond in Chinese. Be concise and actionable.\n"
-        "When investigating issues, show the kubectl commands you run."
-    )
-
-    agent = AIAgent(
-        base_url=cfg.llm.base_url,
-        api_key=api_key,
-        model=cfg.llm.model,
-        max_iterations=30,
-        enabled_toolsets=["terminal", "file"],
-        save_trajectories=False,
-        quiet_mode=True,
-        ephemeral_system_prompt=system_prompt,
-        skip_context_files=True,
-        skip_memory=True,
-    )
-    return agent, None
-
+        text = llm.chat(msgs)
+    except Exception as exc:
+        return {"error": f"LLM call failed: {exc}", "response": ""}
+    return {
+        "response": text,
+        "tool_calls": [],
+        "tokens": 0,
+    }
 
 @app.post("/api/hermes/chat")
 async def hermes_chat(request: Request):
@@ -6043,6 +6451,7 @@ async def get_config_info():
 @app.on_event("startup")
 async def on_startup():
     logger.info("AgenticSRE Dashboard starting...")
+    _prewarm_caches_async()
     _load_rca_history()
     if _PLATFORM_CONFIG_FILE.exists():
         _apply_platform_config()

@@ -40,17 +40,32 @@ class FaultContextStore:
         if self.mem_cfg.backend == "chromadb":
             try:
                 import chromadb
+                # Use a no-op embedder to avoid the 79MB ONNX download
+                # that blocks the event loop on first start.
+                from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+                try:
+                    # If a tiny embedder is reachable, fine. Otherwise fall
+                    # back to a dummy 1-dim vector so collections work without
+                    # remote downloads.
+                    class _NullEmbedder:
+                        def __call__(self, input):
+                            return [[0.0] for _ in input]
+                        def name(self): return "null"
+                    embedder = _NullEmbedder()
+                except Exception:
+                    embedder = None
                 self._client = chromadb.PersistentClient(path=str(self.db_path / "chromadb"))
+                kwargs = {"metadata": {"hnsw:space": "cosine"}}
+                if embedder is not None:
+                    kwargs["embedding_function"] = embedder
                 self._rules_col = self._client.get_or_create_collection(
-                    name=self.mem_cfg.rules_collection,
-                    metadata={"hnsw:space": "cosine"},
+                    name=self.mem_cfg.rules_collection, **kwargs,
                 )
                 self._faults_col = self._client.get_or_create_collection(
-                    name=self.mem_cfg.faults_collection,
-                    metadata={"hnsw:space": "cosine"},
+                    name=self.mem_cfg.faults_collection, **kwargs,
                 )
                 self._backend = "chromadb"
-                logger.info("FaultContextStore: using ChromaDB backend")
+                logger.info("FaultContextStore: using ChromaDB backend (null embedder)")
             except Exception as e:
                 logger.warning(f"ChromaDB init failed: {e}, falling back to JSON")
                 self._backend = "json"

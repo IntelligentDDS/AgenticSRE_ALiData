@@ -95,8 +95,12 @@ Be specific about error messages and their implications. Format as structured an
         es = self.registry.get("elasticsearch")
         if es is None:
             return None
-        # Search for errors first, then general query
+        # Search for errors first
         result = es.execute(query=query, time_range=time_range, namespace=namespace, level="error")
+        # If error-level filter returns nothing, broaden to all levels so the
+        # agent has *something* to analyse (MCP log_set may only contain INFO).
+        if result.success and (not result.data or not result.data.get("entries")):
+            result = es.execute(query=query, time_range=time_range, namespace=namespace)
         if result.success and result.data:
             return result.data
         # Fallback: general search

@@ -1,0 +1,47 @@
+{
+  "error": false,
+  "data": [
+    {
+      "traceId": "b96a6018d5d3c78d95449347b6a6cd05",
+      "duration_ms": "1713.602",
+      "span_count": "4",
+      "error_span_count": "0",
+      "__source__": ""
+    },
+    {
+      "traceId": "547f7c5593434021891514e2e8782a30",
+      "duration_ms": "980.675",
+      "span_count": "4",
+      "error_span_count": "0",
+      "__source__": ""
+    },
+    {
+      "traceId": "fc0bf38b4eebc7c08b7e47ac58a637e9",
+      "duration_ms": "909.141",
+      "span_count": "4",
+      "error_span_count": "0",
+      "__source__": ""
+    },
+    {
+      "traceId": "47244006b568f08bbaaee7400077075f",
+      "duration_ms": "904.051",
+      "span_count": "4",
+      "error_span_count": "0",
+      "__source__": ""
+    },
+    {
+      "traceId": "31f8504f86c91679619941ceb6436ba5",
+      "duration_ms": "895.342",
+      "span_count": "4",
+      "error_span_count": "0",
+      "__source__": ""
+    }
+  ],
+  "query": ".entity_set with(domain='apm', name='apm.service') | entity-call get_trace('apm', 'apm.trace.common')  | extend duration_ms = cast(duration as double) / 1000000, is_error = case when cast(statusCode as varchar) = '2' then 1 else 0 end |  stats span_count = count(1), error_span_count = sum(is_error), duration_ms = max(duration_ms) by traceId | sort duration_ms desc, error_span_count desc | project traceId, duration_ms, span_count, error_span_count | limit 5",
+  "workspace": "rca-benchmark",
+  "time_range": {
+    "from_time": 1780720126,
+    "to_time": 1780723726
+  },
+  "message": "success, returned 5 records"
+}

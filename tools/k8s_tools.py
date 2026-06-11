@@ -1,6 +1,19 @@
 """
 AgenticSRE Kubernetes Tools
 Provides kubectl wrapper and K8s SDK operations with safety controls.
+
+MCP migration audit (2026-06-06):
+  KubectlTool is retained — it's a generic kubectl command runner used for
+  both read (cluster-state inspection: get pods/nodes/svc) and write
+  (remediation: apply/scale/delete). MCP server's umodel_get_entities can
+  cover read-side k8s entity inspection, but kubectl is still the only
+  path for live cluster-state queries and remediation commands. Read/write
+  control stays at the caller via the ``allow_write`` flag.
+
+  K8sResourceTool, K8sHealthTool wrap KubectlTool for higher-level
+  operations and are retained for the same reason.
+
+  No subprocess/kubectl call sites were removed during MCP cutover.
 """
 
 import json

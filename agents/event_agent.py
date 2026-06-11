@@ -82,28 +82,62 @@ Be specific about event types, involved objects, and counts. Format as structure
         }
 
     def _fetch_events(self, namespace: str = "") -> Optional[str]:
-        """Fetch K8s warning events."""
-        kubectl = self.registry.get("kubectl")
-        if kubectl is None:
+        """Synthesize 'events' from MCP k8s.pod entity states (failed/pending pods)."""
+        try:
+            from web_app.app import _mcp_browse_entities
+        except Exception:
             return None
-        cmd = "get events --sort-by='.lastTimestamp' --field-selector type=Warning"
-        if namespace:
-            cmd += f" -n {namespace}"
-        else:
-            cmd += " --all-namespaces"
-        result = kubectl.execute(command=cmd)
-        return result.data if result.success else None
+        pods = _mcp_browse_entities("k8s", "k8s.pod", 500)
+        lines = []
+        for p in pods:
+            ns = p.get("namespace", "")
+            if namespace and ns != namespace:
+                continue
+            status = p.get("status") or "Unknown"
+            if status not in ("Running", "Succeeded"):
+                lines.append(f"Warning {status}\tPod\t{p.get('name','')}\t{ns}\tpod state={status}")
+            if len(lines) >= 50:
+                break
+        return "\n".join(lines) if lines else None
 
     def _fetch_node_status(self) -> Optional[str]:
-        """Fetch node status."""
-        kubectl = self.registry.get("kubectl")
-        if kubectl is None:
+        """Synthesize node summary from MCP k8s.node entities."""
+        try:
+            from web_app.app import _mcp_browse_entities
+        except Exception:
             return None
-        result = kubectl.execute(command="get nodes -o wide")
-        return result.data if result.success else None
+        nodes = _mcp_browse_entities("k8s", "k8s.node", 100)
+        lines = []
+        for n in nodes:
+            lines.append(f"{n.get('name','')}\t{n.get('status','Unknown')}\tcpu={n.get('cpu','')}\tmem={n.get('memory','')}")
+        return "\n".join(lines) if lines else None
 
     def _fetch_problem_pods(self, namespace: str = "") -> List[Dict]:
-        """Find pods in problematic states."""
+        """Find pods in problematic states (MCP-backed)."""
+        try:
+            from web_app.app import _mcp_browse_entities
+        except Exception:
+            return []
+        raw = _mcp_browse_entities("k8s", "k8s.pod", 500)
+        problems = []
+        for p in raw:
+            phase = p.get("status") or "Unknown"
+            name = p.get("name", "")
+            ns = p.get("namespace", "")
+            if namespace and ns != namespace:
+                continue
+            if phase not in ("Running", "Succeeded"):
+                problems.append({
+                    "name": name, "namespace": ns, "phase": phase,
+                    "reason": phase, "restart_count": int(p.get("restart_count", 0) or 0),
+                    "node": p.get("node_name", ""),
+                })
+            if len(problems) >= 20:
+                break
+        return problems
+
+    def _fetch_problem_pods_kubectl_DISABLED(self, namespace: str = "") -> List[Dict]:
+        """OLD kubectl path — kept for reference, never called."""
         k8s_res = self.registry.get("k8s_resources")
         if k8s_res is None:
             return []

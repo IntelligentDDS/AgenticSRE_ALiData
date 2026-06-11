@@ -45,10 +45,18 @@ class KubernetesConfig:
 
 @dataclass
 class ObservabilityConfig:
-    prometheus_url: str = ""
-    elasticsearch_url: str = ""
-    jaeger_url: str = ""
-    grafana_url: str = ""
+    backend: str = "mcp"                              # only "mcp" is supported
+    mcp_endpoint: str = "http://localhost:7980/mcp"
+    mcp_timeout_seconds: float = 60.0
+    mcp_transport_retry: int = 3
+    default_region: str = "cn-hongkong"
+    default_workspace: str = ""
+    default_domain: str = "apm"
+    default_entity_set: str = "apm.service"
+    default_log_set_domain: str = "apm"
+    default_log_set_name: str = ""
+    default_trace_set_domain: str = "apm"
+    default_trace_set_name: str = "apm.trace.common"
 
 
 @dataclass
@@ -318,16 +326,19 @@ def _load_dotenv():
         Path(__file__).parent.parent / ".env",
         Path.cwd() / ".env",
     ]:
-        if candidate.exists():
-            with open(candidate) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, _, value = line.partition('=')
-                        key = key.strip()
-                        value = value.strip().strip('"').strip("'")
-                        if key and key not in os.environ:
-                            os.environ[key] = value
+        if candidate.exists() and candidate.is_file():
+            try:
+                with open(candidate) as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, _, value = line.partition('=')
+                            key = key.strip()
+                            value = value.strip().strip('"').strip("'")
+                            if key and key not in os.environ:
+                                os.environ[key] = value
+            except (OSError, IOError):
+                continue
             break
 
 
